@@ -2,7 +2,7 @@ name: Mesa de Aberturas (valor)
 
 on:
   schedule:
-    - cron: "0 */6 * * *"   # a cada 6h (UTC) — captura + board + deploy
+    - cron: "0 */4 * * *"   # a cada 4h (UTC) — captura + board + deploy
   workflow_dispatch: {}      # botão de rodar manual
 
 concurrency:
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   atualizar:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -20,6 +20,12 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+
+      - name: Cache do navegador (Playwright)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}
 
       - name: Instalar dependências
         run: |
