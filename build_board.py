@@ -36,17 +36,25 @@ MERCADOS = ["Cartões", "Faltas", "Finalizações", "Impedimentos", "Laterais", 
 MERC_SET = set(MERCADOS)
 MODELO = {"Cartões": "cartoes", "Faltas": "faltas", "Finalizações": "finalizacoes"}
 # limiares do flag de valor (secundário)
-EV_MIN, EDGE_MIN, MARGIN_CAP, P_LO, P_HI = 0.05, 0.04, 0.12, 0.08, 0.92
+EV_MIN, EDGE_MIN, MARGIN_CAP, P_LO, P_HI = 0.05, 0.04, 0.12, 0.15, 0.85  # P∈[15,85]% = região calibrada (evita artefato longe do μ)
 FUZZ_MIN = 88
 
 # ---- normalização de nome de time / liga (igual ao build_value_bets) ----
 STOP = {"fc", "cf", "ec", "sc", "ca", "ac", "afc", "club", "clube", "futebol"}
 STATE = re.compile(r"[- ]?(pr|sp|rj|mg|rs|go|ce|pe|ba|mt|ms|pa|to|al|se|rn|pb|pi|ap|ac|ro|rr|df)$")
+# apelidos → forma canônica (as casas grafam o mesmo time de jeitos diferentes; evita jogo duplicado)
+ALIASES = {
+    "sport": "sport recife",
+    "bragantino": "red bull bragantino", "rb bragantino": "red bull bragantino",
+    "vasco": "vasco da gama", "athletico": "athletico paranaense",
+    "gremio novorizontino": "novorizontino", "operario": "operario ferroviario",
+}
 def norm_team(name):
     s = unidecode((name or "").lower()).strip()
     s = STATE.sub("", s); s = re.sub(r"[^a-z0-9 ]", " ", s)
     toks = [t for t in s.split() if t not in STOP]
-    return " ".join(toks) or s.strip()
+    key = " ".join(toks) or s.strip()
+    return ALIASES.get(key, key)
 def _n(s): return unidecode((s or "").lower())
 LEAGUE_RULES = [
     (lambda l: "brasileir" in l and ("serie b" in l or "série b" in l or "- b" in l), ("B", "BR-B", None)),
