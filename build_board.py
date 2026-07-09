@@ -38,6 +38,12 @@ MODELO = {"Cartões": "cartoes", "Faltas": "faltas", "Finalizações": "finaliza
 # limiares do flag de valor (secundário)
 EV_MIN, EDGE_MIN, MARGIN_CAP, P_LO, P_HI = 0.05, 0.04, 0.12, 0.15, 0.85  # P∈[15,85]% = região calibrada (evita artefato longe do μ)
 FUZZ_MIN = 88
+# dedup de confronto entre casas (mesmo jogo grafado diferente por cada casa)
+GROUP_FUZZ_TIME = 75   # mesmo horário exato + semelhança de nomes ≥ isto → mesmo confronto
+GROUP_FUZZ_NAME = 88   # mesmo dia + semelhança de nomes ≥ isto → mesmo confronto (horário pode divergir)
+def _gscore(ah, aa, bh, ba):
+    # semelhança do confronto; aceita ordem trocada (mercados totais são simétricos)
+    return max(min(ratio(ah, bh), ratio(aa, ba)), min(ratio(ah, ba), ratio(aa, bh)))
 
 # ---- normalização de nome de time / liga (igual ao build_value_bets) ----
 STOP = {"fc", "cf", "ec", "sc", "ca", "ac", "afc", "club", "clube", "futebol"}
@@ -188,19 +194,28 @@ def main():
                      + load_normalized("7k", "7k_latest.json") \
                      + load_normalized("EstrelaBet", "estrelabet_latest.json")
     casas_ativas = sorted(set(e["casa"] for e in eventos))
-    # agrupa por jogo (nome normalizado + dia) — multi-casa
-    jogos = {}
+    # agrupa por jogo entre casas — dedup FUZZY (cada casa grafa o mesmo confronto diferente):
+    # (A) mesmo horário exato + nomes ≥ GROUP_FUZZ_TIME, ou (B) mesmo dia + nomes ≥ GROUP_FUZZ_NAME
+    jogos = []
     for e in eventos:
         parts = [p.strip() for p in (e.get("name") or "").split(" - ")]
         dt = parse_start(e.get("start"))
         day = dt.strftime("%Y-%m-%d") if dt else "?"
-        gkey = (norm_team(parts[0]) if len(parts) == 2 else e["name"], norm_team(parts[1]) if len(parts) == 2 else "", day)
-        j = jogos.get(gkey)
-        if not j:
-            j = {"jogo": e["name"], "liga": e["league"],
-                 "inicio": dt.strftime("%d/%m %H:%M") if dt else "?",
-                 "casas": set(), "mercados": {}, "valor": [], "_parts": parts, "_league": e["league"]}
-            jogos[gkey] = j
+        ini = dt.strftime("%d/%m %H:%M") if dt else "?"
+        hn = norm_team(parts[0]) if len(parts) == 2 else norm_team(e["name"])
+        an = norm_team(parts[1]) if len(parts) == 2 else ""
+        j = None
+        if len(parts) == 2:
+            for jj in jogos:
+                if jj["_day"] != day: continue
+                s = _gscore(hn, an, jj["_hn"], jj["_an"])
+                if (jj["_ini"] == ini and s >= GROUP_FUZZ_TIME) or s >= GROUP_FUZZ_NAME:
+                    j = jj; break
+        if j is None:
+            j = {"jogo": e["name"], "liga": e["league"], "inicio": ini,
+                 "casas": set(), "mercados": {}, "valor": [], "_parts": parts, "_league": e["league"],
+                 "_hn": hn, "_an": an, "_day": day, "_ini": ini}
+            jogos.append(j)
         for canon, linhas in e["mercados"].items():
             if canon not in MERC_SET: continue          # só os 6 mercados de interesse
             j["mercados"].setdefault(canon, {})[e["casa"]] = linhas
@@ -208,8 +223,9 @@ def main():
 
     # flag de VALOR (secundário) onde há modelo
     n_valor = 0
-    for j in jogos.values():
+    for j in jogos:
         parts = j.pop("_parts"); league = j.pop("_league")
+        for _k in ("_hn", "_an", "_day", "_ini"): j.pop(_k, None)   # limpa campos internos do dedup
         codes = classify_league(league)
         if codes and len(parts) == 2:
             for canon, model in MODELO.items():
@@ -239,7 +255,7 @@ def main():
         j["n_mercados"] = len(j["mercados"])
         j["tem_valor"] = len(j["valor"]) > 0
 
-    lista = sorted([j for j in jogos.values() if j["mercados"]], key=lambda j: (not j["tem_valor"], j["inicio"]))
+    lista = sorted([j for j in jogos if j["mercados"]], key=lambda j: (not j["tem_valor"], j["inicio"]))
     out = {"gerado": datetime.now(BRT).strftime("%Y-%m-%d %H:%M"), "casas": casas_ativas,
            "mercados": MERCADOS, "fonte": src, "jogos": lista}
     outdir = ROOT / "valor" / "data"; outdir.mkdir(parents=True, exist_ok=True)
