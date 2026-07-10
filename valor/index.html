@@ -37,7 +37,12 @@ h1 .rd{color:var(--purple)}
 .houses{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
 .house{font:700 9.5px var(--disp);letter-spacing:.4px;background:var(--ink);color:#fff;padding:2px 8px;border-radius:6px;text-transform:uppercase}
 .val-strip{background:var(--green-soft);border:1px solid #cdeede;border-radius:10px;padding:8px 10px;margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
-.val-item{font:600 11px var(--sans);color:var(--green);background:#fff;border:1px solid #cdeede;border-radius:7px;padding:3px 9px}
+.val-item{font:600 11px var(--sans);color:var(--green);background:#fff;border:1px solid #cdeede;border-radius:7px;padding:3px 9px;cursor:pointer;transition:all .12s}
+.val-item:hover{background:var(--green-soft);border-color:var(--green)}
+.val-item:focus-visible,.chip:focus-visible,.mkt-h:focus-visible{outline:2px solid var(--purple);outline-offset:2px}
+.chip.ord.on{border-color:var(--gold);color:#7a5a12;background:var(--gold-soft)}
+.fresh{color:var(--faint)} .fresh.stale{color:var(--red);font-weight:600}
+.mkt-h{cursor:pointer}
 .val-item .ev{font-family:var(--mono);color:var(--gold)}
 .mkts{margin-top:10px;display:flex;flex-direction:column;gap:6px}
 .mkt{border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -60,12 +65,19 @@ h1 .rd{color:var(--purple)}
 .empty{text-align:center;padding:48px 20px;color:var(--dim)}
 .empty .big{font-size:38px;margin-bottom:12px}
 .foot{text-align:center;font-size:10.5px;color:var(--faint);margin:18px 0 6px}
+.capbar{border-radius:10px;padding:8px 12px;font:600 11.5px var(--sans);margin-bottom:10px;border:1px solid var(--line)}
+.capbar.cap-green{background:var(--green-soft);border-color:#cdeede;color:var(--green)}
+.capbar.cap-yellow{background:var(--gold-soft);border-color:#f0e2bd;color:#7a5a12}
+.capbar.cap-red{background:#fdeeee;border-color:#f2c9c9;color:var(--red)}
+.capbar .cap-ok{color:var(--green)} .capbar .cap-fail{color:var(--red)}
+.capbar .cap-note{font-weight:500;font-size:11px;margin-top:4px;opacity:.85}
 </style>
 </head><body>
 <div class="wrap">
   <div class="hdr"><div class="mark">R</div><div><h1>Mesa de <span class="rd">Aberturas</span></h1><div class="tag">Rei do Under · odds ao vivo</div></div></div>
   <div class="sub">Jogos com mercados de <b>Cartões · Faltas · Finalizações · Impedimentos · Laterais · Tiros de meta</b> abertos nas casas, com as linhas disponíveis. Onde temos modelo, marcamos <b style="color:var(--green)">valor</b> — mas o foco é saber <b>o que dá pra analisar</b>.</div>
   <div class="disc">Toque num mercado pra ver a escada de linhas (Mais/Menos) por casa. Odds capturadas num instante — <b>podem ter movido</b>. 🎯 = linha com valor (+EV) pelo nosso modelo.</div>
+  <div id="capstatus" class="capbar" style="display:none"></div>
   <div class="bar" id="filtros"></div>
   <div class="meta" id="meta"></div>
   <div id="lista"></div>

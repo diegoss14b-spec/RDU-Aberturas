@@ -218,6 +218,11 @@ def main():
             jogos.append(j)
         for canon, linhas in e["mercados"].items():
             if canon not in MERC_SET: continue          # só os 6 mercados de interesse
+            linhas = [l for l in linhas                 # sanity: odds/linha válidas (brief P0 §2.7)
+                      if isinstance(l.get("linha"), (int, float))
+                      and l.get("over") and l.get("under")
+                      and 1.01 < l["over"] <= 50 and 1.01 < l["under"] <= 50]
+            if not linhas: continue
             j["mercados"].setdefault(canon, {})[e["casa"]] = linhas
         if j["mercados"]: j["casas"].add(e["casa"])
 
@@ -258,6 +263,20 @@ def main():
     lista = sorted([j for j in jogos if j["mercados"]], key=lambda j: (not j["tem_valor"], j["inicio"]))
     out = {"gerado": datetime.now(BRT).strftime("%Y-%m-%d %H:%M"), "casas": casas_ativas,
            "mercados": MERCADOS, "fonte": src, "jogos": lista}
+    # transparência da captura (brief P0 §2.4): quem entrou e quem falhou nesta rodada
+    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k"}
+    _stdir = ROOT / "data" / "odds" / "_status"
+    if _stdir.exists():
+        cap = {"casas_ok": [], "casas_fail": []}
+        for _c, _nome in _disp.items():
+            _f = _stdir / f"{_c}.json"
+            if not _f.exists(): continue
+            try: _st = json.loads(_f.read_text(encoding="utf-8"))
+            except Exception: continue
+            if _st.get("ok"): cap["casas_ok"].append(_nome)
+            else: cap["casas_fail"].append({"casa": _nome, "error": (_st.get("error") or "?")[:120]})
+        if cap["casas_ok"] or cap["casas_fail"]:
+            out["capture"] = cap
     outdir = ROOT / "valor" / "data"; outdir.mkdir(parents=True, exist_ok=True)
     (outdir / "board.js").write_text("window.BOARD=" + json.dumps(out, ensure_ascii=False) + ";", encoding="utf-8")
     print(f"casas={casas_ativas} · jogos com mercado={len(lista)} · com valor={sum(1 for j in lista if j['tem_valor'])} · flags de valor={n_valor}")

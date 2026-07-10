@@ -119,6 +119,16 @@ def main():
         if n_out % 15 == 0: write_latest(n_out)
     f.close(); write_latest(n_out)
     print(f"[estrelabet] {n_det} detalhes · {n_out} jogos com mercado de estatística salvos em {out_path.name}")
+    return n_out
 
 if __name__ == "__main__":
-    main()
+    import time as _t; _t0 = _t.time()
+    from capture_common import finish
+    try:
+        _n = main() or 0
+        sys.exit(finish("estrelabet", _n, 8, t0=_t0))
+    except SystemExit:
+        raise
+    except BaseException as _e:
+        finish("estrelabet", 0, 8, error=_e, t0=_t0)
+        sys.exit(1)

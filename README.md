@@ -34,3 +34,32 @@ Não usa a Sofa nem nada pesado — os dados dos modelos vêm num pacote pequeno
 - Nada no dia a dia. As tarefas locais do valor (RDUOdds*) podem ser desligadas — a nuvem assume.
 - Quando os modelos recalibrarem no PC, o Claude roda `export_pricer_data.py` e você reenvia
   o `data/pricer_data.json` atualizado (um commit). É raro.
+
+---
+
+## Operação v2 (10/07/2026) — captura confiável + banco de odds
+
+**Pipeline do workflow (4/4h):** `run_capture.py` (4 casas, timeout próprio, sem falha silenciosa)
+→ `history_ingest/close/settle` (banco de odds, roda SEMPRE) → `build_board.py` → `gate_board.py`
+(bloqueia deploy que piora o site) → `deploy.py` → commit dos snapshots/histórico no repo.
+
+**Geo-block (descoberta 10/07):** betano.bet.br e 7k.bet.br bloqueiam IP estrangeiro (US/DE=403,
+BR=200). Runners do GitHub são US/EU → os fetchers usam proxy Decodo saída-BR via secrets
+`DECODO_USER` / `DECODO_PASS` (Settings → Secrets and variables → Actions).
+
+**Status da captura:** `data/odds/_status/{casa}.json` + `summary.json`. Exit codes honestos:
+0=ok · 2=soft-fail · 3=captura insuficiente (bloqueia deploy). O site mostra o banner
+"Casas nesta rodada: X ✓ · Y ✗" (BOARD.capture).
+
+**Banco de odds (`data/odds_history/`):**
+- `ticks/{dia}.jsonl` — cada mudança de odd (abertura + movimentos)
+- `keys/{mês}.json` — por mercado-linha-lado: open/close/min/max/n_moves/result/won/clv_pct
+- `clv/{mês}.jsonl` — registros liquidados (CLV% + green/red)
+- `results/results_auto.json` — resultados; gerado NO PC por `export_results_for_valor.py`
+  (matches.json + TEAMS_DATA/seleções do RDUStats) e commitado aqui.
+
+**CLV:** `clv_pct = (open/close − 1) × 100` (>0 = abertura bateu o fechamento). Com 4/4h o
+close é aproximado (última odd até ~4h antes do jogo) — granularidade maior é upgrade futuro.
+
+**Inspecionar 1 jogo:** procurar a key em `data/odds_history/keys/{mês}.json`
+(ex: `superbet|2026-07-10|sport recife|botafogo sp|Cartões|5.5|over`).

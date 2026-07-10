@@ -22,6 +22,8 @@ try:
     import ctypes; ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)
 except Exception: pass
 import requests
+from capture_common import br_proxies, playwright_proxy
+PROX = br_proxies()   # nuvem: proxy BR (geo-block bet.br); local: None
 
 ROOT = Path(__file__).resolve().parent
 OUTDIR = ROOT / "data" / "odds"; OUTDIR.mkdir(parents=True, exist_ok=True)
@@ -43,7 +45,7 @@ def canon(nm):
 
 def get_host():
     try:
-        r = requests.get("https://7k.bet.br/api/sports/anonymous-launch",
+        r = requests.get("https://7k.bet.br/api/sports/anonymous-launch", proxies=PROX,
                          headers={"User-Agent": UA}, timeout=20)
         m = re.search(r"https://([a-z0-9-]+\.fssb\.io)", r.json().get("url", ""))
         if m: return "https://" + m.group(1)
@@ -55,7 +57,7 @@ def get_jwts(host):
     from playwright.sync_api import sync_playwright
     grabbed = {}
     with sync_playwright() as pw:
-        b = pw.chromium.launch(headless=True)
+        b = pw.chromium.launch(headless=True, proxy=playwright_proxy()) if playwright_proxy() else pw.chromium.launch(headless=True)
         ctx = b.new_context(user_agent=UA, locale="pt-BR")
         page = ctx.new_page()
         def on_req(r):
@@ -85,7 +87,7 @@ def main():
 
     def gj(path):
         try:
-            r = requests.get(host + path, headers=hdr, timeout=25)
+            r = requests.get(host + path, headers=hdr, timeout=25, proxies=PROX)
             if r.status_code == 200 and r.text[:1] in "[{": return r.json()
         except Exception: pass
         return None
@@ -144,6 +146,16 @@ def main():
         if n_out % 10 == 0: write_latest(n_out)
     f.close(); write_latest(n_out)
     print(f"[7k] {n_out} jogos com mercado de estatística salvos em {out_path.name}")
+    return n_out
 
 if __name__ == "__main__":
-    main()
+    import time as _t; _t0 = _t.time()
+    from capture_common import finish
+    try:
+        _n = main() or 0
+        sys.exit(finish("7k", _n, 8, t0=_t0))
+    except SystemExit:
+        raise
+    except BaseException as _e:
+        finish("7k", 0, 8, error=_e, t0=_t0)
+        sys.exit(1)

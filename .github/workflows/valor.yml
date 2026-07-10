@@ -2,8 +2,11 @@ name: Mesa de Aberturas (valor)
 
 on:
   schedule:
-    - cron: "0 */4 * * *"   # a cada 4h (UTC) — captura + board + deploy
+    - cron: "0 */4 * * *"   # a cada 4h (UTC) — captura + board + gate + deploy + histórico
   workflow_dispatch: {}      # botão de rodar manual
+
+permissions:
+  contents: write            # commit dos snapshots/histórico de odds no próprio repo
 
 concurrency:
   group: valor
@@ -12,7 +15,7 @@ concurrency:
 jobs:
   atualizar:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -33,17 +36,57 @@ jobs:
           pip install -r requirements.txt
           python -m playwright install --with-deps chromium
 
-      - name: Capturar odds (4 casas)
+      # Orquestrador: roda as 4 casas com timeout próprio, grava _status/summary.json.
+      # Betano e 7k geo-bloqueiam IP estrangeiro → proxy BR via secrets DECODO_USER/PASS.
+      # Exit 3 = captura insuficiente (job fica vermelho DE PROPÓSITO — falha barulhenta).
+      - name: Capturar odds (orquestrado, sem falha silenciosa)
+        id: capture
+        continue-on-error: true
+        env:
+          DECODO_USER: ${{ secrets.DECODO_USER }}
+          DECODO_PASS: ${{ secrets.DECODO_PASS }}
+        run: python run_capture.py
+
+      # Histórico de odds SEMPRE (mesmo com captura parcial — o que entrou vira tick)
+      - name: Banco de odds (ticks + open/close + CLV)
+        if: always()
+        continue-on-error: true
         run: |
-          python fetch_odds_betano.py || true
-          python fetch_odds_superbet.py || true
-          python fetch_odds_7k.py || true
-          python fetch_odds_estrelabet.py || true
+          python history_ingest.py
+          python history_close.py
+          python history_settle.py
 
       - name: Montar o board
+        if: steps.capture.outcome == 'success'
         run: python build_board.py
 
+      # Gate: compara com o board AO VIVO; bloqueia deploy que PIORA o site
+      - name: Gate de qualidade
+        id: gate
+        if: steps.capture.outcome == 'success'
+        continue-on-error: true
+        run: python gate_board.py
+
       - name: Publicar no Netlify
+        if: steps.capture.outcome == 'success' && steps.gate.outcome == 'success'
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
         run: python deploy.py
+
+      # Persistência: snapshots leves + histórico no próprio repo (dataset nosso, versionado)
+      - name: Commit snapshots + histórico
+        if: always()
+        run: |
+          git config user.name "valor-bot"
+          git config user.email "actions@github.com"
+          git add -A data/odds/_status data/odds/*_latest.json data/odds_history || true
+          git diff --cached --quiet || git commit -m "odds: snapshot $(date -u +%Y%m%d_%H%M) [skip ci]"
+          git pull --rebase origin main || true
+          git push || echo "push falhou (sem mudanças ou conflito)"
+
+      # Job falha se a captura foi insuficiente (visibilidade no Actions)
+      - name: Veredito
+        if: steps.capture.outcome != 'success'
+        run: |
+          echo "::error::Captura insuficiente — deploy bloqueado, site antigo permanece no ar (ver data/odds/_status/summary.json)"
+          exit 1

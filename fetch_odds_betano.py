@@ -25,6 +25,9 @@ H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 BASE = "https://www.betano.bet.br"
 TABS = {"1": "gols", "4": "escanteios", "5": "cartoes", "6": "estatisticas"}
 MAX_EVENTS = 60
+MIN_EVENTS = 15                     # menos que isso = captura ruim (exit 2)
+from capture_common import br_proxies, finish
+PROX = br_proxies()                 # nuvem: proxy BR (geo-block); local: None/direto
 
 def log(m):
     line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] {m}"
@@ -36,7 +39,7 @@ def log(m):
 def get(url, tries=3):
     for a in range(tries):
         try:
-            r = creq.get(url, headers=H, impersonate="chrome124", timeout=18)
+            r = creq.get(url, headers=H, impersonate="chrome124", timeout=18, proxies=PROX)
             if r.status_code == 200 and "json" in (r.headers.get("content-type") or ""):
                 return r.json()
             time.sleep(2 * (a + 1))
@@ -109,6 +112,15 @@ def main():
     (OUT / "betano_latest.json").write_text(json.dumps({"file": fp.name, "n": n_ok, "at": stamp},
                                                        ensure_ascii=False), encoding="utf-8")
     log(f"✅ {n_ok} eventos capturados → {fp.name}")
+    return n_ok
 
 if __name__ == "__main__":
-    main()
+    import time as _t; _t0 = _t.time()
+    try:
+        _n = main() or 0
+        sys.exit(finish("betano", _n, MIN_EVENTS, t0=_t0))
+    except SystemExit:
+        raise
+    except BaseException as _e:
+        finish("betano", 0, MIN_EVENTS, error=_e, t0=_t0)
+        sys.exit(1)
