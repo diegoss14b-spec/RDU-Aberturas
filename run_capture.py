@@ -15,7 +15,7 @@ STATUS = ROOT / "data" / "odds" / "_status"
 BRT = timezone(timedelta(hours=-3))
 
 FETCHERS = [  # (casa, script, timeout_s)
-    ("betano",     "fetch_odds_betano.py",     8 * 60),
+    ("betano",     "fetch_odds_betano.py",    13 * 60),
     ("superbet",   "fetch_odds_superbet.py",   8 * 60),
     ("estrelabet", "fetch_odds_estrelabet.py", 6 * 60),
     ("7k",         "fetch_odds_7k.py",        12 * 60),

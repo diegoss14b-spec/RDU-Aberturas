@@ -100,13 +100,13 @@ def main():
                 x = extract_1x2(mks)
                 if x: rec["markets"]["1x2"] = x
                 rec["markets"]["principais_ou"] = extract_ou(mks)
-            time.sleep(1.0)
+            time.sleep(0.45)
             for bt, label in TABS.items():
                 d = get(f"{BASE}/api{ev['url']}?bt={bt}")
                 if d:
                     mks = ((d.get("data") or {}).get("event") or {}).get("markets") or []
                     rec["markets"][label] = extract_ou(mks)
-                time.sleep(1.0)
+                time.sleep(0.45)
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             n_ok += 1
     (OUT / "betano_latest.json").write_text(json.dumps({"file": fp.name, "n": n_ok, "at": stamp},
