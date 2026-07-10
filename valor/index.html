@@ -71,18 +71,69 @@ h1 .rd{color:var(--purple)}
 .capbar.cap-red{background:#fdeeee;border-color:#f2c9c9;color:var(--red)}
 .capbar .cap-ok{color:var(--green)} .capbar .cap-fail{color:var(--red)}
 .capbar .cap-note{font-weight:500;font-size:11px;margin-top:4px;opacity:.85}
+.capbar .cap-note b{font-weight:700}
+/* --- Histórico & CLV --- */
+.hist-nav{margin-top:11px}
+.chip .ct2{font:700 9.5px var(--mono);opacity:.6;margin-left:4px}
+.stat-row{display:flex;gap:8px;flex-wrap:wrap;margin:2px 0 12px}
+.stat{flex:1;min-width:118px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.stat .k{font:600 9.5px var(--sans);color:var(--faint);text-transform:uppercase;letter-spacing:.5px}
+.stat .v{font:700 22px var(--mono);margin-top:3px;line-height:1}
+.stat .v.pos{color:var(--green)} .stat .v.neg{color:var(--red)} .stat .v.wait{color:var(--faint);font-size:16px}
+.stat .s{font:500 10.5px var(--mono);color:var(--dim);margin-top:4px;line-height:1.35}
+.bars{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.barc{flex:1;min-width:200px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px}
+.barc .lab{font:600 10.5px var(--sans);color:var(--dim);margin-bottom:6px}
+.barc .fill{height:8px;border-radius:5px;background:var(--green);min-width:2px} .barc.no .fill{background:var(--red)}
+.hist-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:2px}
+.hist-tbl{min-width:560px}
+.hist-tbl td,.hist-tbl th{padding:6px 7px}
+.hist-tbl td.jg{text-align:left;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:600 11px var(--sans);color:var(--ink)}
+.hist-tbl th.jg{text-align:left}
+.lad tr.sm td{color:var(--faint);opacity:.72}
+.pm{font:600 8.5px var(--mono);color:var(--faint)}
+.hist-mv.up{color:var(--green);font-weight:700} .hist-mv.dn{color:var(--red);font-weight:700} .hist-mv.flat{color:var(--faint)}
+[hidden]{display:none!important}
 </style>
 </head><body>
 <div class="wrap">
   <div class="hdr"><div class="mark">R</div><div><h1>Mesa de <span class="rd">Aberturas</span></h1><div class="tag">Rei do Under · odds ao vivo</div></div></div>
+  <div class="bar hist-nav" id="viewsel">
+    <span class="chip on" data-view="board" role="button" tabindex="0">Mesa de Aberturas</span>
+    <span class="chip" data-view="hist" role="button" tabindex="0">Histórico &amp; CLV</span>
+  </div>
+  <div id="view-board">
   <div class="sub">Jogos com mercados de <b>Cartões · Faltas · Finalizações · Impedimentos · Laterais · Tiros de meta</b> abertos nas casas, com as linhas disponíveis. Onde temos modelo, marcamos <b style="color:var(--green)">valor</b> — mas o foco é saber <b>o que dá pra analisar</b>.</div>
   <div class="disc">Toque num mercado pra ver a escada de linhas (Mais/Menos) por casa. Odds capturadas num instante — <b>podem ter movido</b>. 🎯 = linha com valor (+EV) pelo nosso modelo.</div>
   <div id="capstatus" class="capbar" style="display:none"></div>
   <div class="bar" id="filtros"></div>
   <div class="meta" id="meta"></div>
   <div id="lista"></div>
+  </div><!-- /view-board -->
+  <div id="view-hist" hidden><div id="hist-root"></div></div>
   <div class="foot">Rei do Under · Mesa de Aberturas</div>
 </div>
 <script src="data/board.js"></script>
+<script src="data/history.js"></script>
 <script src="js/board.js"></script>
+<script src="js/history.js"></script>
+<script>
+  // seletor de view: alterna Mesa de Aberturas / Histórico & CLV
+  (function () {
+    var sel = document.getElementById("viewsel");
+    if (!sel) return;
+    var vb = document.getElementById("view-board"), vh = document.getElementById("view-hist");
+    sel.querySelectorAll(".chip").forEach(function (c) {
+      function go() {
+        var v = c.getAttribute("data-view");
+        sel.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x === c); });
+        if (vb) vb.hidden = (v !== "board");
+        if (vh) vh.hidden = (v !== "hist");
+        window.scrollTo(0, 0);
+      }
+      c.onclick = go;
+      c.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } };
+    });
+  })();
+</script>
 </body></html>

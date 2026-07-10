@@ -73,9 +73,12 @@ def main():
             if res is None:
                 n_nores += 1; continue
             linha = float(linha)
-            over_won = res > linha
             k["result"] = res
-            k["won"] = over_won if lado == "over" else (not over_won)
+            if res == linha:                       # linha inteira empatou = push (stake devolvido)
+                k["won"] = None
+            else:
+                over_won = res > linha
+                k["won"] = over_won if lado == "over" else (not over_won)
             if k.get("open_odd") and k.get("close_odd"):
                 k["clv_pct"] = round((k["open_odd"] / k["close_odd"] - 1) * 100, 2)
                 k["beat_close"] = k["clv_pct"] > 0

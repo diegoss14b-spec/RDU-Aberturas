@@ -55,6 +55,7 @@ jobs:
           python history_ingest.py
           python history_close.py
           python history_settle.py
+          python build_history.py
 
       - name: Montar o board
         if: steps.capture.outcome == 'success'
