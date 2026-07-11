@@ -23,10 +23,12 @@ ROOT = Path(__file__).resolve().parent
 # cortada; do IP residencial BR funciona 100%). Fix = proxy BR na nuvem, igual betano/7k.
 sys.path.insert(0, str(ROOT))
 try:
-    from capture_common import br_proxies
+    from capture_common import br_proxies, odds_window, in_window
     PROX = br_proxies()          # nuvem: Decodo BR via env; local: None (direto)
 except Exception:
     PROX = None
+    def odds_window(): return None       # sem capture_common: modo close desliga, janela cheia
+    def in_window(_s, _w): return True
 OUTDIR = ROOT / "data" / "odds"; OUTDIR.mkdir(parents=True, exist_ok=True)
 BRT = timezone(timedelta(hours=-3))
 BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget"
@@ -35,6 +37,8 @@ H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0",
      "Origin": "https://www.estrelabet.bet.br", "Referer": "https://www.estrelabet.bet.br/"}
 HOURS = 96
 MAX_EVENTS = 200
+MIN_EVENTS = 8    # mínimo pro finish() (abaixo = exit 2)
+MIN_EFF = MIN_EVENTS  # modo close (ODDS_WINDOW_H) reduz — ver main()
 
 EXCL = ("jogador", "técnico", "tecnico", "substituto", "cometidas", " - ", "1º tempo", "2º tempo",
         "1° tempo", "handicap", "ímpar", "impar", "/par", "a gol", "exatos", "exato", "vermelho",
@@ -74,6 +78,13 @@ def main():
     now = datetime.now(BRT)
     lst = get(f"{BASE}/GetEvents?{PARAMS}&sportId=66&hoursRange={HOURS}&categoryId=0&championshipIds=0")
     events = (lst or {}).get("events") or []
+    _wh = odds_window()
+    if _wh is not None:   # modo close: filtra ANTES do sort/cap (senão o top-200 por mercados descarta jogos da janela)
+        global MIN_EFF
+        _tot = len(events)
+        events = [e for e in events if in_window(e.get("startDate"), _wh)]
+        MIN_EFF = (min(MIN_EVENTS, 1) if events else 0)   # janela curta: 1+ ok; lista vazia não é falha
+        print(f"[estrelabet] modo close: janela {_wh:g}h -> {len(events)} de {_tot} eventos")
     champs = {c["id"]: c.get("name", "") for c in ((lst or {}).get("champs") or [])}
     # ordenar por nº de mercados (os com stats têm muitos) e capar
     def nmk(e): return len(flat_ids(e.get("desktopMarketIds") or e.get("marketIds") or e.get("markets") or []))
@@ -136,9 +147,9 @@ if __name__ == "__main__":
     from capture_common import finish
     try:
         _n = main() or 0
-        sys.exit(finish("estrelabet", _n, 8, t0=_t0))
+        sys.exit(finish("estrelabet", _n, MIN_EFF, t0=_t0))
     except SystemExit:
         raise
     except BaseException as _e:
-        finish("estrelabet", 0, 8, error=_e, t0=_t0)
+        finish("estrelabet", 0, MIN_EFF, error=_e, t0=_t0)
         sys.exit(1)

@@ -19,6 +19,7 @@ try:
     import ctypes; ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)
 except Exception: pass
 import requests
+from capture_common import odds_window, in_window
 
 ROOT = Path(__file__).resolve().parent
 OUTDIR = ROOT / "data" / "odds"; OUTDIR.mkdir(parents=True, exist_ok=True)
@@ -28,6 +29,8 @@ H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0",
 BRT = timezone(timedelta(hours=-3))
 DAYS = 4          # janela de captura (hoje + N dias)
 MAX_EVENTS = 500  # teto de detalhes por rodada
+MIN_EVENTS = 10   # mínimo pro finish() (abaixo = exit 2)
+MIN_EFF = MIN_EVENTS  # modo close (ODDS_WINDOW_H) reduz — ver main()
 
 def dec(raw):
     try:
@@ -90,6 +93,14 @@ def main():
     lst = get(f"{BASE}/events/by-date?currentStatus=active&offerState=prematch&sportId=5&startDate={d0}&endDate={d1}")
     events = (lst or {}).get("data") or []
     print(f"[superbet] by-date: {len(events)} eventos (janela {DAYS}d)")
+    _wh = odds_window()
+    if _wh is not None:   # modo close: kickoff = unixDateMillis (utcDate/matchDate = fallback; matchTimestamp NÃO é kickoff)
+        global MIN_EFF
+        _tot = len(events)
+        events = [e for e in events
+                  if in_window(e.get("unixDateMillis") or e.get("utcDate") or e.get("matchDate"), _wh)]
+        MIN_EFF = (min(MIN_EVENTS, 1) if events else 0)   # janela curta: 1+ ok; lista vazia não é falha
+        print(f"[superbet] modo close: janela {_wh:g}h -> {len(events)} de {_tot} eventos")
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
     out_path = OUTDIR / f"superbet_{stamp}.jsonl"
@@ -146,9 +157,9 @@ if __name__ == "__main__":
     from capture_common import finish
     try:
         _n = main() or 0
-        sys.exit(finish("superbet", _n, 10, t0=_t0))
+        sys.exit(finish("superbet", _n, MIN_EFF, t0=_t0))
     except SystemExit:
         raise
     except BaseException as _e:
-        finish("superbet", 0, 10, error=_e, t0=_t0)
+        finish("superbet", 0, MIN_EFF, error=_e, t0=_t0)
         sys.exit(1)

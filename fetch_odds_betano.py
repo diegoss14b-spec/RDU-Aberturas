@@ -26,7 +26,8 @@ BASE = "https://www.betano.bet.br"
 TABS = {"1": "gols", "4": "escanteios", "5": "cartoes", "6": "estatisticas"}
 MAX_EVENTS = 60
 MIN_EVENTS = 15                     # menos que isso = captura ruim (exit 2)
-from capture_common import br_proxies, finish
+from capture_common import br_proxies, finish, odds_window, in_window
+MIN_EFF = MIN_EVENTS                # modo close (ODDS_WINDOW_H) reduz — ver main()
 PROX = br_proxies()                 # nuvem: proxy BR (geo-block); local: None/direto
 
 def log(m):
@@ -85,6 +86,13 @@ def main():
                            "league": ev.get("leagueName"), "region": ev.get("regionName"),
                            "start": ev.get("startTime")})
     log(f"feed: {len(events)} eventos")
+    _wh = odds_window()
+    if _wh is not None:             # modo close: só eventos com início em [agora, agora+janela]
+        global MIN_EFF
+        _tot = len(events)
+        events = [e for e in events if in_window(e.get("start"), _wh)]
+        MIN_EFF = (min(MIN_EVENTS, 1) if events else 0)   # janela curta: 1+ ok; lista vazia não é falha
+        log(f"[betano] modo close: janela {_wh:g}h -> {len(events)} de {_tot} eventos")
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
     fp = OUT / f"betano_{stamp}.jsonl"
     n_ok = 0
@@ -118,9 +126,9 @@ if __name__ == "__main__":
     import time as _t; _t0 = _t.time()
     try:
         _n = main() or 0
-        sys.exit(finish("betano", _n, MIN_EVENTS, t0=_t0))
+        sys.exit(finish("betano", _n, MIN_EFF, t0=_t0))
     except SystemExit:
         raise
     except BaseException as _e:
-        finish("betano", 0, MIN_EVENTS, error=_e, t0=_t0)
+        finish("betano", 0, MIN_EFF, error=_e, t0=_t0)
         sys.exit(1)

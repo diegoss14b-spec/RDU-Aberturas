@@ -51,9 +51,14 @@ def casa_ok(casa):
 def main():
     STATUS.mkdir(parents=True, exist_ok=True)
     results = {}
-    for casa, script, tmo in FETCHERS:
-        print(f"\n===== {casa} (timeout {tmo//60}min) =====", flush=True)
-        results[casa] = run_one(casa, script, tmo)
+    # PARALELO (11/07): sequencial custava 15-20 min de wall-time (billable no Actions);
+    # as 4 casas em paralelo = max(casa) ≈ 8-13 min. Fetchers são processos isolados.
+    from concurrent.futures import ThreadPoolExecutor
+    print("===== captura paralela das 4 casas =====", flush=True)
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futs = {casa: ex.submit(run_one, casa, script, tmo) for casa, script, tmo in FETCHERS}
+        for casa, fut in futs.items():
+            results[casa] = fut.result()
 
     # RETRY (11/07): casa que falhou ganha UMA segunda chance depois que todas rodaram
     # (falhas transitórias — rate-limit, proxy instável, timeout apertado — resolvem na 2ª).

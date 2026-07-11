@@ -23,7 +23,7 @@ try:
     import ctypes; ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)
 except Exception: pass
 import requests
-from capture_common import br_proxies, playwright_proxy
+from capture_common import br_proxies, playwright_proxy, odds_window, in_window
 PROX = br_proxies()   # nuvem: proxy BR (geo-block bet.br); local: None
 
 ROOT = Path(__file__).resolve().parent
@@ -36,6 +36,8 @@ MIN_MARKETS = 60     # só jogos com muitos mercados têm os de estatística
 #   (cartões/faltas) só existiam em jogos com 141+ mercados totais. 7-14 jogos/run é o
 #   tamanho real da oferta do 7k; threshold menor = só mais probes à toa.
 MAX_EVENTS = 120
+MIN_EVENTS = 8    # mínimo pro finish() (abaixo = exit 2)
+MIN_EFF = MIN_EVENTS  # modo close (ODDS_WINDOW_H) reduz — ver main()
 
 def canon(nm):
     m = (nm or "").lower()
@@ -135,6 +137,14 @@ def main():
     evs = gj("/api/pulse/snapshot/events?lang=BR-PT") or []
     cand = [e for e in evs if str(e.get("SportId")) == "1" and not e.get("IsLive")
             and (e.get("TotalActiveMarketsCount") or 0) >= MIN_MARKETS]
+    _wh = odds_window()
+    if _wh is not None:   # modo close: filtra ANTES do sort/cap e das 2 chamadas markets/all por evento
+        global MIN_EFF
+        _tot = len(cand)
+        cand = [e for e in cand
+                if in_window(e.get("StartTimeUtc") or e.get("StartDate") or e.get("StartEventDate"), _wh)]
+        MIN_EFF = (min(MIN_EVENTS, 1) if cand else 0)   # janela curta: 1+ ok; lista vazia não é falha
+        print(f"[7k] modo close: janela {_wh:g}h -> {len(cand)} de {_tot} eventos")
     cand.sort(key=lambda e: -(e.get("TotalActiveMarketsCount") or 0))
     cand = cand[:MAX_EVENTS]
     print(f"[7k] snapshot {len(evs)} eventos · {len(cand)} candidatos (futebol+prematch+≥{MIN_MARKETS} mercados)")
@@ -193,9 +203,9 @@ if __name__ == "__main__":
     from capture_common import finish
     try:
         _n = main() or 0
-        sys.exit(finish("7k", _n, 8, t0=_t0))
+        sys.exit(finish("7k", _n, MIN_EFF, t0=_t0))
     except SystemExit:
         raise
     except BaseException as _e:
-        finish("7k", 0, 8, error=_e, t0=_t0)
+        finish("7k", 0, MIN_EFF, error=_e, t0=_t0)
         sys.exit(1)
