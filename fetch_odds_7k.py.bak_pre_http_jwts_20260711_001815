@@ -4,9 +4,8 @@ estatística de JOGO INTEIRO, pra a Mesa de Aberturas.
 
 Fluxo (FSSB "pulse"):
  1. host FSSB via 7k.bet.br/api/sports/anonymous-launch
- 2. JWTs anônimos (authorization+session) direto do HTML da launch page do FSSB
-    ('internalToken'/'sessionToken' inline no <script> do SPA — SEM browser; expiram em
-    ~1 dia → frescos a cada run; Playwright virou só fallback se o HTTP puro falhar)
+ 2. JWTs anônimos (authorization+session) + header time-area via Playwright (o SPA os gera;
+    expiram em ~1 dia → pegar frescos a cada run)
  3. /api/pulse/snapshot/events?lang=BR-PT -> eventos (filtra futebol+prematch+muitos mercados)
  4. por evento: markets/all?markets=<eid>:ALL descobre os MarketType._id dos mercados de
     estatística; depois markets/all?markets=<eid>:<codes> traz Selections COM preço
@@ -31,10 +30,6 @@ OUTDIR = ROOT / "data" / "odds"; OUTDIR.mkdir(parents=True, exist_ok=True)
 BRT = timezone(timedelta(hours=-3))
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0"
 MIN_MARKETS = 60     # só jogos com muitos mercados têm os de estatística
-# ^ diagnóstico 11/07/2026: NÃO baixar achando que rende mais jogos — no snapshot do dia
-#   havia 290 candidatos ≥60 mkts (457 ≥40, 767 ≥20), mas mercados de estatística
-#   (cartões/faltas) só existiam em jogos com 141+ mercados totais. 7-14 jogos/run é o
-#   tamanho real da oferta do 7k; threshold menor = só mais probes à toa.
 MAX_EVENTS = 120
 
 def canon(nm):
@@ -58,43 +53,8 @@ def get_host():
     return "https://prod20350-kbet-152319626.fssb.io"
 
 def get_jwts(host):
-    """JWTs anônimos SEM browser (descoberta 11/07/2026): a launch page do FSSB — a mesma
-    URL que o anonymous-launch devolve (ex.: {host}/br-pt/spbk?operatorToken=logout) —
-    embute os 2 tokens no HTML inline do SPA: 'internalToken' = header authorization e
-    'sessionToken' = header session (customerId=-1, expira ~1 dia). 1 GET + regex resolve.
-    Validado 11/07: snapshot/events 200 (959 jogos futebol prematch) e markets/all 200 com
-    os tokens (403 sem). Se o HTTP puro falhar, cai no fallback Playwright antigo."""
-    launch_url = host + "/br-pt/spbk?operatorToken=logout"   # chute razoável se o launch falhar
-    try:
-        r = requests.get("https://7k.bet.br/api/sports/anonymous-launch", proxies=PROX,
-                         headers={"User-Agent": UA, "Accept": "application/json",
-                                  "Referer": "https://7k.bet.br/sports"}, timeout=20)
-        u = (r.json() or {}).get("url") or ""
-        if u.startswith("https://"): launch_url = u
-    except Exception: pass
-    hh = {"User-Agent": UA, "Accept": "text/html,*/*;q=0.8",
-          "Accept-Language": "pt-BR,pt;q=0.9", "Referer": "https://7k.bet.br/"}
-    html = ""
-    try:
-        from curl_cffi import requests as _cr
-        html = _cr.get(launch_url, impersonate="chrome124", proxies=PROX, timeout=25, headers=hh).text
-    except Exception:
-        try: html = requests.get(launch_url, proxies=PROX, timeout=25, headers=hh).text
-        except Exception: html = ""
-    mi = re.search(r"[\'\"]internalToken[\'\"]\s*:\s*[\'\"](eyJ[^\'\"]+)[\'\"]", html)
-    ms = re.search(r"[\'\"]sessionToken[\'\"]\s*:\s*[\'\"](eyJ[^\'\"]+)[\'\"]", html)
-    if mi and ms:
-        return {"authorization": mi.group(1), "session": ms.group(1), "time-area": "1"}
-    print("[7k] tokens não vieram na launch page (HTTP) — tentando fallback Playwright")
-    return _get_jwts_browser()
-
-def _get_jwts_browser():
-    """fallback antigo: navega o 7k via Playwright e captura authorization+session+time-area
-    de qualquer request /api. Só roda se o HTTP puro falhar E o playwright estiver instalado."""
-    try:
-        from playwright.sync_api import sync_playwright
-    except Exception:
-        return {}
+    """navega o 7k e captura authorization+session+time-area de qualquer request /api"""
+    from playwright.sync_api import sync_playwright
     grabbed = {}
     with sync_playwright() as pw:
         b = pw.chromium.launch(headless=True, proxy=playwright_proxy()) if playwright_proxy() else pw.chromium.launch(headless=True)
@@ -121,7 +81,7 @@ def main():
     host = get_host()
     jwt = get_jwts(host)
     if "authorization" not in jwt:
-        print("[7k] não consegui os JWTs (HTTP puro nem fallback Playwright) — abortando"); return
+        print("[7k] não consegui os JWTs (Playwright) — abortando"); return
     hdr = {"User-Agent": UA, "Accept": "application/json", "Accept-Language": "pt-BR",
            "authorization": jwt["authorization"], "session": jwt["session"], "time-area": jwt.get("time-area", "1")}
 

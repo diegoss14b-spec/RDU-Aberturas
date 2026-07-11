@@ -155,8 +155,18 @@
           .concat((cap.casas_fail || []).map(function (f) { return '<span class="cap-fail" title="' + esc(f.error || "") + '">' + esc(f.casa) + " ✗</span>"; }));
         var cls = failN === 0 ? "cap-green" : (okN >= 3 ? "cap-yellow" : "cap-red");
         capEl.className = "capbar " + cls;
+        // confiabilidade 7 dias por casa (rodadas ok / rodadas totais)
+        var histTxt = "";
+        if (cap.hist7) {
+          var hs = Object.keys(cap.hist7).map(function (c) {
+            var h = cap.hist7[c], pct = h.total ? Math.round(100 * h.ok / h.total) : 0;
+            return c + " " + pct + "% (" + h.ok + "/" + h.total + ")";
+          });
+          histTxt = '<div class="cap-note">Últimos 7 dias: ' + hs.join(" · ") + "</div>";
+        }
         capEl.innerHTML = "Casas nesta rodada: " + parts.join(" · ") +
-          (failN ? '<div class="cap-note">Captura incompleta — mercados podem existir nas casas marcadas com ✗ e não aparecer aqui.</div>' : "");
+          (failN ? '<div class="cap-note">Captura incompleta — mercados podem existir nas casas marcadas com ✗ e não aparecer aqui.</div>' : "") +
+          histTxt;
         capEl.style.display = "";
       } else {
         capEl.style.display = "none";

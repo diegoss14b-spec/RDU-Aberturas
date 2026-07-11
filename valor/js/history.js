@@ -15,6 +15,73 @@
   function cls(x) { return x == null ? "" : (x > 0 ? "pos" : (x < 0 ? "neg" : "")); }
   function pm(ci) { if (!ci || ci[0] == null) return ""; return ' <span class="pm">±' + Math.round((ci[1] - ci[0]) / 2) + '</span>'; }
 
+  // --- gráficos de movimentação (window.MOVES de build_moves.py) ---
+  var MV = window.MOVES || {};
+  var CASA_COR = { betano: "#6d28d9", superbet: "#2f6f57", estrelabet: "#c2410c", "7k": "#1d4ed8" };
+
+  function mvSeries(gk, casa) { var g = MV[gk]; return (g && g[casa] && g[casa].length >= 2) ? g[casa] : null; }
+
+  function sparkline(gk, casa) {
+    var s = mvSeries(gk, casa);
+    if (!s) return '<span class="pm">—</span>';
+    var w = 84, h = 22, p = 2;
+    var ts = s.map(function (x) { return x[0]; }), os = s.map(function (x) { return x[1]; });
+    var t0 = Math.min.apply(null, ts), t1 = Math.max.apply(null, ts);
+    var o0 = Math.min.apply(null, os), o1 = Math.max.apply(null, os);
+    var dt = (t1 - t0) || 1, dO = (o1 - o0) || 1;
+    var pts = s.map(function (x) {
+      return (p + (x[0] - t0) / dt * (w - 2 * p)).toFixed(1) + "," + (h - p - (x[1] - o0) / dO * (h - 2 * p)).toFixed(1);
+    }).join(" ");
+    var dir = os[os.length - 1] > os[0] ? "dn" : (os[os.length - 1] < os[0] ? "up" : "");
+    return '<svg class="spark ' + dir + '" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '"><polyline points="' + pts + '"/></svg>';
+  }
+
+  function bigChart(gk) {
+    var g = MV[gk];
+    if (!g) return '<div class="pm">sem série pra essa linha</div>';
+    var casas = Object.keys(g).filter(function (c) { return c !== "_ko" && g[c].length; });
+    if (!casas.length) return '<div class="pm">sem série pra essa linha</div>';
+    var all = [];
+    casas.forEach(function (c) { all = all.concat(g[c]); });
+    var ts = all.map(function (x) { return x[0]; }), os = all.map(function (x) { return x[1]; });
+    var t0 = Math.min.apply(null, ts), t1 = Math.max.apply(null, ts);
+    if (g._ko && g._ko > t1 && g._ko - t1 < 48 * 60) t1 = g._ko;   // estende até o kickoff se perto
+    var o0 = Math.min.apply(null, os), o1 = Math.max.apply(null, os);
+    var pad = (o1 - o0) * 0.15 + 0.02; o0 -= pad; o1 += pad;
+    var W = 640, H = 170, L = 44, R = 10, T = 10, B = 22;
+    var dt = (t1 - t0) || 1, dO = (o1 - o0) || 1;
+    function X(t) { return L + (t - t0) / dt * (W - L - R); }
+    function Y(o) { return T + (1 - (o - o0) / dO) * (H - T - B); }
+    function fmtT(m) { var d = new Date(m * 60000); return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + " " + ("0" + d.getHours()).slice(-2) + "h"; }
+    var sv = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H + '" style="font-family:var(--mono)">';
+    // grid horizontal (3 linhas) + labels de odd
+    for (var i = 0; i <= 2; i++) {
+      var ov = o0 + dO * i / 2, y = Y(ov);
+      sv += '<line x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '" stroke="#e7e2d8" stroke-width="1"/>';
+      sv += '<text x="' + (L - 6) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9" fill="#9a94a6">' + ov.toFixed(2) + "</text>";
+    }
+    // labels de tempo (início/fim)
+    sv += '<text x="' + L + '" y="' + (H - 6) + '" font-size="9" fill="#9a94a6">' + fmtT(t0) + "</text>";
+    sv += '<text x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end" font-size="9" fill="#9a94a6">' + fmtT(t1) + "</text>";
+    // kickoff
+    if (g._ko && g._ko >= t0 && g._ko <= t1) {
+      sv += '<line x1="' + X(g._ko) + '" y1="' + T + '" x2="' + X(g._ko) + '" y2="' + (H - B) + '" stroke="#c2410c" stroke-width="1" stroke-dasharray="3,3"/>';
+      sv += '<text x="' + X(g._ko) + '" y="' + (T + 8) + '" text-anchor="middle" font-size="8" fill="#c2410c">kickoff</text>';
+    }
+    casas.forEach(function (c) {
+      var cor = CASA_COR[c] || "#6b6577";
+      var s = g[c].slice().sort(function (a, b) { return a[0] - b[0]; });
+      var pts = s.map(function (x) { return X(x[0]).toFixed(1) + "," + Y(x[1]).toFixed(1); }).join(" ");
+      sv += '<polyline points="' + pts + '" fill="none" stroke="' + cor + '" stroke-width="1.8"/>';
+      s.forEach(function (x) { sv += '<circle cx="' + X(x[0]).toFixed(1) + '" cy="' + Y(x[1]).toFixed(1) + '" r="2.4" fill="' + cor + '"/>'; });
+    });
+    sv += "</svg>";
+    var leg = '<div class="mv-legend">' + casas.map(function (c) {
+      return '<span><span class="sw" style="background:' + (CASA_COR[c] || "#6b6577") + '"></span>' + esc(c) + "</span>";
+    }).join("") + "</div>";
+    return leg + '<div class="mv-chart">' + sv + "</div>";
+  }
+
   function chip(label, active, extra, onclick) {
     var c = document.createElement("span");
     c.className = "chip" + (extra ? " " + extra : "") + (active ? " on" : "");
@@ -156,10 +223,10 @@
   function tblLiquidadas(rows) {
     if (!rows.length) return '<div class="empty"><div class="big">📭</div>Nenhuma linha liquidada com esses filtros.</div>';
     var t = '<div class="hist-scroll"><table class="lad hist-tbl"><thead><tr>' +
-      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Fecha</th><th>CLV</th><th>Res.</th></tr></thead><tbody>';
+      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Fecha</th><th>CLV</th><th>Res.</th><th>Mov.</th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var invalid = !r.clv_valido;
-      t += '<tr class="' + (invalid ? "sm" : "") + '"' + (invalid ? ' title="abertura pós-apito — sem CLV real"' : "") + '>' +
+      t += '<tr class="' + (invalid ? "sm" : "") + (mvSeries(r.gk, r.casa) ? " has-mv" : "") + '" data-gk="' + esc(r.gk || "") + '"' + (invalid ? ' title="abertura pós-apito — sem CLV real"' : "") + '>' +
         '<td class="jg" title="' + esc(r.jogo) + ' · ' + esc(r.data) + ' · ' + esc(r.casa) + '">' + esc(r.jogo) + '</td>' +
         '<td title="' + esc(r.mercado) + '">' + (ABBR[r.mercado] || esc(r.mercado)) + '</td>' +
         '<td class="ln">' + br(r.linha, 1) + '</td>' +
@@ -168,6 +235,7 @@
         '<td class="u">' + br(r.close, 2) + '</td>' +
         '<td class="' + (invalid ? "" : cls(r.clv)) + '">' + (invalid ? "—" : sign(r.clv, 1)) + '</td>' +
         '<td class="' + (r.won ? "hist-mv up" : "hist-mv dn") + '" title="total no jogo: ' + esc(r.result) + '">' + (r.won ? "green" : "red") + '</td>' +
+        '<td>' + sparkline(r.gk, r.casa) + '</td>' +
         '</tr>';
     });
     return t + "</tbody></table></div>";
@@ -176,11 +244,11 @@
   function tblAbertas(rows) {
     if (!rows.length) return '<div class="empty"><div class="big">🕓</div>Nenhuma linha aberta com movimento agora.<br><span style="font-size:12px">O movimento aparece quando uma linha é capturada em mais de uma rodada antes do jogo.</span></div>';
     var t = '<div class="hist-scroll"><table class="lad hist-tbl"><thead><tr>' +
-      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Agora</th><th>Δ%</th><th>Obs</th></tr></thead><tbody>';
+      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Agora</th><th>Δ%</th><th>Obs</th><th>Mov.</th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var d = r.drift_pct;
       var mv = d == null ? "flat" : (d < 0 ? "up" : (d > 0 ? "dn" : "flat"));
-      t += '<tr>' +
+      t += '<tr class="' + (mvSeries(r.gk, r.casa) ? "has-mv" : "") + '" data-gk="' + esc(r.gk || "") + '">' +
         '<td class="jg" title="' + esc(r.jogo) + ' · ' + esc(r.data) + ' · ' + esc(r.casa) + '">' + esc(r.jogo) + '</td>' +
         '<td title="' + esc(r.mercado) + '">' + (ABBR[r.mercado] || esc(r.mercado)) + '</td>' +
         '<td class="ln">' + br(r.linha, 1) + '</td>' +
@@ -189,6 +257,7 @@
         '<td class="u">' + br(r.last, 2) + '</td>' +
         '<td class="hist-mv ' + mv + '">' + sign(d, 1) + '</td>' +
         '<td>' + (r.n_moves || 0) + '</td>' +
+        '<td>' + sparkline(r.gk, r.casa) + '</td>' +
         '</tr>';
     });
     return t + "</tbody></table></div>";
@@ -214,6 +283,29 @@
     var tbl = document.createElement("div");
     tbl.innerHTML = state.aba === "liquidadas" ? tblLiquidadas(vis) : tblAbertas(vis);
     root.appendChild(tbl);
+
+    // clique numa linha com série -> expande/recolhe o gráfico de movimentação
+    tbl.querySelectorAll("tr.has-mv").forEach(function (tr) {
+      tr.style.cursor = "pointer";
+      tr.title = (tr.title ? tr.title + " · " : "") + "clique pra ver o gráfico";
+      tr.onclick = function () {
+        var nxt = tr.nextElementSibling;
+        if (nxt && nxt.classList.contains("mv-chart-row")) {   // já aberto -> fecha
+          nxt.remove(); tr.classList.remove("mv-open"); return;
+        }
+        // fecha outros abertos
+        tbl.querySelectorAll(".mv-chart-row").forEach(function (x) { x.remove(); });
+        tbl.querySelectorAll("tr.mv-open").forEach(function (x) { x.classList.remove("mv-open"); });
+        var cr = document.createElement("tr");
+        cr.className = "mv-chart-row";
+        var td = document.createElement("td");
+        td.colSpan = tr.children.length;
+        td.innerHTML = bigChart(tr.getAttribute("data-gk"));
+        cr.appendChild(td);
+        tr.parentNode.insertBefore(cr, tr.nextSibling);
+        tr.classList.add("mv-open");
+      };
+    });
   }
 
   render();

@@ -275,6 +275,21 @@ def main():
             except Exception: continue
             if _st.get("ok"): cap["casas_ok"].append(_nome)
             else: cap["casas_fail"].append({"casa": _nome, "error": (_st.get("error") or "?")[:120]})
+        # confiabilidade 7 dias (11/07): lê o history.jsonl das rodadas e agrega por casa
+        _hf = _stdir / "history.jsonl"
+        if _hf.exists():
+            from datetime import timedelta as _td
+            _cut = (datetime.now(BRT) - _td(days=7)).strftime("%Y-%m-%d %H:%M")
+            _agg = {}
+            for _ln in _hf.read_text(encoding="utf-8").splitlines():
+                try: _r = json.loads(_ln)
+                except Exception: continue
+                if (_r.get("ts") or "") < _cut: continue
+                for _c, _v in (_r.get("casas") or {}).items():
+                    a = _agg.setdefault(_c, {"ok": 0, "total": 0})
+                    a["total"] += 1; a["ok"] += 1 if _v.get("ok") else 0
+            if _agg:
+                cap["hist7"] = {_disp.get(c, c): v for c, v in _agg.items()}
         if cap["casas_ok"] or cap["casas_fail"]:
             out["capture"] = cap
     outdir = ROOT / "valor" / "data"; outdir.mkdir(parents=True, exist_ok=True)

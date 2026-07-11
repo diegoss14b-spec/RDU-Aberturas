@@ -17,29 +17,50 @@ BRT = timezone(timedelta(hours=-3))
 FETCHERS = [  # (casa, script, timeout_s)
     ("betano",     "fetch_odds_betano.py",    13 * 60),
     ("superbet",   "fetch_odds_superbet.py",   8 * 60),
-    ("estrelabet", "fetch_odds_estrelabet.py", 6 * 60),
+    ("estrelabet", "fetch_odds_estrelabet.py", 10 * 60),   # 11/07: +proxy BR → mais lenta
     ("7k",         "fetch_odds_7k.py",        12 * 60),
 ]
+
+
+def run_one(casa, script, tmo):
+    """roda 1 fetcher isolado; devolve o exit code (124 = timeout)."""
+    t0 = time.time()
+    try:
+        p = subprocess.run([sys.executable, "-X", "utf8", str(ROOT / script)],
+                           cwd=str(ROOT), timeout=tmo)
+        rc = p.returncode
+    except subprocess.TimeoutExpired:
+        rc = 124
+        (STATUS / f"{casa}.json").write_text(json.dumps({
+            "casa": casa, "ok": False, "n_events": 0,
+            "error": f"TIMEOUT apos {tmo}s", "error_class": "Timeout",
+            "ts_brt": datetime.now(BRT).strftime("%Y-%m-%d %H:%M"),
+            "duration_sec": round(time.time() - t0, 1)}, ensure_ascii=False), encoding="utf-8")
+    print(f"[{casa}] exit={rc} ({time.time()-t0:.0f}s)", flush=True)
+    return rc
+
+
+def casa_ok(casa):
+    f = STATUS / f"{casa}.json"
+    try:
+        return bool(json.loads(f.read_text(encoding="utf-8")).get("ok"))
+    except Exception:
+        return False
+
 
 def main():
     STATUS.mkdir(parents=True, exist_ok=True)
     results = {}
     for casa, script, tmo in FETCHERS:
         print(f"\n===== {casa} (timeout {tmo//60}min) =====", flush=True)
-        t0 = time.time()
-        try:
-            p = subprocess.run([sys.executable, "-X", "utf8", str(ROOT / script)],
-                               cwd=str(ROOT), timeout=tmo)
-            rc = p.returncode
-        except subprocess.TimeoutExpired:
-            rc = 124
-            (STATUS / f"{casa}.json").write_text(json.dumps({
-                "casa": casa, "ok": False, "n_events": 0,
-                "error": f"TIMEOUT apos {tmo}s", "error_class": "Timeout",
-                "ts_brt": datetime.now(BRT).strftime("%Y-%m-%d %H:%M"),
-                "duration_sec": round(time.time() - t0, 1)}, ensure_ascii=False), encoding="utf-8")
-        results[casa] = rc
-        print(f"[{casa}] exit={rc} ({time.time()-t0:.0f}s)", flush=True)
+        results[casa] = run_one(casa, script, tmo)
+
+    # RETRY (11/07): casa que falhou ganha UMA segunda chance depois que todas rodaram
+    # (falhas transitórias — rate-limit, proxy instável, timeout apertado — resolvem na 2ª).
+    for casa, script, tmo in FETCHERS:
+        if not casa_ok(casa):
+            print(f"\n===== RETRY {casa} =====", flush=True)
+            results[casa] = run_one(casa, script, tmo)
 
     # consolida
     casas_ok, casas_fail, total_events = [], [], 0
@@ -59,6 +80,16 @@ def main():
                "total_events": total_events,
                "deploy_allowed": deploy_allowed, "reason": reason}
     (STATUS / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
+    # histórico por rodada (base do painel de confiabilidade da Mesa) — 1 linha/rodada, com
+    # o status final de cada casa (pós-retry) e nº de eventos
+    per_casa = {}
+    for casa, _, _ in FETCHERS:
+        f = STATUS / f"{casa}.json"
+        st = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+        per_casa[casa] = {"ok": bool(st.get("ok")), "n": st.get("n_events") or 0}
+    hist_line = {"ts": summary["ts_brt"], "casas": per_casa, "total": total_events}
+    with (STATUS / "history.jsonl").open("a", encoding="utf-8") as hf:
+        hf.write(json.dumps(hist_line, ensure_ascii=False) + "\n")
     print(f"\n===== RESUMO: {len(casas_ok)}/4 casas ok · {total_events} eventos · deploy_allowed={deploy_allowed} ({reason})")
     for cf in casas_fail:
         print(f"  ✗ {cf['casa']}: {cf['error']}")

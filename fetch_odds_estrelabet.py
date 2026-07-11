@@ -19,6 +19,14 @@ except Exception: pass
 import requests
 
 ROOT = Path(__file__).resolve().parent
+# 11/07: a Altenar passou a rate-limitar IP de datacenter (nuvem capturava ~5 detalhes e era
+# cortada; do IP residencial BR funciona 100%). Fix = proxy BR na nuvem, igual betano/7k.
+sys.path.insert(0, str(ROOT))
+try:
+    from capture_common import br_proxies
+    PROX = br_proxies()          # nuvem: Decodo BR via env; local: None (direto)
+except Exception:
+    PROX = None
 OUTDIR = ROOT / "data" / "odds"; OUTDIR.mkdir(parents=True, exist_ok=True)
 BRT = timezone(timedelta(hours=-3))
 BASE = "https://sb2frontend-altenar2.biahosted.com/api/widget"
@@ -45,10 +53,12 @@ def canon(nm):
 OUTC = re.compile(r"(mais|menos|acima|abaixo|over|under)\s*(?:de)?\s*([\d.]+)", re.I)
 
 def get(url):
-    for _ in range(3):
+    for a in range(3):
         try:
-            r = requests.get(url, headers=H, timeout=30)
+            r = requests.get(url, headers=H, timeout=30, proxies=PROX)
             if r.status_code == 200 and r.text[:1] in "[{": return r.json()
+            if r.status_code in (403, 429):   # rate-limit: espera progressiva antes de re-tentar
+                time.sleep(3.0 * (a + 1)); continue
         except Exception: pass
         time.sleep(1.2)
     return None

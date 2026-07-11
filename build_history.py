@@ -181,6 +181,7 @@ def main():
         ots, kts = ts(v.get("open_ts")), ts(v.get("kickoff"))
         clv_valido = bool(v.get("open_odd") and v.get("close_odd") and ots and kts and ots < kts)
         liquidadas.append({
+            "gk": f'{djogo}|{h}|{a2}|{mercado}|{linha}|{lado}',
             "jogo": f'{v.get("home_raw") or h} x {v.get("away_raw") or a2}',
             "data": djogo, "casa": casa, "mercado": mercado,
             "linha": float(linha), "lado": LADO_PT.get(lado, lado),
@@ -203,6 +204,7 @@ def main():
         op, last = v.get("open_odd"), v.get("last_odd")
         drift = round((last / op - 1) * 100, 2) if (op and last) else None
         abertas.append({
+            "gk": f'{djogo}|{h}|{a2}|{mercado}|{linha}|{lado}',
             "jogo": f'{v.get("home_raw") or h} x {v.get("away_raw") or a2}',
             "data": djogo, "casa": casa, "mercado": mercado,
             "linha": float(linha), "lado": LADO_PT.get(lado, lado),

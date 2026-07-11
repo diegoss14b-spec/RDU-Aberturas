@@ -92,6 +92,15 @@ h1 .rd{color:var(--purple)}
 .hist-tbl th.jg{text-align:left}
 .lad tr.sm td{color:var(--faint);opacity:.72}
 .pm{font:600 8.5px var(--mono);color:var(--faint)}
+/* --- gráficos de movimentação --- */
+.spark{display:inline-block;vertical-align:middle;cursor:pointer}
+.spark polyline{fill:none;stroke:var(--purple);stroke-width:1.6}
+.spark.dn polyline{stroke:var(--red)} .spark.up polyline{stroke:var(--green)}
+.mv-chart-row td{background:var(--panel);padding:10px 12px!important}
+.mv-chart{width:100%;overflow-x:auto}
+.mv-legend{display:flex;gap:12px;font:600 10px var(--sans);color:var(--dim);margin-bottom:6px;flex-wrap:wrap}
+.mv-legend .sw{display:inline-block;width:10px;height:3px;border-radius:2px;vertical-align:2px;margin-right:4px}
+tr.mv-open td{background:var(--purple-soft)!important}
 .hist-mv.up{color:var(--green);font-weight:700} .hist-mv.dn{color:var(--red);font-weight:700} .hist-mv.flat{color:var(--faint)}
 [hidden]{display:none!important}
 </style>
@@ -115,6 +124,7 @@ h1 .rd{color:var(--purple)}
 </div>
 <script src="data/board.js"></script>
 <script src="data/history.js"></script>
+<script src="data/moves.js"></script>
 <script src="js/board.js"></script>
 <script src="js/history.js"></script>
 <script>
