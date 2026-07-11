@@ -77,10 +77,15 @@ def is_full_game(mn):
 def main():
     struct = get(f"{BASE}/struct") or {}
     tnames = {}
+    def _nm(o):  # 12/07: Superbet usa localNames{pt-BR}, NÃO name → sem isto tnames ficava vazio (liga em branco)
+        ln = o.get("localNames")
+        if isinstance(ln, dict): return ln.get("pt-BR") or ln.get("en") or next(iter(ln.values()), None)
+        return o.get("name")
     def walk(o):
         if isinstance(o, dict):
-            if o.get("id") and o.get("name") and ("tournament" in json.dumps(o.get("type", "")) or True):
-                tnames[str(o["id"])] = o["name"]
+            nm = _nm(o)
+            if o.get("id") and nm:
+                tnames[str(o["id"])] = nm
             for v in o.values(): walk(v)
         elif isinstance(o, list):
             for v in o: walk(v)
