@@ -122,6 +122,54 @@ class ShotsPricer:
         return {"mu": mu, "p_over": po, "p_under": 1.0 - po}
 
 
+# ---------------- ESCANTEIOS (Ridge por lado + blend liga, Poisson) ----------------
+class CornersPricer:
+    market = "escanteios"
+
+    def __init__(self):
+        if _BUNDLE and _BUNDLE.get("corners"):
+            b = _BUNDLE["corners"]
+            self.C = b["C"]; self.lgavg = b["lgavg"]
+            self.by = {_tk(k): v for k, v in b["teams"].items()}
+            self.leagues = set(lg for lg, _ in self.by)
+            return
+        h = _read("Modelo Preditivo de Escanteios v2.html")
+        m = re.search(r"const C=", h)
+        self.C, _ = json.JSONDecoder().raw_decode(h, m.end())
+        m = re.search(r"const LG_AVGS=", h)
+        self.lgavg, _ = json.JSONDecoder().raw_decode(h, m.end())
+        mt = re.search(r"const T_DATA=`([^`]*)`", h)
+        self.by = {}; self.leagues = set()
+        for ln in mt.group(1).strip().split("\n"):
+            if not ln: continue
+            p = ln.split("\t")
+            self.leagues.add(p[0])
+            self.by[(p[0], int(p[1]))] = {
+                "fH": float(p[3]), "fA": float(p[4]), "cH": float(p[5]), "cA": float(p[6]),
+                "recF": float(p[7]) if len(p) > 7 and p[7] else None,
+                "recA": float(p[8]) if len(p) > 8 and p[8] else None}
+
+    def _side(self, side, own, opp, lg):
+        w = self.C[side]
+        if side == "home":
+            f = [own["fH"], opp["cA"], own["recF"] if own["recF"] is not None else own["fH"],
+                 opp["recA"] if opp["recA"] is not None else opp["cA"], lg / 2]
+        else:
+            f = [own["fA"], opp["cH"], own["recF"] if own["recF"] is not None else own["fA"],
+                 opp["recA"] if opp["recA"] is not None else opp["cH"], lg / 2]
+        return w[0] + w[1] * f[0] + w[2] * f[1] + w[3] * f[2] + w[4] * f[3] + w[5] * f[4]
+
+    def price(self, lg, home_id, away_id, line):
+        h = self.by.get((lg, int(home_id))); a = self.by.get((lg, int(away_id)))
+        if not h or not a or lg not in self.lgavg: return None
+        lgtot = self.lgavg[lg]["tot"]
+        ph = self._side("home", h, a, lgtot); pa = self._side("away", a, h, lgtot)
+        bl = self.C["blend"]
+        mu = max(1.0, (1 - bl) * (ph + pa) + bl * lgtot)
+        po = 1.0 - pois_cdf(math.floor(line), mu)
+        return {"mu": mu, "p_over": po, "p_under": 1.0 - po}
+
+
 # ---------------- FALTAS (Binomial Negativa, μ recência de matches.json) ----------------
 class FoulsPricer:
     market = "faltas"
@@ -177,10 +225,17 @@ class FoulsPricer:
 if __name__ == "__main__":
     import sys
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    cp, sp, fp = CardsPricer(), ShotsPricer(), FoulsPricer()
+    cp, sp, fp, xp = CardsPricer(), ShotsPricer(), FoulsPricer(), CornersPricer()
     print(f"Cartões: ȳ={cp.ybar} β={cp.beta} · ligas={sorted(cp.leagues)} · {len(cp.by)} times")
     print(f"Finaliz: β={sp.beta} φ={sp.phi} · ligas={sorted(sp.leagues)} · {len(sp.by)} times")
     print(f"Faltas:  β={fp.beta} φ={fp.phi} · times c/ fc={len(fp.fc)} · ligas c/ base={sorted(fp.lgtot)}")
+    print(f"Escant.: blend={xp.C['blend']} · ligas={sorted(xp.leagues)} · {len(xp.by)} times")
+    xpl = [tid for (lg, tid) in xp.by if lg == "PL"][:2]
+    if len(xpl) == 2:
+        h, a = xpl
+        for L in (8.5, 9.5, 10.5):
+            r = xp.price("PL", h, a, L)
+            print(f"  ESC PL {h}x{a} L{L}: μ={r['mu']:.2f} over={r['p_over']*100:.1f}% (justa {1/max(r['p_over'],1e-6):.2f})")
     # self-test: Arsenal(42) x Man City(17)? procurar 2 ids da PL nos cartões
     pl_ids = [tid for (lg, tid) in cp.by if lg == "PL"][:2]
     if len(pl_ids) == 2:

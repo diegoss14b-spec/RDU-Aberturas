@@ -27,14 +27,14 @@ except Exception:
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from value_pricers import CardsPricer, ShotsPricer, FoulsPricer
+from value_pricers import CardsPricer, ShotsPricer, FoulsPricer, CornersPricer
 
 BRT = timezone(timedelta(hours=-3))
 # mercados do board (ordem de exibição) + qual tem modelo de valor
-# Diego (08/07): mostrar SÓ estes 6; escanteios/chutes-no-gol/desarmes não vão pro site
-MERCADOS = ["Cartões", "Faltas", "Finalizações", "Impedimentos", "Laterais", "Tiros de meta"]
+# 12/07: Escanteios entra (Diego pediu no comparador de valor — modelo v2 de 11 ligas)
+MERCADOS = ["Cartões", "Faltas", "Finalizações", "Escanteios", "Impedimentos", "Laterais", "Tiros de meta"]
 MERC_SET = set(MERCADOS)
-MODELO = {"Cartões": "cartoes", "Faltas": "faltas", "Finalizações": "finalizacoes"}
+MODELO = {"Cartões": "cartoes", "Faltas": "faltas", "Finalizações": "finalizacoes", "Escanteios": "escanteios"}
 # limiares do flag de valor (secundário)
 EV_MIN, EDGE_MIN, MARGIN_CAP, P_LO, P_HI = 0.05, 0.04, 0.12, 0.15, 0.85  # P∈[15,85]% = região calibrada (evita artefato longe do μ)
 FUZZ_MIN = 88
@@ -62,26 +62,33 @@ def norm_team(name):
     key = " ".join(toks) or s.strip()
     return ALIASES.get(key, key)
 def _n(s): return unidecode((s or "").lower())
+# tupla: (cartoes, faltas, finalizacoes, escanteios)
 LEAGUE_RULES = [
-    (lambda l: "brasileir" in l and ("serie b" in l or "série b" in l or "- b" in l), ("B", "BR-B", None)),
-    (lambda l: "brasileir" in l and "serie b" not in l, ("A", "BR-A", "BR")),
-    (lambda l: "premier league" in l or ("premier" in l and "ingl" in l), ("PL", "PL", "PL")),
-    (lambda l: "laliga" in l or "la liga" in l or ("primera" in l and "espan" in l), ("LL", "LL", "LL")),
-    (lambda l: "serie a" in l and ("ital" in l or "itali" in l), ("SA", "SA", "SA")),
-    (lambda l: "bundesliga" in l and "2" not in l, ("BU", "BU", "BU")),
-    (lambda l: "ligue 1" in l, ("L1", "L1", "L1")),
+    (lambda l: "brasileir" in l and ("serie b" in l or "série b" in l or "- b" in l), ("B", "BR-B", None, "BR-B")),
+    (lambda l: "brasileir" in l and "serie b" not in l, ("A", "BR-A", "BR", "BR-A")),
+    (lambda l: "premier league" in l or ("premier" in l and "ingl" in l), ("PL", "PL", "PL", "PL")),
+    (lambda l: "laliga" in l or "la liga" in l or ("primera" in l and "espan" in l), ("LL", "LL", "LL", "LL")),
+    (lambda l: "serie a" in l and ("ital" in l or "itali" in l), ("SA", "SA", "SA", "SA")),
+    (lambda l: "bundesliga" in l and "2" not in l, ("BU", "BU", "BU", "BU")),
+    (lambda l: "ligue 1" in l, ("L1", "L1", "L1", "L1")),
+    # ligas exóticas: só escanteios (modelo v2 tem CSL/BOL/ECU/NOR)
+    (lambda l: "chin" in l or "super liga chinesa" in l or "csl" in l, (None, None, None, "CSL")),
+    (lambda l: "bolivi" in l or "boliviano" in l, (None, None, None, "BOL")),
+    (lambda l: "equador" in l or "ecuad" in l or "ligapro" in l, (None, None, None, "ECU")),
+    (lambda l: "norueg" in l or "eliteserien" in l, (None, None, None, "NOR")),
 ]
 def classify_league(lg):
     l = _n(lg)
     for pred, c in LEAGUE_RULES:
         try:
-            if pred(l): return {"cartoes": c[0], "faltas": c[1], "finalizacoes": c[2]}
+            if pred(l): return {"cartoes": c[0], "faltas": c[1], "finalizacoes": c[2], "escanteios": c[3]}
         except Exception: pass
     return None
 
 # Betano: nome do mercado cru -> mercado canônico do board (só jogo inteiro)
 BETANO_MK = {
     "Total de Cartões": "Cartões", "Total de Faltas": "Faltas", "Total de chutes": "Finalizações",
+    "Escanteios": "Escanteios",
     "Chutes no gol": "Chutes no gol", "Total de Impedimentos": "Impedimentos",
     "Total de laterais": "Laterais", "Total de tiros de meta": "Tiros de meta",
 }
@@ -101,7 +108,7 @@ def load_betano():
         if not ln.strip(): continue
         e = json.loads(ln)
         mk = {}
-        for aba in ("cartoes", "estatisticas", "principais_ou"):
+        for aba in ("cartoes", "estatisticas", "principais_ou", "escanteios"):
             for m in (e.get("markets", {}).get(aba) or []):
                 canon = BETANO_MK.get(m.get("market"))
                 if not canon: continue
@@ -152,8 +159,8 @@ def de_vig(over, under):
 
 
 def main():
-    cp, sp, fp = CardsPricer(), ShotsPricer(), FoulsPricer()
-    PRICERS = {"cartoes": cp, "finalizacoes": sp, "faltas": fp}
+    cp, sp, fp, xp = CardsPricer(), ShotsPricer(), FoulsPricer(), CornersPricer()
+    PRICERS = {"cartoes": cp, "finalizacoes": sp, "faltas": fp, "escanteios": xp}
     import value_pricers as _vp
     if getattr(_vp, "_BUNDLE", None) and _vp._BUNDLE.get("name_idx"):
         # NUVEM: resolver de nome→id vem do bundle (sem HTML nem matches.json)
@@ -178,7 +185,13 @@ def main():
                 t = m.get(s) or {}
                 if t.get("id") and t.get("name") and (comp, t["id"]) not in seen:
                     seen.add((comp, t["id"])); fouls_idx.setdefault(comp, {})[norm_team(t["name"])] = t["id"]
-        IDX = {"cartoes": cards_idx, "finalizacoes": shots_idx, "faltas": fouls_idx}
+        xh = (ROOT / "netlify-deploy/Modelo Preditivo de Escanteios v2.html").read_text(encoding="utf-8", errors="replace")
+        xmt = re.search(r"const T_DATA=`([^`]*)`", xh)
+        corners_idx = {}
+        for lnn in xmt.group(1).strip().split("\n"):
+            if lnn:
+                p = lnn.split("\t"); corners_idx.setdefault(p[0], {})[norm_team(p[2])] = int(p[1])
+        IDX = {"cartoes": cards_idx, "finalizacoes": shots_idx, "faltas": fouls_idx, "escanteios": corners_idx}
 
     def match(model, lg, name):
         d = IDX[model].get(lg) or {}; key = norm_team(name)

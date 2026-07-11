@@ -102,6 +102,21 @@ h1 .rd{color:var(--purple)}
 .mv-legend .sw{display:inline-block;width:10px;height:3px;border-radius:2px;vertical-align:2px;margin-right:4px}
 tr.mv-open td{background:var(--purple-soft)!important}
 .hist-mv.up{color:var(--green);font-weight:700} .hist-mv.dn{color:var(--red);font-weight:700} .hist-mv.flat{color:var(--faint)}
+/* --- Valor (+EV) --- */
+.vbets{display:flex;flex-direction:column;gap:9px}
+.vbet{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px 13px;box-shadow:0 1px 2px rgba(26,22,38,.04)}
+.vb-rank{font:700 13px var(--mono);color:var(--faint);width:20px;text-align:center;flex-shrink:0}
+.vb-main{flex:1;min-width:0}
+.vb-top{display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap}
+.vb-ev{font:700 12px var(--mono);color:#fff;background:var(--green);border-radius:6px;padding:2px 7px}
+.vb-ev.ev-md{background:#3f9b5c} .vb-ev.ev-lo{background:#84a98c}
+.vb-pick{font:600 12.5px var(--sans);color:var(--ink)} .vb-pick b{color:var(--purple)}
+.vb-game{font:600 14px var(--disp);letter-spacing:-.2px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vb-meta{font-size:10.5px;color:var(--faint);margin-top:2px}
+.vb-num{text-align:right;flex-shrink:0}
+.vb-odd{font:12.5px var(--mono);color:var(--ink)} .vb-odd b{font-size:15px;color:var(--red)}
+.vb-house{font:700 8.5px var(--disp);letter-spacing:.4px;background:var(--ink);color:#fff;padding:1px 6px;border-radius:5px;text-transform:uppercase}
+.vb-prob{font-size:10.5px;color:var(--dim);margin-top:3px}
 [hidden]{display:none!important}
 </style>
 </head><body>
@@ -109,6 +124,7 @@ tr.mv-open td{background:var(--purple-soft)!important}
   <div class="hdr"><div class="mark">R</div><div><h1>Mesa de <span class="rd">Aberturas</span></h1><div class="tag">Rei do Under · odds ao vivo</div></div></div>
   <div class="bar hist-nav" id="viewsel">
     <span class="chip on" data-view="board" role="button" tabindex="0">Mesa de Aberturas</span>
+    <span class="chip val" data-view="valor" role="button" tabindex="0">🎯 Valor (+EV)</span>
     <span class="chip" data-view="hist" role="button" tabindex="0">Histórico &amp; CLV</span>
   </div>
   <div id="view-board">
@@ -119,6 +135,7 @@ tr.mv-open td{background:var(--purple-soft)!important}
   <div class="meta" id="meta"></div>
   <div id="lista"></div>
   </div><!-- /view-board -->
+  <div id="view-valor" hidden></div>
   <div id="view-hist" hidden><div id="hist-root"></div></div>
   <div class="foot">Rei do Under · Mesa de Aberturas</div>
 </div>
@@ -126,19 +143,22 @@ tr.mv-open td{background:var(--purple-soft)!important}
 <script src="data/history.js"></script>
 <script src="data/moves.js"></script>
 <script src="js/board.js"></script>
+<script src="js/valor.js"></script>
 <script src="js/history.js"></script>
 <script>
-  // seletor de view: alterna Mesa de Aberturas / Histórico & CLV
+  // seletor de view: alterna Mesa de Aberturas / Valor (+EV) / Histórico & CLV
   (function () {
     var sel = document.getElementById("viewsel");
     if (!sel) return;
-    var vb = document.getElementById("view-board"), vh = document.getElementById("view-hist");
+    var vb = document.getElementById("view-board"), vv = document.getElementById("view-valor"), vh = document.getElementById("view-hist");
     sel.querySelectorAll(".chip").forEach(function (c) {
       function go() {
         var v = c.getAttribute("data-view");
         sel.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x === c); });
         if (vb) vb.hidden = (v !== "board");
+        if (vv) vv.hidden = (v !== "valor");
         if (vh) vh.hidden = (v !== "hist");
+        if (v === "valor" && window.renderValor) window.renderValor();
         window.scrollTo(0, 0);
       }
       c.onclick = go;
