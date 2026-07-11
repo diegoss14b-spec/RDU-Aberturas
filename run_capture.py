@@ -92,9 +92,13 @@ def main():
         f = STATUS / f"{casa}.json"
         st = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
         per_casa[casa] = {"ok": bool(st.get("ok")), "n": st.get("n_events") or 0}
-    hist_line = {"ts": summary["ts_brt"], "casas": per_casa, "total": total_events}
-    with (STATUS / "history.jsonl").open("a", encoding="utf-8") as hf:
-        hf.write(json.dumps(hist_line, ensure_ascii=False) + "\n")
+    # SÓ nas capturas CHEIAS (o painel "7 dias" mede a confiabilidade do board completo;
+    # o modo close tem janela curta e mediria uma coisa diferente → não polui o painel)
+    import os
+    if not os.environ.get("ODDS_WINDOW_H"):
+        hist_line = {"ts": summary["ts_brt"], "casas": per_casa, "total": total_events}
+        with (STATUS / "history.jsonl").open("a", encoding="utf-8") as hf:
+            hf.write(json.dumps(hist_line, ensure_ascii=False) + "\n")
     print(f"\n===== RESUMO: {len(casas_ok)}/4 casas ok · {total_events} eventos · deploy_allowed={deploy_allowed} ({reason})")
     for cf in casas_fail:
         print(f"  ✗ {cf['casa']}: {cf['error']}")
