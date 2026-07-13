@@ -274,6 +274,7 @@ def main():
                         "away": fx["away"],
                         "sofa_id": fx["sofa_id"],
                         "casas": set(), "mercados": {}, "times": {}, "valor": [],
+                        "_stale_casas": set(),
                         "_parts": [fx["home"], fx["away"]],
                         "_league": fx.get("league") or e.get("league") or "",
                         "_hn": fx["_hn"], "_an": fx["_an"],
@@ -308,9 +309,11 @@ def main():
                  "away": parts[1].strip() if len(parts) == 2 else "",
                  "casas": set(), "mercados": {}, "times": {}, "valor": [],
                  "_parts": parts, "_league": e["league"],
-                 "_hn": hn, "_an": an, "_day": day, "_ini": ini}
+                 "_hn": hn, "_an": an, "_day": day, "_ini": ini,
+                 "_stale_casas": set()}
             jogos.append(j)
             n_fuzzy += 1
+        j.setdefault("_stale_casas", set())
         def _sane(linhas):
             return [l for l in linhas
                     if isinstance(l.get("linha"), (int, float))
@@ -337,7 +340,10 @@ def main():
                     slot[side]["nome"] = tname
                 # se já existe de outra fonte, prefere o nome do confronto
                 slot[side]["casas"][e["casa"]] = linhas
-        if j["mercados"] or j["times"]: j["casas"].add(e["casa"])
+        if j["mercados"] or j["times"]:
+            j["casas"].add(e["casa"])
+            if e.get("_stale"):
+                j["_stale_casas"].add(e["casa"])
 
     print(f"match: sofa_hit={n_sofa_hit} · fuzzy/orphan={n_fuzzy} · grupos={len(jogos)}")
     # flag de VALOR (secundário) onde há modelo
@@ -373,6 +379,9 @@ def main():
         j["casas"] = sorted(j["casas"])
         j["n_mercados"] = len(j["mercados"])
         j["tem_valor"] = len(j["valor"]) > 0
+        stale = sorted(j.pop("_stale_casas", set()) or [])
+        if stale:
+            j["stale_casas"] = stale
         # limpa slots de times vazios
         times_clean = {}
         for c, sides in (j.get("times") or {}).items():
@@ -393,14 +402,22 @@ def main():
     _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle"}
     _stdir = ROOT / "data" / "odds" / "_status"
     if _stdir.exists():
-        cap = {"casas_ok": [], "casas_fail": []}
+        cap = {"casas_ok": [], "casas_fail": [], "casas_stale": []}
         for _c, _nome in _disp.items():
             _f = _stdir / f"{_c}.json"
             if not _f.exists(): continue
             try: _st = json.loads(_f.read_text(encoding="utf-8"))
             except Exception: continue
             if _st.get("ok"): cap["casas_ok"].append(_nome)
-            else: cap["casas_fail"].append({"casa": _nome, "error": (_st.get("error") or "?")[:120]})
+            else: cap["casas_fail"].append({"casa": _nome, "error": (_st.get("error") or "?")[:120],
+                                            "error_class": _st.get("error_class")})
+        # stale-keep: casas presentes no board via full antigo
+        _stale_all = set()
+        for _j in lista:
+            for _sc in (_j.get("stale_casas") or []):
+                _stale_all.add(_sc)
+        if _stale_all:
+            cap["casas_stale"] = sorted(_stale_all)
         # confiabilidade 7 dias (11/07): lê o history.jsonl das rodadas e agrega por casa
         _hf = _stdir / "history.jsonl"
         if _hf.exists():
@@ -416,7 +433,7 @@ def main():
                     a["total"] += 1; a["ok"] += 1 if _v.get("ok") else 0
             if _agg:
                 cap["hist7"] = {_disp.get(c, c): v for c, v in _agg.items()}
-        if cap["casas_ok"] or cap["casas_fail"]:
+        if cap["casas_ok"] or cap["casas_fail"] or cap.get("casas_stale"):
             out["capture"] = cap
     outdir = ROOT / "valor" / "data"; outdir.mkdir(parents=True, exist_ok=True)
     (outdir / "board.js").write_text("window.BOARD=" + json.dumps(out, ensure_ascii=False) + ";", encoding="utf-8")

@@ -196,6 +196,7 @@
     var qTxt = Object.keys(q).length
       ? Object.keys(q).map(function (k) { return k + " " + q[k]; }).join(" · ")
       : "";
+    var lm = H.line_moves_7d;
     var histHtml = H
       ? '<div class="op-sec"><div class="op-sec-h">Banco de odds (histórico)</div>'
         + '<div class="op-kpis op-kpis-sm">'
@@ -203,9 +204,14 @@
         + kpiMini("Liquidadas", H.liquidadas)
         + kpiMini("CLV válidas", H.clv_validas)
         + kpiMini("% moveu", H.moveu_pct != null ? br(H.moveu_pct, 1) + "%" : "—")
+        + kpiMini("Line moves 7d", lm != null ? String(lm) : "—")
         + "</div>"
+        + (H.clv_em_formacao
+          ? '<div class="op-av op-av-warn">CLV em formação — N pré-jogo &lt; ' + esc(String(H.clv_limiar || 30)) +
+            " (agora " + esc(String(H.clv_validas || 0)) + "). Não use ROI/green agregado como prova.</div>"
+          : "")
         + (qTxt ? '<div class="op-muted op-note">Qualidade captura: ' + esc(qTxt) + "</div>" : "")
-        + '<div class="op-muted op-note">CLV válido exige abertura vista antes do apito. '
+        + '<div class="op-muted op-note">CLV válido exige abertura vista antes do apito. Line move = main line mudou. '
         + "Gerado " + esc(H.gerado || "—") + ".</div></div>"
       : "";
 

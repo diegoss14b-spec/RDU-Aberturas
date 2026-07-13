@@ -32,13 +32,15 @@
 
   function freshness() {
     var m = /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(B.gerado || "");
-    if (!m) return { txt: "?", stale: false };
+    if (!m) return { txt: "?", mins: null, stale: false, band: "unk" };
     var d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
     var mins = Math.round((Date.now() - d.getTime()) / 60000);
     if (mins < 0) mins = 0;
     var txt = mins < 1 ? "agora mesmo" : mins < 60 ? ("há " + mins + " min")
       : ("há " + Math.floor(mins / 60) + "h" + (mins % 60 ? " " + (mins % 60) + "min" : ""));
-    return { txt: txt, stale: mins > 300 };
+    // OddsPortal-style: green ≤10min · yellow 10–60 · red >60 · stale board >5h
+    var band = mins <= 10 ? "fresh" : mins <= 60 ? "mid" : "old";
+    return { txt: txt, mins: mins, stale: mins > 300, band: band };
   }
 
   function chip(label, active, cls, onclick) {
@@ -301,12 +303,22 @@
     // se não há NENHUMA linha de time em nenhuma casa, ainda mostramos as colunas vazias
     // (usuário pediu layout fixo 3 colunas pra usar a tela)
 
+    var staleSet = {};
+    (j.stale_casas || []).forEach(function (c) { staleSet[c] = 1; });
+    var frCard = freshness();
     el.innerHTML =
-      '<div class="g-top"><div><div class="g-name">' + esc(j.jogo) + "</div>" +
+      '<div class="g-top"><div><div class="g-name">' + esc(j.jogo) +
+      ' <span class="fresh-dot ' + frCard.band + '" title="Frescor da mesa: ' + esc(frCard.txt) + '"></span></div>' +
       '<div class="g-liga">' + esc(j.liga || "") + "</div>" +
       '<div class="houses">' + Object.keys(allHouses).map(function (c) {
-        return '<span class="house">' + esc(c) + "</span>";
-      }).join("") + "</div></div>" +
+        return '<span class="house' + (staleSet[c] ? " house-stale" : "") + '"' +
+          (staleSet[c] ? ' title="Inventário antigo (stale-keep) — última full reutilizada"' : "") +
+          ">" + esc(c) + (staleSet[c] ? " *" : "") + "</span>";
+      }).join("") + "</div>" +
+      (j.stale_casas && j.stale_casas.length
+        ? '<div class="g-stale-note">⚠ casa reutilizada (full anterior): ' + esc(j.stale_casas.join(", ")) + "</div>"
+        : "") +
+      "</div>" +
       '<div class="g-when">' + esc(j.inicio) + "</div></div>" +
       valStrip +
       grid;
@@ -350,21 +362,28 @@
     meta.innerHTML =
       "<b>" + esc(state.mercado) + "</b> · " + vis.length + " jogo" + (vis.length === 1 ? "" : "s") +
       " · " + esc(Object.keys(nCasas).join(", ") || "—") +
-      ' · <span class="fresh' + (fr.stale ? " stale" : "") + '">atualizado ' + esc(fr.txt) +
+      ' · <span class="fresh fresh-' + fr.band + (fr.stale ? " stale" : "") + '">' +
+      '<span class="fresh-dot ' + fr.band + '"></span> atualizado ' + esc(fr.txt) +
       (fr.stale ? " ⚠ (pode estar defasado)" : "") + "</span>" +
       ' · <span class="meta-hint">jogo · mandante · visitante</span>';
 
     var capEl = document.getElementById("capstatus");
     if (capEl) {
       var cap = B.capture;
-      if (cap && ((cap.casas_ok || []).length || (cap.casas_fail || []).length)) {
+      if (cap && ((cap.casas_ok || []).length || (cap.casas_fail || []).length || (cap.casas_stale || []).length)) {
         var okN = (cap.casas_ok || []).length, failN = (cap.casas_fail || []).length;
+        var staleN = (cap.casas_stale || []).length;
         var parts = (cap.casas_ok || []).map(function (c) {
           return '<span class="cap-ok">' + esc(c) + " ✓</span>";
         }).concat((cap.casas_fail || []).map(function (f) {
-          return '<span class="cap-fail" title="' + esc(f.error || "") + '">' + esc(f.casa) + " ✗</span>";
+          return '<span class="cap-fail" title="' + esc((f.error_class ? f.error_class + ": " : "") + (f.error || "")) + '">' +
+            esc(f.casa) + " ✗</span>";
+        })).concat((cap.casas_stale || []).map(function (c) {
+          return '<span class="cap-stale" title="Full anterior reutilizado (stale-keep)">' + esc(c) + " *</span>";
         }));
-        var cls = failN === 0 ? "cap-green" : (okN >= 3 ? "cap-yellow" : "cap-red");
+        var cls = failN === 0 && staleN === 0 ? "cap-green" : (okN >= 3 || staleN ? "cap-yellow" : "cap-red");
+        if (fr.band === "old" || fr.stale) cls = "cap-red";
+        else if (fr.band === "mid" && cls === "cap-green") cls = "cap-yellow";
         capEl.className = "capbar " + cls;
         var histTxt = "";
         if (cap.hist7) {
@@ -374,8 +393,10 @@
           });
           histTxt = '<div class="cap-note">Últimos 7 dias: ' + hs.join(" · ") + "</div>";
         }
-        capEl.innerHTML = "Casas nesta rodada: " + parts.join(" · ") +
-          (failN ? '<div class="cap-note">Captura incompleta — mercados podem existir nas casas marcadas com ✗ e não aparecer aqui.</div>' : "") +
+        capEl.innerHTML = '<span class="fresh-dot ' + fr.band + '"></span> Frescor mesa: <b>' + esc(fr.txt) + "</b> · Casas: " +
+          parts.join(" · ") +
+          (failN ? '<div class="cap-note">Captura incompleta — mercados podem existir nas casas ✗ e não aparecer aqui.</div>' : "") +
+          (staleN ? '<div class="cap-note">* Stale-keep: odd da full anterior (até 12h) porque a captura atual falhou ou não atualizou.</div>' : "") +
           histTxt;
         capEl.style.display = "";
       } else {

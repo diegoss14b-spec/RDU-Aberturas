@@ -180,6 +180,8 @@ def main():
         "n_bateu": len(bateu), "n_nao": len(nao),
         "roi_abertura": ra, "roi_fechamento": rf,
         "roi_delta": (round(ra - rf, 2) if (ra is not None and rf is not None) else None),
+        "em_formacao": n_valid < LIMIARES["head"],
+        "limiar_clv": LIMIARES["head"],
     }
 
     # --- recortes sobre V (só se head_ok) ---

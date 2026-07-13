@@ -279,22 +279,50 @@ def board_coverage(board):
     }
 
 
+def count_line_moves(days=7):
+    """Conta ticks kind=line_move nos últimos N dias."""
+    ticks_dir = ROOT / "data" / "odds_history" / "ticks"
+    if not ticks_dir.exists():
+        return 0
+    cut = (now_brt() - timedelta(days=days)).strftime("%Y-%m-%d")
+    n = 0
+    for f in sorted(ticks_dir.glob("*.jsonl")):
+        if f.stem < cut:
+            continue
+        try:
+            for ln in f.read_text(encoding="utf-8").splitlines():
+                try:
+                    t = json.loads(ln)
+                except Exception:
+                    continue
+                if t.get("kind") == "line_move":
+                    n += 1
+        except Exception:
+            continue
+    return n
+
+
 def history_health():
     hist = load_js_window(ROOT / "valor" / "data" / "history.js", "window.HIST=")
     if not hist:
         return None
     banco = hist.get("banco") or {}
     head = hist.get("head") or {}
+    n_valid = banco.get("clv_validas") if banco.get("clv_validas") is not None else head.get("n_valid")
+    lim = (hist.get("limiares") or {}).get("head") or 30
     return {
         "gerado": hist.get("gerado"),
         "monitoradas": banco.get("monitoradas"),
         "liquidadas": banco.get("liquidadas"),
-        "clv_validas": banco.get("clv_validas") or head.get("n_valid"),
+        "clv_validas": n_valid,
         "moveu_pct": banco.get("moveu_pct"),
         "green_geral": head.get("green_geral"),
         "n_abertas": len(hist.get("abertas") or []),
         "n_liquidadas_tab": len(hist.get("liquidadas") or []),
         "quality": banco.get("quality") or {},
+        "line_moves_7d": count_line_moves(7),
+        "clv_em_formacao": (n_valid or 0) < lim,
+        "clv_limiar": lim,
     }
 
 

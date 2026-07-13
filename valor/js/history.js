@@ -12,8 +12,18 @@
   var LADO_EN = { "Mais": "over", "Menos": "under", over: "over", under: "under" };
 
   // explorar | liquidadas | abertas
-  var state = { aba: "explorar", merc: "todos", res: "todos",
+  var state = { aba: "explorar", merc: "todos", res: "todos", quality: "todos",
     game: null, mercado: null, linha: null, casa: null };
+
+  var Q_LABEL = {
+    full_prematch: "pré-jogo OK", late_open: "open tarde", no_close: "sem close",
+    post_kickoff: "pós-apito", open: "aberta", unknown: "?"
+  };
+  function qBadge(q) {
+    if (!q || q === "unknown") return "";
+    var cls = q === "full_prematch" ? "q-ok" : (q === "late_open" ? "q-mid" : "q-bad");
+    return '<span class="q-badge ' + cls + '" title="Qualidade da captura">' + esc(Q_LABEL[q] || q) + "</span>";
+  }
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function br(x, d) { if (x == null || x !== x) return "—"; var n = Number(x); return (d != null ? n.toFixed(d) : String(n)).replace(".", ","); }
@@ -341,12 +351,22 @@
 
   // --- banner / headline (CLV) ---
   function banner() {
-    var b = H.banco || {}, nv = (H.head || {}).n_valid || 0;
+    var b = H.banco || {}, nv = (H.head || {}).n_valid || 0, head = H.head || {};
     var el = document.createElement("div");
+    var formacao = head.em_formacao != null ? head.em_formacao : (nv < LIM.head);
     el.className = "capbar " + (nv >= LIM.head ? "cap-green" : (nv > 0 ? "cap-yellow" : "cap-red"));
+    var q = b.quality || {};
+    var qBits = Object.keys(q).map(function (k) {
+      return (Q_LABEL[k] || k) + " <b>" + q[k] + "</b>";
+    }).join(" · ");
     el.innerHTML = "Banco de odds: <b>" + (b.monitoradas || 0) + "</b> linhas · <b>" +
       (b.liquidadas || 0) + "</b> liquidadas · <b>" + (b.clv_validas || 0) + "</b> CLV pré-jogo · " +
       br(b.moveu_pct, 1) + "% moveram" +
+      (formacao
+        ? '<div class="cap-note"><b>CLV em formação</b> — precisa ≥' + (head.limiar_clv || LIM.head) +
+          " linhas com abertura <b>antes</b> do apito (agora " + nv + "). Não use taxa/ROI agregado ainda.</div>"
+        : "") +
+      (qBits ? '<div class="cap-note">Qualidade: ' + qBits + "</div>" : "") +
       '<div class="cap-note">Explore um <b>jogo → mercado → main line</b> pra ver a curva até o fechamento e se a linha bateu.</div>';
     return el;
   }
@@ -419,11 +439,27 @@
         var card = document.createElement("button");
         card.type = "button";
         card.className = "ex-game-card" + (g.settled ? " settled" : " open");
+        // quality dominante do jogo (pior das rows)
+        var qRank = { post_kickoff: 0, no_close: 1, late_open: 2, full_prematch: 3, open: 2, unknown: 2 };
+        var bestQ = null, bestR = 99;
+        Object.keys(g.mercados).forEach(function (m) {
+          Object.keys(g.mercados[m].linhas || {}).forEach(function (Lk) {
+            var ln = g.mercados[m].linhas[Lk];
+            Object.keys(ln.lados || {}).forEach(function (lado) {
+              (ln.lados[lado].rows || []).forEach(function (r) {
+                var q = r.quality; if (!q) return;
+                var rk = qRank[q] != null ? qRank[q] : 2;
+                if (rk < bestR) { bestR = rk; bestQ = q; }
+              });
+            });
+          });
+        });
         card.innerHTML =
           '<div class="ex-g-top"><div class="ex-g-name">' + esc(g.jogo) + '</div>' +
           '<div class="ex-g-when">' + esc((g.kickoff || g.data || "").slice(0, 16).replace("T", " ")) + "</div></div>" +
           '<div class="ex-g-meta">' +
           (g.settled ? '<span class="ex-badge done">liquidado</span>' : '<span class="ex-badge live">aberto</span>') +
+          (bestQ ? qBadge(bestQ) : "") +
           '<span class="ex-g-m">' + nMerc + " mercado" + (nMerc === 1 ? "" : "s") + "</span>" +
           '<span class="ex-g-c">' + Object.keys(g.casas).join(" · ") + "</span></div>";
         card.onclick = function () {
@@ -612,6 +648,15 @@
       box.appendChild(chip("🟢 green", state.res === "green", "val", function () { state.res = state.res === "green" ? "todos" : "green"; render(); }));
       box.appendChild(chip("🔴 red", state.res === "red", "ord", function () { state.res = state.res === "red" ? "todos" : "red"; render(); }));
     }
+    // filtro qualidade (liquidadas + abertas)
+    if (state.aba === "liquidadas" || state.aba === "abertas") {
+      ["todos", "full_prematch", "late_open", "no_close", "post_kickoff"].forEach(function (q) {
+        var lab = q === "todos" ? "Qualidade: todas" : (Q_LABEL[q] || q);
+        box.appendChild(chip(lab, state.quality === q, "", function () {
+          state.quality = q; render();
+        }));
+      });
+    }
     return box;
   }
 
@@ -622,6 +667,7 @@
         if (state.res === "green" && !r.won) return false;
         if (state.res === "red" && r.won) return false;
       }
+      if (state.quality !== "todos" && (r.quality || "") !== state.quality) return false;
       return true;
     });
   }
@@ -629,7 +675,7 @@
   function tblLiquidadas(rows) {
     if (!rows.length) return '<div class="empty"><div class="big">📭</div>Nenhuma linha liquidada com esses filtros.</div>';
     var t = '<div class="hist-scroll"><table class="lad hist-tbl"><thead><tr>' +
-      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Fecha</th><th>CLV</th><th>Res.</th><th>Mov.</th></tr></thead><tbody>';
+      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Fecha</th><th>CLV</th><th>Qual.</th><th>Res.</th><th>Mov.</th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var invalid = !r.clv_valido;
       t += '<tr class="' + (invalid ? "sm" : "") + (anyMv(r.gk) ? " has-mv" : "") + '" data-gk="' + esc(r.gk || "") + '">' +
@@ -638,6 +684,7 @@
         '<td class="ln">' + br(r.linha, 1) + "</td><td>" + esc(r.lado) + "</td>" +
         '<td class="o">' + br(r.open, 2) + '</td><td class="u">' + br(r.close, 2) + "</td>" +
         '<td class="' + (invalid ? "" : cls(r.clv)) + '">' + (invalid ? "—" : sign(r.clv, 1)) + "</td>" +
+        "<td>" + qBadge(r.quality) + "</td>" +
         '<td class="' + (r.won ? "hist-mv up" : "hist-mv dn") + '">' + (r.won ? "green" : "red") + "</td>" +
         "<td>" + sparkline(r.gk, r.casa) + "</td></tr>";
     });
@@ -647,7 +694,7 @@
   function tblAbertas(rows) {
     if (!rows.length) return '<div class="empty"><div class="big">🕓</div>Nenhuma linha aberta com movimento.</div>';
     var t = '<div class="hist-scroll"><table class="lad hist-tbl"><thead><tr>' +
-      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Agora</th><th>Δ%</th><th>Obs</th><th>Mov.</th></tr></thead><tbody>';
+      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Agora</th><th>Δ%</th><th>Qual.</th><th>Obs</th><th>Mov.</th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var d = r.drift_pct;
       var mv = d == null ? "flat" : (d < 0 ? "up" : (d > 0 ? "dn" : "flat"));
@@ -655,7 +702,9 @@
         '<td class="jg">' + esc(r.jogo) + "</td><td>" + (ABBR[r.mercado] || esc(r.mercado)) + "</td>" +
         '<td class="ln">' + br(r.linha, 1) + "</td><td>" + esc(r.lado) + "</td>" +
         '<td class="o">' + br(r.open, 2) + '</td><td class="u">' + br(r.last, 2) + "</td>" +
-        '<td class="hist-mv ' + mv + '">' + sign(d, 1) + "</td><td>" + (r.n_moves || 0) + "</td>" +
+        '<td class="hist-mv ' + mv + '">' + sign(d, 1) + "</td>" +
+        "<td>" + qBadge(r.quality) + "</td>" +
+        "<td>" + (r.n_moves || 0) + "</td>" +
         "<td>" + sparkline(r.gk, r.casa) + "</td></tr>";
     });
     return t + "</tbody></table></div>";
