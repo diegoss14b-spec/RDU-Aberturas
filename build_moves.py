@@ -63,6 +63,8 @@ def main():
         except Exception:
             continue
         for k, v in keys.items():
+            if k.startswith("__") or not isinstance(v, dict):
+                continue
             meta = parse_history_key(k)
             if meta.get("format") == "unknown":
                 continue

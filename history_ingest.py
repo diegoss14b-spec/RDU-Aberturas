@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 """history_ingest.py — BANCO DE ODDS. A cada captura, lê {casa}_latest e registra:
-  - TICK (append ticks/{YYYY-MM-DD}.jsonl) quando odd mudou ≥0.01 ou 1ª obs
-  - KEY (upsert keys/{YYYY-MM}.json) open/last/min/max/n_obs/n_moves + sofa_id
+  - TICK (append) quando odd mudou ≥0.01, 1ª obs, ou main line mudou
+  - KEY upsert open/last/min/max + sofa_id + capture_quality
 
-Chave canônica (13/07):
+Chave canônica:
   com Sofa:  casa|sofa:{id}|mercado|linha|lado
   sem Sofa:  casa|data|home_norm|away_norm|mercado|linha|lado
+
+P1: não atualiza last_odd depois do kickoff; quality full_prematch|late_open|…
 """
 import json, sys
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from collections import defaultdict
 try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
@@ -18,10 +21,12 @@ except Exception:
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from canonical import resolve_fixture, history_key, load_sofa_fixtures, parse_start, norm_team
+from history_quality import (
+    compute_capture_quality, is_pre_kickoff, pick_main_line, parse_ts, ensure_aware, BRT,
+)
 
 ODDS = ROOT / "data" / "odds"
 HIST = ROOT / "data" / "odds_history"
-BRT = timezone(timedelta(hours=-3))
 CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle"]
 
 BETANO_MK = {
@@ -74,6 +79,12 @@ def load_events(casa):
         return []
 
 
+def _gid(idt, djogo, h, a):
+    if idt.get("sofa_id"):
+        return f"sofa:{idt['sofa_id']}"
+    return f"{djogo}|{h}|{a}"
+
+
 def main():
     now = datetime.now(BRT)
     now_iso = now.strftime("%Y-%m-%dT%H:%M:%S%z")
@@ -86,7 +97,15 @@ def main():
     tick_path = HIST / "ticks" / f"{now.strftime('%Y-%m-%d')}.jsonl"
     tick_f = tick_path.open("a", encoding="utf-8")
 
-    n_ticks = n_new = n_obs = n_sofa = 0
+    # main line state (persistido no próprio keys file sob __main_lines__)
+    main_store = keys.get("__main_lines__") or {}
+    if not isinstance(main_store, dict):
+        main_store = {}
+
+    # batch: (casa,gid,mercado) -> list of {linha,over,under}
+    batch_ou = defaultdict(list)
+
+    n_ticks = n_new = n_obs = n_sofa = n_skip_post = n_line_moves = 0
     for casa in CASAS:
         for ev in load_events(casa):
             idt = resolve_fixture(
@@ -99,7 +118,17 @@ def main():
                 n_sofa += 1
             djogo = idt["day"]
             h, a = idt["hn"], idt["an"]
+            gid = _gid(idt, djogo, h, a)
+            kick_iso = idt.get("kickoff_iso") or ""
+
             for mercado, linhas in (ev["mercados"] or {}).items():
+                # coleta O/U da partida p/ main line
+                for l in linhas:
+                    if l.get("over") and l.get("under") and l.get("linha") is not None:
+                        batch_ou[(casa, gid, mercado)].append({
+                            "linha": l["linha"], "over": l["over"], "under": l["under"],
+                        })
+
                 for l in linhas:
                     linha = l.get("linha")
                     if linha is None:
@@ -113,15 +142,18 @@ def main():
                             sofa_id=idt.get("sofa_id"),
                         )
                         k = keys.get(key)
+                        pre_ko = is_pre_kickoff(now, kick_iso) if kick_iso else True
                         changed = (k is None) or (abs((k.get("last_odd") or 0) - odd) >= 0.01)
+
                         if k is None:
+                            # open só “vale” se 1ª vista pré-kickoff; senão marca post
                             keys[key] = k = {
                                 "open_odd": odd, "open_ts": now_iso, "open_is_first_seen": True,
                                 "close_odd": None, "close_ts": None,
                                 "last_odd": odd, "last_ts": now_iso,
                                 "n_obs": 0, "n_moves": 0,
                                 "max_odd": odd, "min_odd": odd,
-                                "kickoff": idt.get("kickoff_iso") or "",
+                                "kickoff": kick_iso,
                                 "home_raw": ev["home_raw"], "away_raw": ev["away_raw"],
                                 "home_norm": h, "away_norm": a,
                                 "sofa_id": idt.get("sofa_id"),
@@ -131,33 +163,66 @@ def main():
                             }
                             n_new += 1
                         else:
-                            if changed and k.get("status") == "open":
-                                k["n_moves"] = (k.get("n_moves") or 0) + 1
-                            # atualiza metadados canônicos se ainda faltava sofa
                             if idt.get("sofa_id") and not k.get("sofa_id"):
                                 k["sofa_id"] = idt["sofa_id"]
                                 k["match_method"] = idt.get("match_method")
                                 k["match_confidence"] = idt.get("match_confidence")
+                            if kick_iso and not k.get("kickoff"):
+                                k["kickoff"] = kick_iso
+
                         k["n_obs"] = (k.get("n_obs") or 0) + 1
+
+                        # P1: não poluir last com odd pós-kickoff (preserva close real)
                         if k.get("status") == "open":
-                            k["last_odd"] = odd
-                            k["last_ts"] = now_iso
-                            k["max_odd"] = max(k.get("max_odd") or odd, odd)
-                            k["min_odd"] = min(k.get("min_odd") or odd, odd)
-                        if changed:
+                            if pre_ko:
+                                if changed:
+                                    k["n_moves"] = (k.get("n_moves") or 0) + 1
+                                k["last_odd"] = odd
+                                k["last_ts"] = now_iso
+                                k["max_odd"] = max(k.get("max_odd") or odd, odd)
+                                k["min_odd"] = min(k.get("min_odd") or odd, odd)
+                            else:
+                                n_skip_post += 1
+
+                        k["capture_quality"] = compute_capture_quality(k, now)
+
+                        if changed and pre_ko:
                             tick_f.write(json.dumps({
-                                "ts": now_iso, "casa": casa, "kickoff": k.get("kickoff"),
+                                "ts": now_iso, "kind": "price",
+                                "casa": casa, "kickoff": k.get("kickoff"),
                                 "home": h, "away": a, "mercado": mercado,
                                 "linha": linha, "lado": lado, "odd": odd,
                                 "sofa_id": k.get("sofa_id"),
-                                "djogo": djogo,
+                                "djogo": djogo, "gid": gid,
                             }, ensure_ascii=False) + "\n")
                             n_ticks += 1
+
+    # main line moves por (casa, gid, mercado)
+    for (casa, gid, mercado), ou_list in batch_ou.items():
+        main = pick_main_line(ou_list)
+        if main is None:
+            continue
+        mk = f"{casa}|{gid}|{mercado}"
+        prev = main_store.get(mk) or {}
+        prev_line = prev.get("line")
+        if prev_line is not None and abs(float(prev_line) - float(main)) >= 0.01:
+            tick_f.write(json.dumps({
+                "ts": now_iso, "kind": "line_move",
+                "casa": casa, "mercado": mercado, "gid": gid,
+                "linha_from": prev_line, "linha_to": main,
+                "sofa_id": gid.replace("sofa:", "") if str(gid).startswith("sofa:") else None,
+            }, ensure_ascii=False) + "\n")
+            n_line_moves += 1
+            n_ticks += 1
+        main_store[mk] = {"line": main, "ts": now_iso}
+
+    keys["__main_lines__"] = main_store
     tick_f.close()
     kf.write_text(json.dumps(keys, ensure_ascii=False), encoding="utf-8")
     print(
-        f"[ingest] {n_obs:,} obs · {n_ticks:,} ticks · {n_new:,} keys novas · "
-        f"sofa_match={n_sofa} · total keys mês={len(keys):,}"
+        f"[ingest] {n_obs:,} obs · {n_ticks:,} ticks ({n_line_moves} line_move) · "
+        f"{n_new:,} keys novas · sofa_match={n_sofa} · skip_post_ko={n_skip_post} · "
+        f"total keys mês={len(keys):,}"
     )
 
 

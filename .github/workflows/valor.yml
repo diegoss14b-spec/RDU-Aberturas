@@ -1,15 +1,16 @@
 name: Mesa de Aberturas (valor)
 
-# 13/07 — banco de odds denso (repo PÚBLICO = Actions ilimitado):
-#   full  = a cada 1h UTC: captura cheia + board + deploy + ticks (CLV/gráficos)
-#   close = jogo em ≤75min E última captura >30min (modo filtrado, sem deploy)
-#   skip  = captura muito recente (<25min) ou gate sem necessidade
-# Cron horário: o gate decide o modo.
+# 14/07 — densificação close (P1):
+#   full  = :00 UTC captura cheia + board + deploy
+#   close = jogo em ≤90min e última captura ≥12min (janela 2.5h, sem deploy)
+#   skip  = captura <12min
+# Extra crons :15/:30/:45 só pra close denso perto do apito.
 
 on:
   schedule:
-    - cron: "0 * * * *"      # horário (UTC) — o gate decide o modo
-  workflow_dispatch: {}       # manual = sempre full
+    - cron: "0 * * * *"           # full candidate
+    - cron: "15,30,45 * * * *"    # close densify
+  workflow_dispatch: {}           # manual = sempre full
 
 permissions:
   contents: write             # commit dos snapshots/histórico de odds no próprio repo
@@ -57,10 +58,11 @@ jobs:
               last = dt.datetime.strptime(s['ts_brt'], '%Y-%m-%d %H:%M').replace(
                   tzinfo=dt.timezone(dt.timedelta(hours=-3)))
               age_min = (now - last).total_seconds() / 60
-              if age_min < 20:
+              # mínimo 12 min entre capturas (densifica close sem martelar proxy)
+              if age_min < 12:
                   emit('skip', f'captura recente ({age_min:.0f}min)')
 
-              # close ANTES do full genérico: jogos em ≤75 min precisam de preço de fechamento
+              # jogos iminentes (≤90 min) → close prioritário
               soon = 0
               try:
                   t = urllib.request.urlopen(
@@ -75,23 +77,23 @@ jobs:
                       if k.tzinfo is None:
                           k = k.replace(tzinfo=dt.timezone(dt.timedelta(hours=-3)))
                       m = (k - now).total_seconds() / 60
-                      if 0 <= m <= 75: soon += 1
+                      if 0 <= m <= 90: soon += 1
               except Exception as e:
                   print('close-check falhou (segue full se aplicável):', e)
 
-              # close se há jogo iminente E última captura já tem ≥30 min
-              # (evita close a cada cron se full/close acabou de rodar)
-              if soon and age_min >= 30:
-                  emit('close', f'{soon} jogos em ≤75min (ultima captura ha {age_min:.0f}min)')
+              # close denso: ≥12 min desde última + jogo em ≤90 min
+              if soon and age_min >= 12:
+                  emit('close', f'{soon} jogos em ≤90min (ultima captura ha {age_min:.0f}min)')
 
-              # full horário densifica ticks (CLV/gráficos) quando não há close prioritário
+              # full só no horário :00 (cron principal) — crons :15/:30/:45 não full
+              minute = now.minute
               if os.environ.get('EVENT') == 'schedule':
-                  if soon and age_min < 30:
-                      emit('skip', f'jogo iminente mas captura ha {age_min:.0f}min (<30)')
+                  if minute != 0:
+                      emit('skip', f'slot {minute:02d}min sem jogo iminente')
                   emit('full', f'horario 1h (ultima ha {age_min:.0f}min)')
 
               if soon:
-                  emit('close', f'{soon} jogos em ≤75min')
+                  emit('close', f'{soon} jogos em ≤90min')
               emit('skip', 'sem jogo iminente')
           except SystemExit:
               raise

@@ -294,6 +294,7 @@ def history_health():
         "green_geral": head.get("green_geral"),
         "n_abertas": len(hist.get("abertas") or []),
         "n_liquidadas_tab": len(hist.get("liquidadas") or []),
+        "quality": banco.get("quality") or {},
     }
 
 

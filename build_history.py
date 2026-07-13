@@ -23,6 +23,7 @@ except Exception: pass
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from canonical import parse_history_key
+from history_quality import compute_capture_quality
 
 HIST = ROOT / "data" / "odds_history"
 OUT = ROOT / "valor" / "data" / "history.js"
@@ -101,7 +102,11 @@ def main():
     keys = {}
     for f in sorted(glob.glob(str(HIST / "keys" / "*.json"))):
         try:
-            keys.update(json.loads(Path(f).read_text(encoding="utf-8")))
+            raw = json.loads(Path(f).read_text(encoding="utf-8"))
+            for kk, vv in raw.items():
+                if kk.startswith("__") or not isinstance(vv, dict):
+                    continue
+                keys[kk] = vv
         except Exception as e:
             print(f"[history] pulei {f}: {type(e).__name__}")
 
@@ -202,6 +207,7 @@ def main():
         casa, gid, gk, mercado, linha, lado = row_ids(k, v)
         ots, kts = ts(v.get("open_ts")), ts(v.get("kickoff"))
         clv_valido = bool(v.get("open_odd") and v.get("close_odd") and ots and kts and ots < kts)
+        q = v.get("capture_quality") or compute_capture_quality(v)
         home = v.get("home_raw") or v.get("home_norm") or ""
         away = v.get("away_raw") or v.get("away_norm") or ""
         liquidadas.append({
@@ -213,7 +219,7 @@ def main():
             "clv": v.get("clv_pct"), "beat": v.get("beat_close"),
             "result": v.get("result"), "won": v.get("won"),
             "n_moves": v.get("n_moves", 0), "kickoff": v.get("kickoff"),
-            "clv_valido": clv_valido,
+            "clv_valido": clv_valido, "quality": q,
             "sofa_id": v.get("sofa_id"), "match_method": v.get("match_method"),
         })
     liquidadas.sort(key=lambda x: x["kickoff"] or "", reverse=True)
@@ -229,6 +235,7 @@ def main():
         casa, gid, gk, mercado, linha, lado = row_ids(k, v)
         op, last = v.get("open_odd"), v.get("last_odd")
         drift = round((last / op - 1) * 100, 2) if (op and last) else None
+        q = v.get("capture_quality") or compute_capture_quality(v)
         home = v.get("home_raw") or v.get("home_norm") or ""
         away = v.get("away_raw") or v.get("away_norm") or ""
         abertas.append({
@@ -238,17 +245,23 @@ def main():
             "linha": float(linha), "lado": LADO_PT.get(lado, lado),
             "open": op, "last": last, "min": v.get("min_odd"), "max": v.get("max_odd"),
             "drift_pct": drift, "n_moves": v.get("n_moves", 0), "kickoff": v.get("kickoff"),
+            "quality": q,
             "sofa_id": v.get("sofa_id"), "match_method": v.get("match_method"),
         })
     abertas.sort(key=lambda x: (x["kickoff"] or "", -(x.get("n_moves") or 0)))
 
     # banner no MESMO universo das métricas (BOARD6), pra não superestimar o tamanho do banco
     b6 = {k: v for k, v in keys.items() if merc_of(k) in BOARD6}
+    q_counts = {}
+    for v in b6.values():
+        q = v.get("capture_quality") or compute_capture_quality(v)
+        q_counts[q] = q_counts.get(q, 0) + 1
     banco = {
         "monitoradas": len(b6),
         "liquidadas": n_settled,
         "clv_validas": n_valid,
         "moveu_pct": round(100 * sum(1 for v in b6.values() if (v.get("n_moves") or 0) >= 1) / len(b6), 1) if b6 else 0.0,
+        "quality": q_counts,
     }
 
     out = {

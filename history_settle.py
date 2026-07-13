@@ -68,6 +68,8 @@ def main():
         keys = json.loads(p.read_text(encoding="utf-8"))
         changed = False
         for key, k in keys.items():
+            if key.startswith("__") or not isinstance(k, dict):
+                continue
             if k.get("status") != "closed": continue
             meta = parse_history_key(key)
             casa = meta.get("casa") or key.split("|")[0]

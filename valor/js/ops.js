@@ -192,6 +192,10 @@
       : "";
 
     // --- histórico banco ---
+    var q = H.quality || {};
+    var qTxt = Object.keys(q).length
+      ? Object.keys(q).map(function (k) { return k + " " + q[k]; }).join(" · ")
+      : "";
     var histHtml = H
       ? '<div class="op-sec"><div class="op-sec-h">Banco de odds (histórico)</div>'
         + '<div class="op-kpis op-kpis-sm">'
@@ -200,6 +204,7 @@
         + kpiMini("CLV válidas", H.clv_validas)
         + kpiMini("% moveu", H.moveu_pct != null ? br(H.moveu_pct, 1) + "%" : "—")
         + "</div>"
+        + (qTxt ? '<div class="op-muted op-note">Qualidade captura: ' + esc(qTxt) + "</div>" : "")
         + '<div class="op-muted op-note">CLV válido exige abertura vista antes do apito. '
         + "Gerado " + esc(H.gerado || "—") + ".</div></div>"
       : "";
