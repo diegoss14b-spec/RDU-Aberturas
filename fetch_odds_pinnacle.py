@@ -1,19 +1,21 @@
 # -*- coding: utf-8 -*-
-"""fetch_odds_pinnacle.py — captura Escanteios (jogo + time) da Pinnacle via API guest Arcadia
+"""fetch_odds_pinnacle.py — Escanteios + Cartões (Bookings) via API guest Arcadia
 (gringa: guest.api.arcadia.pinnacle.com — NÃO é pinnacle.bet.br).
 
-Mecanismo (validado 13/07/2026):
-  - matchups futebol: /sports/29/matchups
-  - escanteios = matchup FILHO com units='Corners' e parentId = jogo principal
-    ex.: 'America Mineiro (Corners) / Londrina (Corners)' parent=jogo gols
-  - odds: /matchups/{id}/markets/straight
-    s;0;ou;{linha}     → total da partida (period 0 = jogo inteiro)
-    s;0;tt;{linha};home → total mandante
-    s;0;tt;{linha};away → total visitante
-  - preços em AMERICANOS → convertidos p/ decimal
+Mecanismo (validado 13–14/07/2026, caso França×Espanha):
+  - matchups futebol: /sports/29/matchups?withSpecials=true
+  - specials de volume = matchup FILHO type=matchup com parentId = jogo principal
+      units='Corners'  → Escanteios  (ex. France (Corners) / Spain (Corners))
+      units='Bookings' → Cartões     (ex. France (Bookings) / Spain (Bookings))
+    ⚠ type=special + units=Bookings = props de JOGADOR (ignorar)
+  - odds: /matchups/{id}/markets/straight  (period 0 = FT)
+      s;0;ou;{linha}      → total partida
+      s;0;tt;{linha};home → total mandante
+      s;0;tt;{linha};away → total visitante
+  - preços AMERICANOS → decimal
+  - Bookings: linhas ~2.5–4.5 = contagem de cartões (NÃO booking points 10/25)
 
-Saída: data/odds/pinnacle_{stamp}.jsonl + pinnacle_latest.json (formato board).
-Cartões (units=Bookings): parser preparado; só grava quando houver O/U de partida aberta.
+Saída: 1 linha JSONL por JOGO (parent), mesclando Corners+Bookings em mercados.
 """
 import sys, os, json, re, time, random
 from pathlib import Path
@@ -49,7 +51,7 @@ H = {
 }
 MIN_EVENTS = 3
 MIN_EFF = MIN_EVENTS
-MAX_SPECIALS = 80  # teto de matchups de corners/bookings por rodada
+MAX_SPECIALS = 100  # teto de filhos corners/bookings por rodada
 
 # units Arcadia → mercado canônico do board
 UNIT_CANON = {
@@ -92,7 +94,6 @@ def get(path, tries=3):
 
 def _parts_names(m):
     parts = m.get("participants") or []
-    # home/away: alignment  home/away or order
     home = away = None
     for p in parts:
         al = (p.get("alignment") or "").lower()
@@ -110,11 +111,13 @@ def _parts_names(m):
     return home or "", away or ""
 
 
-def _strip_unit_suffix(name, unit):
-    """'America Mineiro (Corners)' → 'America Mineiro'."""
+def _strip_unit_suffix(name, unit=None):
+    """'France (Bookings)' / 'Spain (Corners)' → nome limpo."""
     n = (name or "").strip()
-    for u in (unit, unit.title(), unit.upper(), "Corners", "Bookings", "Cards"):
+    for u in ("Corners", "Bookings", "Cards", "Corner", "Booking", "Card"):
         n = re.sub(rf"\s*\({re.escape(u)}\)\s*$", "", n, flags=re.I)
+    if unit:
+        n = re.sub(rf"\s*\({re.escape(unit)}\)\s*$", "", n, flags=re.I)
     return n.strip()
 
 
@@ -132,6 +135,9 @@ def parse_markets(mkts, period=0):
         if per != period:
             continue
         typ = (m.get("type") or "").lower()
+        # só totais (ignora moneyline/spread de "mais cartões")
+        if typ not in ("total", "team_total"):
+            continue
         prices = m.get("prices") or []
         over = under = None
         line = None
@@ -165,8 +171,10 @@ def parse_markets(mkts, period=0):
                 home[line] = row
             elif side == "away":
                 away[line] = row
+
     def _arr(d):
         return [d[L] for L in sorted(d)]
+
     return _arr(match), _arr(home), _arr(away)
 
 
@@ -180,14 +188,20 @@ def main():
         return 0
 
     by_id = {m["id"]: m for m in mups if m.get("id")}
-    # specials de corners/bookings
+
+    # só matchup-filho O/U (NÃO specials de jogador)
     specials = []
+    n_skip_special = 0
     for m in mups:
         units = (m.get("units") or "").strip()
         ul = units.lower()
         if ul not in UNIT_CANON:
             continue
         if not m.get("parentId"):
+            continue
+        # props de elenco: type=special (ex. "Rodri / Gavi / …" Bookings)
+        if (m.get("type") or "").lower() != "matchup":
+            n_skip_special += 1
             continue
         specials.append(m)
 
@@ -198,10 +212,20 @@ def main():
         MIN_EFF = min(MIN_EVENTS, 1) if specials else 0
         print(f"[pinnacle] modo close: janela {_wh:g}h -> {len(specials)} de {_tot} specials")
 
-    # prioriza quem tem mais mercados
-    specials.sort(key=lambda m: -(m.get("totalMarketCount") or 0))
+    # prioriza bookings (poucos) + quem tem mais mercados; nunca cortar o único Bookings
+    def _prio(m):
+        ul = (m.get("units") or "").lower()
+        book_boost = 1000 if ul in ("bookings", "cards") else 0
+        return -(book_boost + (m.get("totalMarketCount") or 0))
+
+    specials.sort(key=_prio)
     specials = specials[:MAX_SPECIALS]
-    print(f"[pinnacle] specials corners/bookings: {len(specials)}")
+    n_corners = sum(1 for m in specials if (m.get("units") or "").lower() == "corners")
+    n_books = sum(1 for m in specials if (m.get("units") or "").lower() in ("bookings", "cards"))
+    print(
+        f"[pinnacle] filhos O/U: {len(specials)} "
+        f"(corners={n_corners} bookings={n_books} · skip specials/props={n_skip_special})"
+    )
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
     out_path = OUTDIR / f"pinnacle_{stamp}.jsonl"
@@ -209,79 +233,127 @@ def main():
 
     def write_latest(n):
         latest.write_text(
-            json.dumps({"file": out_path.name, "n": n, "at": now.isoformat(timespec="seconds")}, ensure_ascii=False),
+            json.dumps(
+                {"file": out_path.name, "n": n, "at": now.isoformat(timespec="seconds")},
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
 
     write_latest(0)
-    n_out = 0
-    with out_path.open("w", encoding="utf-8") as f:
-        for m in specials:
-            mid = m["id"]
-            units = (m.get("units") or "").strip()
-            canon = UNIT_CANON[units.lower()]
-            parent = by_id.get(m.get("parentId")) or {}
-            # nomes: preferir parent (sem sufixo Corners)
-            if parent:
-                ph, pa = _parts_names(parent)
-                league = (parent.get("league") or {}).get("name") or (m.get("league") or {}).get("name") or ""
-                start = parent.get("startTime") or m.get("startTime")
-            else:
-                ph, pa = _parts_names(m)
-                ph, pa = _strip_unit_suffix(ph, units), _strip_unit_suffix(pa, units)
-                league = (m.get("league") or {}).get("name") or ""
-                start = m.get("startTime")
-            ph = _strip_unit_suffix(ph, units) or ph
-            pa = _strip_unit_suffix(pa, units) or pa
-            if not ph or not pa:
-                continue
 
-            mkts = get(f"/matchups/{mid}/markets/straight")
-            time.sleep(random.uniform(0.12, 0.28))
-            if not mkts:
-                continue
-            match_lines, home_lines, away_lines = parse_markets(mkts, period=0)
-            if not match_lines and not home_lines and not away_lines:
-                continue
+    # parent_id → rec acumulado (Corners + Bookings no mesmo jogo)
+    by_parent = {}
+    n_fetch_ok = 0
 
-            merc = {}
-            merc_t = {}
-            if match_lines:
-                merc[canon] = match_lines
-            if home_lines or away_lines:
-                by_team = {}
-                if home_lines:
-                    by_team[ph] = home_lines
-                if away_lines:
-                    by_team[pa] = away_lines
-                if by_team:
-                    merc_t[canon] = by_team
+    for m in specials:
+        mid = m["id"]
+        units = (m.get("units") or "").strip()
+        canon = UNIT_CANON[units.lower()]
+        pid = m.get("parentId")
+        parent = by_id.get(pid) or {}
 
-            if not merc and not merc_t:
-                continue
+        if parent:
+            ph, pa = _parts_names(parent)
+            league = (parent.get("league") or {}).get("name") or (m.get("league") or {}).get("name") or ""
+            start = parent.get("startTime") or m.get("startTime")
+        else:
+            ph, pa = _parts_names(m)
+            ph, pa = _strip_unit_suffix(ph, units), _strip_unit_suffix(pa, units)
+            league = (m.get("league") or {}).get("name") or ""
+            start = m.get("startTime")
+        ph = _strip_unit_suffix(ph, units) or ph
+        pa = _strip_unit_suffix(pa, units) or pa
+        if not ph or not pa:
+            continue
 
-            name = f"{ph} - {pa}"
+        mkts = get(f"/matchups/{mid}/markets/straight")
+        time.sleep(random.uniform(0.12, 0.28))
+        if not mkts:
+            continue
+        match_lines, home_lines, away_lines = parse_markets(mkts, period=0)
+        if not match_lines and not home_lines and not away_lines:
+            continue
+        n_fetch_ok += 1
+
+        key = pid or mid
+        rec = by_parent.get(key)
+        if rec is None:
+            league_clean = (
+                league.replace(" Corners", "")
+                .replace(" Bookings", "")
+                .replace(" Cards", "")
+                .strip()
+            )
             rec = {
                 "casa": "Pinnacle",
                 "event_id": mid,
-                "parent_id": m.get("parentId"),
-                "name": name,
-                "league": league.replace(" Corners", "").replace(" Bookings", "").strip(),
+                "parent_id": pid,
+                "name": f"{ph} - {pa}",
+                "league": league_clean,
                 "start": start,
                 "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"),
-                "mercados": merc,
-                "units": units,
+                "mercados": {},
+                "units_seen": [],
+                "child_ids": {},
             }
-            if merc_t:
-                rec["mercados_time"] = merc_t
-            f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-            f.flush()
+            by_parent[key] = rec
+
+        rec["child_ids"][canon] = mid
+        rec["units_seen"].append(units)
+        if match_lines:
+            rec["mercados"][canon] = match_lines
+        if home_lines or away_lines:
+            merc_t = rec.setdefault("mercados_time", {})
+            by_team = merc_t.setdefault(canon, {})
+            if home_lines:
+                by_team[ph] = home_lines
+            if away_lines:
+                by_team[pa] = away_lines
+
+    # grava 1 linha por jogo
+    n_out = 0
+    n_with_cards = 0
+    n_with_corners = 0
+    with out_path.open("w", encoding="utf-8") as f:
+        for rec in by_parent.values():
+            if not rec.get("mercados") and not rec.get("mercados_time"):
+                continue
+            # serialização limpa
+            out = {
+                "casa": rec["casa"],
+                "event_id": rec["event_id"],
+                "parent_id": rec.get("parent_id"),
+                "name": rec["name"],
+                "league": rec["league"],
+                "start": rec["start"],
+                "captured_at": rec["captured_at"],
+                "mercados": rec["mercados"],
+                "units": "+".join(sorted(set(rec.get("units_seen") or []))) or None,
+                "child_ids": rec.get("child_ids") or {},
+            }
+            if rec.get("mercados_time"):
+                out["mercados_time"] = rec["mercados_time"]
+            f.write(json.dumps(out, ensure_ascii=False) + "\n")
             n_out += 1
-            if n_out % 10 == 0:
-                write_latest(n_out)
+            if "Cartões" in rec["mercados"] or "Cartões" in (rec.get("mercados_time") or {}):
+                n_with_cards += 1
+            if "Escanteios" in rec["mercados"] or "Escanteios" in (rec.get("mercados_time") or {}):
+                n_with_corners += 1
 
     write_latest(n_out)
-    print(f"[pinnacle] {n_out} jogos com escanteios/cartões salvos em {out_path.name}")
+    print(
+        f"[pinnacle] {n_out} jogos salvos ({n_with_corners} escanteios · {n_with_cards} cartões) "
+        f"· fetch_ok={n_fetch_ok} → {out_path.name}"
+    )
+    # highlight FRA-ESP se presente
+    for rec in by_parent.values():
+        nm = (rec.get("name") or "").lower()
+        if "france" in nm and "spain" in nm:
+            print(f"[pinnacle] FRA×ESP mercados={list(rec.get('mercados') or {})} child_ids={rec.get('child_ids')}")
+            if "Cartões" in (rec.get("mercados") or {}):
+                print(f"  Cartões: {rec['mercados']['Cartões']}")
+            break
     return n_out
 
 
