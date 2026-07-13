@@ -28,6 +28,10 @@ except Exception:
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from value_pricers import CardsPricer, ShotsPricer, FoulsPricer, CornersPricer
+from canonical import (
+    norm_team, gscore as _gscore, side_hit as _side_hit, match_to_sofa,
+    load_sofa_fixtures, parse_start, n as _n, SOFA_TOKEN_MIN,
+)
 
 BRT = timezone(timedelta(hours=-3))
 # mercados do board (ordem de exibição) + qual tem modelo de valor
@@ -41,41 +45,7 @@ FUZZ_MIN = 88
 # dedup de confronto entre casas (mesmo jogo grafado diferente por cada casa)
 GROUP_FUZZ_TIME = 75   # mesmo horário exato + semelhança de nomes ≥ isto → mesmo confronto
 GROUP_FUZZ_NAME = 88   # mesmo dia + semelhança de nomes ≥ isto → mesmo confronto (horário pode divergir)
-def _gscore(ah, aa, bh, ba):
-    # semelhança do confronto; aceita ordem trocada (mercados totais são simétricos)
-    return max(min(ratio(ah, bh), ratio(aa, ba)), min(ratio(ah, ba), ratio(aa, bh)))
 
-# ---- SofaScore como base canônica (sistema "vivo") ----
-# Ideia: horário + contexto (liga) + 1 lado reconhecível bastam.
-# Diferença de grafia NÃO pode impedir captura/merge.
-SOFA_TIME_TOL_MIN = 45          # |Δ kickoff| aceito no par (min)
-SOFA_PAIR_MIN = 72              # 2 lados razoáveis
-SOFA_ONE_SIDE = 86              # 1 lado forte no horário certo
-SOFA_ONE_SIDE_TIME = 25         # janela do atalho 1 lado
-SOFA_SLOT_TIME = 20             # janela "só tem 1 jogo nesse horário"
-SOFA_TOKEN_MIN = 4              # token mínimo p/ substring (ceara, londrina…)
-
-# ---- normalização de nome de time / liga (igual ao build_value_bets) ----
-STOP = {"fc", "cf", "ec", "sc", "ca", "ac", "afc", "club", "clube", "futebol"}
-STATE = re.compile(r"[- ]?(pr|sp|rj|mg|rs|go|ce|pe|ba|mt|ms|pa|to|al|se|rn|pb|pi|ap|ac|ro|rr|df)$")
-# apelidos → forma canônica (as casas grafam o mesmo time de jeitos diferentes; evita jogo duplicado)
-ALIASES = {
-    "sport": "sport recife",
-    "bragantino": "red bull bragantino", "rb bragantino": "red bull bragantino",
-    "vasco": "vasco da gama", "athletico": "athletico paranaense",
-    "gremio novorizontino": "novorizontino", "operario": "operario ferroviario",
-    # Pinnacle (EN) ↔ casas BR
-    "france": "franca", "spain": "espanha", "england": "inglaterra", "argentina": "argentina",
-    "america mineiro": "america mg", "athletic club": "athletic club mg",
-    "ceara": "ceara", "londrina": "londrina",
-}
-def norm_team(name):
-    s = unidecode((name or "").lower()).strip()
-    s = STATE.sub("", s); s = re.sub(r"[^a-z0-9 ]", " ", s)
-    toks = [t for t in s.split() if t not in STOP]
-    key = " ".join(toks) or s.strip()
-    return ALIASES.get(key, key)
-def _n(s): return unidecode((s or "").lower())
 # tupla: (cartoes, faltas, finalizacoes, escanteios)
 LEAGUE_RULES = [
     (lambda l: "brasileir" in l and ("serie b" in l or "série b" in l or "- b" in l), ("B", "BR-B", None, "BR-B")),
@@ -200,205 +170,6 @@ def _assign_side(team_name, home, away):
     if rh >= 68 and rh >= ra: return "home"
     if ra >= 68 and ra > rh: return "away"
     return None
-
-
-def _tokens(s):
-    """tokens úteis do nome normalizado (ignora miúdos)."""
-    return [t for t in (s or "").split() if len(t) >= SOFA_TOKEN_MIN]
-
-
-def _side_hit(book_side, sofa_side):
-    """Quão bem um lado da casa casa com um lado do sofa (0–100).
-    Usa fuzzy + contenção de token (ceara ⊂ ceara sc / athletic ⊂ athletic club)."""
-    if not book_side or not sofa_side:
-        return 0
-    r = ratio(book_side, sofa_side)
-    # token: se o token principal do book aparece no sofa (ou vice-versa)
-    bt, st = _tokens(book_side), _tokens(sofa_side)
-    if bt and st:
-        for a in bt:
-            for b in st:
-                if a == b or a in b or b in a:
-                    r = max(r, 92)
-                    break
-    return r
-
-
-def _league_fp(lg):
-    """Assinatura grossa de liga p/ filtrar candidatos (serie b ≠ premier)."""
-    l = _n(lg or "")
-    if "serie b" in l or "série b" in l or "serie-b" in l or "br-b" in l:
-        return "br-b"
-    if "serie c" in l or "série c" in l:
-        return "br-c"
-    if ("brasileir" in l or "serie a" in l or "br-a" in l) and "serie b" not in l and "série b" not in l:
-        return "br-a"
-    if "world cup" in l or "copa do mundo" in l or l.strip() == "wc" or "fifa" in l:
-        return "wc"
-    if "copa" in l and "brasil" in l:
-        return "br-cdb"
-    if "premier league" in l or ( "premier" in l and "ingl" in l):
-        return "epl"
-    if "laliga" in l or "la liga" in l:
-        return "laliga"
-    if "champions" in l:
-        return "ucl"
-    if "allsvenskan" in l:
-        return "allsv"
-    if "uruguay" in l or "uruguai" in l or "auf" in l:
-        return "uy"
-    if "ecuad" in l or "ligapro" in l:
-        return "ec"
-    if "china" in l or "csl" in l:
-        return "csl"
-    if "russia" in l or "russian" in l:
-        return "ru"
-    return None
-
-
-def load_sofa_fixtures():
-    """Carrega data/fixtures/sofa_latest.json → lista de fixtures com _hn/_an/_lfp."""
-    ptr = ROOT / "data" / "fixtures" / "sofa_latest.json"
-    if not ptr.exists():
-        return []
-    try:
-        meta = json.loads(ptr.read_text(encoding="utf-8"))
-        src = ROOT / "data" / "fixtures" / meta["file"]
-        data = json.loads(src.read_text(encoding="utf-8"))
-    except Exception:
-        return []
-    out = []
-    for f in data.get("fixtures") or []:
-        f = dict(f)
-        f["_hn"] = norm_team(f.get("home"))
-        f["_an"] = norm_team(f.get("away"))
-        f["_lfp"] = _league_fp(f.get("league") or "") or _league_fp(f.get("label") or "")
-        out.append(f)
-    return out
-
-
-def _kickoff_delta_min(start_dt, fixture):
-    """|Δ| em minutos entre start da casa e fixture sofa."""
-    if not start_dt or not fixture.get("start_ts"):
-        return 9999
-    try:
-        fs = datetime.fromtimestamp(int(fixture["start_ts"]), tz=timezone.utc)
-        if start_dt.tzinfo is None:
-            sdt = start_dt.replace(tzinfo=BRT).astimezone(timezone.utc)
-        else:
-            sdt = start_dt.astimezone(timezone.utc)
-        return abs((sdt - fs).total_seconds()) / 60.0
-    except Exception:
-        return 9999
-
-
-def match_to_sofa(hn, an, day_brt, start_dt, fixtures, book_league=""):
-    """Encaixa evento de casa num fixture SofaScore.
-    Retorna (fixture, score, method) ou (None, 0, None).
-
-    Sistema vivo (Diego):
-      - SofaScore é a base de nomes/horário
-      - Série B 20:30 + 'Ceará' → Ceará x Athletic, mesmo com visitante grafado diferente
-      - Terminologia NÃO pode impedir merge se horário+contexto batem
-    """
-    if not fixtures or not hn:
-        return None, 0, None
-    cands = [f for f in fixtures if f.get("day_brt") == day_brt]
-    if not cands:
-        return None, 0, None
-
-    book_lfp = _league_fp(book_league)
-    # se dá pra filtrar por liga, prefere candidatos da mesma família
-    same_lg = [f for f in cands if book_lfp and f.get("_lfp") == book_lfp] if book_lfp else []
-    pool = same_lg if same_lg else cands
-
-    best, best_sc, best_m = None, -1, None
-
-    def _consider(f, sc, method):
-        nonlocal best, best_sc, best_m
-        if sc > best_sc:
-            best, best_sc, best_m = f, sc, method
-
-    for f in pool:
-        dt_min = _kickoff_delta_min(start_dt, f)
-        # HH:MM exato BRT
-        if dt_min > 500 and start_dt:
-            try:
-                t_brt = (start_dt.astimezone(BRT) if start_dt.tzinfo else start_dt).strftime("%H:%M")
-                if t_brt == f.get("time_brt"):
-                    dt_min = 0
-            except Exception:
-                pass
-
-        pair = _gscore(hn, an, f["_hn"], f["_an"]) if an else 0
-        # melhor lado book↔sofa (ordem livre)
-        rh = max(_side_hit(hn, f["_hn"]), _side_hit(hn, f["_an"]))
-        ra = max(_side_hit(an, f["_hn"]), _side_hit(an, f["_an"])) if an else 0
-        one = max(rh, ra)
-        both_ok = rh >= 70 and ra >= 70
-
-        # A) dois lados + horário
-        if dt_min <= SOFA_TIME_TOL_MIN and (pair >= SOFA_PAIR_MIN or both_ok):
-            _consider(f, max(pair, (rh + ra) / 2) + max(0, 40 - dt_min), "pair")
-
-        # B) um lado forte + horário (Ceará 20:30 / Athletic Club MG)
-        if dt_min <= SOFA_ONE_SIDE_TIME and one >= SOFA_ONE_SIDE:
-            rivals = 0
-            for g in pool:
-                if g is f:
-                    continue
-                try:
-                    d2 = abs(int(f["start_ts"]) - int(g["start_ts"])) / 60.0
-                except Exception:
-                    d2 = 999
-                if d2 > SOFA_ONE_SIDE_TIME:
-                    continue
-                og = max(_side_hit(hn, g["_hn"]), _side_hit(hn, g["_an"]),
-                         _side_hit(an, g["_hn"]) if an else 0,
-                         _side_hit(an, g["_an"]) if an else 0)
-                if og >= SOFA_ONE_SIDE - 2:
-                    rivals += 1
-            if rivals == 0:
-                bonus = 5 if book_lfp and f.get("_lfp") == book_lfp else 0
-                _consider(f, one + max(0, 25 - dt_min) + bonus, "one_side")
-
-        # C) slot único: no horário X só existe 1 fixture da liga e há QUALQUER token em comum
-        if dt_min <= SOFA_SLOT_TIME and one >= 75:
-            slot = []
-            for g in pool:
-                try:
-                    d2 = abs(int(f["start_ts"]) - int(g["start_ts"])) / 60.0
-                except Exception:
-                    d2 = 999
-                if d2 <= SOFA_SLOT_TIME:
-                    slot.append(g)
-            if len(slot) == 1:
-                _consider(f, 80 + one * 0.2 + max(0, 20 - dt_min), "slot_unique")
-
-    # D) fallback em TODOS do dia (sem filtro de liga) se pool filtrado falhou
-    if best is None and same_lg and pool is same_lg:
-        return match_to_sofa(hn, an, day_brt, start_dt, cands, book_league="")
-
-    if best is None:
-        return None, 0, None
-    return best, best_sc, best_m
-
-
-def parse_start(s):
-    """ms numérico (Betano/Superbet) · s epoch · ISO (Estrela/Pinnacle) → datetime BRT."""
-    if s is None: return None
-    try:
-        if isinstance(s, (int, float)) or (isinstance(s, str) and str(s).strip().isdigit()):
-            n = int(float(s))
-            # 13 dígitos = ms; 10 = segundos
-            if n > 1e12:
-                n = n / 1000.0
-            elif n > 1e11:  # ms ainda
-                n = n / 1000.0
-            return datetime.fromtimestamp(n, tz=BRT)
-        return datetime.fromisoformat(str(s).replace("Z", "+00:00")).astimezone(BRT)
-    except Exception:
-        return None
 
 
 def de_vig(over, under):

@@ -1,9 +1,82 @@
-/* valor.js — view "Valor (+EV)": agrega TODAS as linhas com valor de todos os jogos do board
-   (multi-casa, já calculado pelo build_board), ranqueadas por EV%. Sem stake. */
+/* valor.js — view "Valor (+EV)": linhas com valor + score de confiança (qualidade de dados). */
 (function () {
   "use strict";
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function evCls(ev) { return ev >= 10 ? "ev-hi" : ev >= 7 ? "ev-md" : "ev-lo"; }
+
+  var MODELO_MKT = { "Cartões": 1, "Faltas": 1, "Finalizações": 1, "Escanteios": 1 };
+
+  /** Score 0–100: qualidade dos dados, NÃO previsão extra. */
+  function confScore(b, j, B) {
+    var s = 0;
+    // EV na zona útil (15–40 pts)
+    var ev = +b.ev_pct || 0;
+    if (ev >= 12) s += 20;
+    else if (ev >= 8) s += 15;
+    else if (ev >= 5) s += 10;
+    else s += 5;
+    // probabilidade na região calibrada (15–85%)
+    var p = +b.nossa_prob || 0;
+    if (p >= 20 && p <= 80) s += 20;
+    else if (p >= 15 && p <= 85) s += 12;
+    else s += 4;
+    // cobertura: nº de casas no jogo/mercado
+    var nCasas = 1;
+    try {
+      var m = (j.mercados || {})[b.mercado];
+      if (m && typeof m === "object") nCasas = Object.keys(m).length || 1;
+      else if (j.casas) nCasas = (j.casas.length || Object.keys(j.casas || {}).length) || 1;
+    } catch (e) { /* ignore */ }
+    if (nCasas >= 4) s += 20;
+    else if (nCasas >= 3) s += 15;
+    else if (nCasas >= 2) s += 10;
+    else s += 4;
+    // fixture sofa confirmado
+    if (j.sofa_id) s += 15;
+    else s += 5;
+    // frescor da mesa
+    var mins = ageMins(B.gerado);
+    if (mins != null) {
+      if (mins <= 90) s += 15;
+      else if (mins <= 180) s += 10;
+      else if (mins <= 360) s += 5;
+    } else s += 8;
+    // kickoff razoável (não jogo já começado há horas, nem >48h)
+    var toKo = minsToKick(b.inicio || j.inicio);
+    if (toKo != null) {
+      if (toKo >= 15 && toKo <= 24 * 60) s += 10;
+      else if (toKo > 0 && toKo < 15) s += 4; // late
+      else if (toKo > 24 * 60 && toKo <= 48 * 60) s += 6;
+    } else s += 5;
+    return Math.max(0, Math.min(100, Math.round(s)));
+  }
+
+  function ageMins(gerado) {
+    var m = /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(gerado || "");
+    if (!m) return null;
+    var d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    return Math.round((Date.now() - d.getTime()) / 60000);
+  }
+
+  function minsToKick(inicio) {
+    // "dd/mm HH:MM" (BRT implícito)
+    var m = /(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/.exec(inicio || "");
+    if (!m) return null;
+    var now = new Date();
+    var y = now.getFullYear();
+    var d = new Date(y, +m[2] - 1, +m[1], +m[3], +m[4]);
+    // se já passou >12h no calendário, assume ano seguinte (virada)
+    if (d.getTime() - now.getTime() < -12 * 3600 * 1000) d.setFullYear(y + 1);
+    return Math.round((d.getTime() - now.getTime()) / 60000);
+  }
+
+  function confLabel(sc) {
+    if (sc >= 70) return { cls: "conf-hi", txt: "alta" };
+    if (sc >= 50) return { cls: "conf-md", txt: "média" };
+    return { cls: "conf-lo", txt: "baixa" };
+  }
+
+  var filt = { minConf: 0, multiCasa: false, near: false };
 
   window.renderValor = function () {
     var root = document.getElementById("view-valor");
@@ -12,31 +85,84 @@
     var bets = [];
     (B.jogos || []).forEach(function (j) {
       (j.valor || []).forEach(function (v) {
-        bets.push({ jogo: j.jogo, liga: j.liga, inicio: j.inicio, mercado: v.mercado, linha: v.linha,
+        var conf = confScore(v, j, B);
+        var nCasas = 1;
+        try {
+          var m = (j.mercados || {})[v.mercado];
+          if (m && typeof m === "object") nCasas = Object.keys(m).length || 1;
+        } catch (e) { /* ignore */ }
+        bets.push({
+          jogo: j.jogo, liga: j.liga, inicio: j.inicio, mercado: v.mercado, linha: v.linha,
           lado: v.lado, casa: v.casa, odd: v.odd, nossa_prob: v.nossa_prob, edge_pp: v.edge_pp,
-          ev_pct: v.ev_pct, mu: v.mu });
+          ev_pct: v.ev_pct, mu: v.mu, conf: conf, nCasas: nCasas, sofa_id: j.sofa_id || null
+        });
       });
     });
-    bets.sort(function (a, b) { return b.ev_pct - a.ev_pct; });
+    // ordena por confiança desc, depois EV
+    bets.sort(function (a, b) {
+      if (b.conf !== a.conf) return b.conf - a.conf;
+      return b.ev_pct - a.ev_pct;
+    });
 
-    var head = '<div class="sub">Todas as linhas com <b style="color:var(--green)">valor (+EV)</b> pelos nossos modelos, de todas as casas capturadas, <b>ranqueadas por EV%</b>. A decisão de <b>quanto</b> apostar é sua — aqui só apontamos onde a odd está acima do justo.</div>'
-      + '<div class="disc"><b>EV%</b> = retorno esperado por real apostado, se a nossa probabilidade estiver certa. <b>Odd justa</b> = 100 ÷ nossa probabilidade. Odds capturadas num instante — <b>podem ter movido</b>. Cobrimos Cartões/Faltas/Finalizações (7 ligas) + Escanteios (11 ligas).</div>';
+    var head = '<div class="sub">Linhas com <b style="color:var(--green)">valor (+EV)</b> pelos modelos, ranqueadas por <b>confiança</b> (qualidade dos dados) e EV%. ' +
+      'Confiança ≠ previsão: mede cobertura, frescor, fixture e região calibrada. A stake é sua.</div>'
+      + '<div class="disc"><b>EV%</b> = retorno esperado se a prob. do modelo estiver certa. <b>Odd justa</b> = 100 ÷ nossa %. ' +
+      'Modelos: Cartões/Faltas/Finalizações (7 ligas) + Escanteios (11 ligas). Odds de um instante — <b>podem ter movido</b>.</div>';
+
+    // filtros
+    var filtHtml = '<div class="vb-filt" id="vb-filt">'
+      + '<span class="chip' + (filt.minConf === 0 ? ' on' : '') + '" data-f="all">Todos</span>'
+      + '<span class="chip' + (filt.minConf === 70 ? ' on' : '') + '" data-f="hi">Alta confiança</span>'
+      + '<span class="chip' + (filt.multiCasa ? ' on' : '') + '" data-f="multi">≥2 casas</span>'
+      + '<span class="chip' + (filt.near ? ' on' : '') + '" data-f="near">Próx. 90 min</span>'
+      + '</div>';
+
+    var filtered = bets.filter(function (b) {
+      if (b.conf < filt.minConf) return false;
+      if (filt.multiCasa && b.nCasas < 2) return false;
+      if (filt.near) {
+        var mk = minsToKick(b.inicio);
+        if (mk == null || mk < 0 || mk > 90) return false;
+      }
+      return true;
+    });
+
+    // distribuição por mercado
+    var byM = {};
+    filtered.forEach(function (b) { byM[b.mercado] = (byM[b.mercado] || 0) + 1; });
+    var dist = Object.keys(byM).sort(function (a, b) { return byM[b] - byM[a]; })
+      .map(function (m) { return esc(m) + " <b>" + byM[m] + "</b>"; }).join(" · ");
 
     if (!bets.length) {
       root.innerHTML = head + '<div class="empty"><div class="big">🎯</div>Nenhuma aposta de valor no momento.<br>'
-        + '<span style="font-size:12px;color:var(--faint)">Aparecem quando há jogo das ligas cobertas (Brasileirão A/B, big-5 europeias, China/Bolívia/Equador/Noruega) com mercado aberto nas casas.</span></div>';
+        + '<span style="font-size:12px;color:var(--faint)">Aparecem quando há jogo das ligas cobertas com mercado aberto nas casas.</span></div>';
       return;
     }
 
-    var rows = bets.map(function (b, i) {
+    if (!filtered.length) {
+      root.innerHTML = head + filtHtml + '<div class="empty"><div class="big">🔍</div>Nenhum sinal com este filtro.</div>';
+      bindFilt(root);
+      return;
+    }
+
+    var rows = filtered.map(function (b, i) {
       var fair = b.nossa_prob > 0 ? (100 / b.nossa_prob) : 0;
+      var cl = confLabel(b.conf);
+      var confHtml = '<span class="vb-conf ' + cl.cls + '" title="Score de qualidade dos dados (0–100)">'
+        + '<span class="vb-conf-bar"><i style="width:' + b.conf + '%"></i></span> '
+        + b.conf + ' · ' + cl.txt + '</span>';
       return '<div class="vbet">'
         + '<div class="vb-rank">' + (i + 1) + '</div>'
         + '<div class="vb-main">'
         + '<div class="vb-top"><span class="vb-ev ' + evCls(b.ev_pct) + '">+' + b.ev_pct.toFixed(1) + '%</span>'
+        + confHtml
         + '<span class="vb-pick">' + esc(b.mercado) + ' <b>' + esc(b.lado) + ' ' + b.linha + '</b></span></div>'
         + '<div class="vb-game">' + esc(b.jogo) + '</div>'
-        + '<div class="vb-meta">' + esc(b.inicio) + (b.liga ? ' · ' + esc(b.liga) : '') + ' · μ ' + b.mu + '</div>'
+        + '<div class="vb-meta">' + esc(b.inicio) + (b.liga ? ' · ' + esc(b.liga) : '')
+        + ' · μ ' + b.mu
+        + (b.sofa_id ? ' · sofa' : ' · sem fixture')
+        + ' · ' + b.nCasas + ' casa' + (b.nCasas > 1 ? 's' : '')
+        + '</div>'
         + '</div>'
         + '<div class="vb-num">'
         + '<div class="vb-odd"><span class="vb-house">' + esc(b.casa) + '</span> @ <b>' + b.odd.toFixed(2) + '</b></div>'
@@ -45,7 +171,25 @@
         + '</div>';
     }).join("");
 
-    var meta = '<div class="meta">' + bets.length + ' linha' + (bets.length > 1 ? 's' : '') + ' com valor · atualizado ' + esc(B.gerado || "") + '</div>';
-    root.innerHTML = head + meta + '<div class="vbets">' + rows + '</div>';
+    var meta = '<div class="meta">' + filtered.length + ' de ' + bets.length + ' sinal' + (bets.length > 1 ? 'is' : '')
+      + (dist ? ' · ' + dist : '')
+      + ' · atualizado ' + esc(B.gerado || "") + '</div>';
+    root.innerHTML = head + filtHtml + meta + '<div class="vbets">' + rows + '</div>';
+    bindFilt(root);
   };
+
+  function bindFilt(root) {
+    var bar = root.querySelector("#vb-filt");
+    if (!bar) return;
+    bar.querySelectorAll(".chip").forEach(function (c) {
+      c.onclick = function () {
+        var f = c.getAttribute("data-f");
+        if (f === "all") { filt.minConf = 0; filt.multiCasa = false; filt.near = false; }
+        else if (f === "hi") { filt.minConf = filt.minConf === 70 ? 0 : 70; }
+        else if (f === "multi") { filt.multiCasa = !filt.multiCasa; }
+        else if (f === "near") { filt.near = !filt.near; }
+        window.renderValor();
+      };
+    });
+  }
 })();

@@ -4,17 +4,22 @@
   var jogos = B.jogos || [];
   var MERCADOS = B.mercados || ["Cartões", "Faltas", "Finalizações", "Chutes no gol", "Escanteios", "Impedimentos", "Laterais", "Tiros de meta", "Desarmes"];
 
-  function firstMarket() {
-    if (jogos.some(function (j) { return hasMkt(j, "Cartões"); })) return "Cartões";
-    for (var i = 0; i < MERCADOS.length; i++) {
-      var m = MERCADOS[i];
-      if (jogos.some(function (j) { return hasMkt(j, m); })) return m;
-    }
-    return MERCADOS[0] || "Cartões";
-  }
-
   function hasMkt(j, m) {
     return (j.mercados && j.mercados[m]) || (j.times && j.times[m]);
+  }
+
+  /** Abre no mercado com MAIOR cobertura (evita esconder Escanteios atrás de Cartões). */
+  function firstMarket() {
+    var best = null, bestN = -1;
+    for (var i = 0; i < MERCADOS.length; i++) {
+      var m = MERCADOS[i];
+      var n = 0;
+      for (var j = 0; j < jogos.length; j++) {
+        if (hasMkt(jogos[j], m)) n++;
+      }
+      if (n > bestN) { bestN = n; best = m; }
+    }
+    return best || MERCADOS[0] || "Cartões";
   }
 
   var state = { mercado: firstMarket(), soValor: false, ordem: "valor" };
@@ -111,8 +116,26 @@
     return m;
   }
 
+  /** Descarta linhas de time misturadas no total de partida (ex. Fin 10.5 vs 24.5). */
+  function matchOnlyLines(lines, mercado) {
+    if (!lines || !lines.length) return lines || [];
+    var arr = lines.slice().sort(function (a, b) { return a.linha - b.linha; });
+    var maxL = arr[arr.length - 1].linha;
+    if (mercado === "Finalizações" && maxL >= 18) {
+      return arr.filter(function (l) { return +l.linha >= 16.5; });
+    }
+    if (mercado === "Faltas" && maxL >= 20) {
+      return arr.filter(function (l) { return +l.linha >= 16.5; });
+    }
+    if (mercado === "Escanteios" && maxL >= 9) {
+      return arr.filter(function (l) { return +l.linha >= 6.5; });
+    }
+    return arr;
+  }
+
   /** Main line de uma casa: menor |over−under| (mais equilibrada). */
-  function mainLineCasa(lines) {
+  function mainLineCasa(lines, mercado) {
+    lines = matchOnlyLines(lines, mercado);
     if (!lines || !lines.length) return null;
     var best = null, score = Infinity;
     lines.forEach(function (l) {
@@ -127,12 +150,12 @@
   }
 
   /** Main line “do bloco”: moda das main lines por casa. */
-  function pickMainLine(perCasa) {
+  function pickMainLine(perCasa, mercado) {
     var casas = Object.keys(perCasa || {});
     if (!casas.length) return null;
     var votes = {};
     casas.forEach(function (c) {
-      var ml = mainLineCasa(perCasa[c]);
+      var ml = mainLineCasa(perCasa[c], mercado);
       if (!ml) return;
       var L = ml.linha;
       votes[L] = (votes[L] || 0) + 1;
@@ -183,8 +206,11 @@
     var tag = opts.tag, title = opts.title, sub = opts.sub || "", perCasa = opts.perCasa || {};
     var vm = opts.vm, mercado = opts.mercado, kind = opts.kind;
     var linhas = allLinhas(perCasa);
-    var mainL = pickMainLine(perCasa);
-    if (mainL == null && linhas.length) mainL = linhas[Math.floor(linhas.length / 2)];
+    var mainL = pickMainLine(perCasa, mercado);
+    if (mainL == null && linhas.length) {
+      var only = matchOnlyLines(linhas.map(function (L) { return { linha: L, over: 2, under: 2 }; }), mercado);
+      mainL = only.length ? only[Math.floor(only.length / 2)].linha : linhas[Math.floor(linhas.length / 2)];
+    }
     var alts = linhas.filter(function (L) { return +L !== +mainL; });
     var casas = Object.keys(perCasa);
 
@@ -369,14 +395,15 @@
 
   var sub = document.querySelector("#view-board .sub");
   if (sub) {
-    sub.innerHTML = "Escolha um <b>mercado</b> nos chips. Cada jogo abre em <b>3 colunas</b>: " +
-      "<b>linha do jogo</b> (esquerda), <b>mandante</b> (meio) e <b>visitante</b> (direita). " +
-      "Onde há modelo, marcamos <b style=\"color:var(--green)\">valor (+EV)</b>.";
+    sub.innerHTML = "Escolha um <b>mercado</b> nos chips (abre no de maior cobertura). Cada jogo: " +
+      "<b>linha do jogo</b> · <b>mandante</b> · <b>visitante</b>. " +
+      "Mercados: <b>Cartões · Faltas · Finalizações · Chutes no gol · Escanteios · Impedimentos · Laterais · Tiros de meta · Desarmes</b>. " +
+      "Onde há modelo: <b style=\"color:var(--green)\">valor (+EV)</b>.";
   }
   var disc = document.querySelector("#view-board .disc");
   if (disc) {
-    disc.innerHTML = "Odds capturadas num instante — <b>podem ter movido</b>. Main line = menor gap Mais/Menos. " +
-      "Linhas de time só aparecem quando a casa publica (ex.: Superbet Finalizações / Betano Cartões).";
+    disc.innerHTML = "Odds capturadas num instante — <b>podem ter movido</b>. Main line = menor gap Mais/Menos (só cluster de partida). " +
+      "Linhas de time só quando a casa publica (ex.: Superbet Fin / Betano Cartões).";
   }
 
   render();

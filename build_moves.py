@@ -12,6 +12,9 @@ try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception: pass
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+from canonical import parse_history_key
+
 OUT = ROOT / "valor" / "data" / "moves.js"
 BOARD_M = {"Cartões", "Faltas", "Finalizações", "Impedimentos", "Laterais", "Tiros de meta",
            "Escanteios", "Chutes no gol", "Desarmes"}
@@ -41,8 +44,13 @@ def main():
             odd = t.get("odd")
             if tm is None or not odd:
                 continue
-            djogo = (t.get("kickoff") or "")[:10]
-            gk = f'{djogo}|{t.get("home")}|{t.get("away")}|{t.get("mercado")}|{t.get("linha")}|{t.get("lado")}'
+            djogo = t.get("djogo") or (t.get("kickoff") or "")[:10]
+            sid = t.get("sofa_id")
+            if sid:
+                gid = f"sofa:{sid}"
+            else:
+                gid = f'{djogo}|{t.get("home")}|{t.get("away")}'
+            gk = f'{gid}|{t.get("mercado")}|{t.get("linha")}|{t.get("lado")}'
             series.setdefault(gk, {}).setdefault(t.get("casa"), []).append([tm, float(odd)])
             ko = ts_min(t.get("kickoff") or "")
             if ko: kicks[gk] = ko
@@ -55,11 +63,14 @@ def main():
         except Exception:
             continue
         for k, v in keys.items():
-            parts = k.split("|")
-            if len(parts) < 7:
+            meta = parse_history_key(k)
+            if meta.get("format") == "unknown":
                 continue
-            casa, djogo, h, a, merc, linha, lado = parts[:7]
-            if merc not in BOARD_M:
+            casa = meta.get("casa") or k.split("|")[0]
+            merc = meta.get("mercado")
+            linha = meta.get("linha")
+            lado = meta.get("lado")
+            if merc not in BOARD_M or linha is None or not lado:
                 continue
             o, c = v.get("open_odd"), v.get("close_odd") or v.get("last_odd")
             ot, ct = ts_min(v.get("open_ts") or ""), ts_min(v.get("close_ts") or v.get("last_ts") or "")
@@ -67,7 +78,15 @@ def main():
                 continue
             if ct is None:
                 ct = ot
-            gk = f"{djogo}|{h}|{a}|{merc}|{linha}|{lado}"
+            sid = v.get("sofa_id") or meta.get("sofa_id")
+            djogo = (v.get("kickoff") or "")[:10] or meta.get("day") or ""
+            hn = v.get("home_norm") or meta.get("hn") or ""
+            an = v.get("away_norm") or meta.get("an") or ""
+            if sid:
+                gid = f"sofa:{sid}"
+            else:
+                gid = f"{djogo}|{hn}|{an}"
+            gk = f"{gid}|{merc}|{linha}|{lado}"
             bucket = series.setdefault(gk, {}).setdefault(casa, [])
             # só injeta se a série ainda está vazia/curta (não sobrescreve ticks densos)
             if len(bucket) < 2:

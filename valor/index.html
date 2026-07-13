@@ -202,6 +202,13 @@ tr.mv-open td{background:var(--purple-soft)!important}
 .vb-odd{font:12.5px var(--mono);color:var(--ink)} .vb-odd b{font-size:15px;color:var(--red)}
 .vb-house{font:700 8.5px var(--disp);letter-spacing:.4px;background:var(--ink);color:#fff;padding:1px 6px;border-radius:5px;text-transform:uppercase}
 .vb-prob{font-size:10.5px;color:var(--dim);margin-top:3px}
+.vb-conf{display:inline-flex;align-items:center;gap:4px;font:700 10px var(--mono);border-radius:5px;padding:2px 6px;letter-spacing:.2px}
+.vb-conf.conf-hi{background:#dcfce7;color:#166534}
+.vb-conf.conf-md{background:#fef9c3;color:#854d0e}
+.vb-conf.conf-lo{background:#fee2e2;color:#991b1b}
+.vb-conf-bar{display:inline-block;width:36px;height:4px;background:var(--line);border-radius:2px;overflow:hidden;vertical-align:middle}
+.vb-conf-bar>i{display:block;height:100%;background:currentColor;border-radius:2px}
+.vb-filt{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
 [hidden]{display:none!important}
 </style>
 </head><body>
@@ -213,8 +220,8 @@ tr.mv-open td{background:var(--purple-soft)!important}
     <span class="chip" data-view="hist" role="button" tabindex="0">Histórico &amp; CLV</span>
   </div>
   <div id="view-board">
-  <div class="sub">Jogos com mercados de <b>Cartões · Faltas · Finalizações · Impedimentos · Laterais · Tiros de meta</b> abertos nas casas, com as linhas disponíveis. Onde temos modelo, marcamos <b style="color:var(--green)">valor</b> — mas o foco é saber <b>o que dá pra analisar</b>.</div>
-  <div class="disc">Toque num mercado pra ver a escada de linhas (Mais/Menos) por casa. Odds capturadas num instante — <b>podem ter movido</b>. 🎯 = linha com valor (+EV) pelo nosso modelo.</div>
+  <div class="sub">Jogos com mercados de <b>Cartões · Faltas · Finalizações · Chutes no gol · Escanteios · Impedimentos · Laterais · Tiros de meta · Desarmes</b> abertos nas casas. Onde temos modelo, marcamos <b style="color:var(--green)">valor</b> — o foco é saber <b>o que dá pra analisar</b>.</div>
+  <div class="disc">A mesa abre no mercado com <b>maior cobertura</b>. Escada de linhas (Mais/Menos) por casa. Odds de um instante — <b>podem ter movido</b>. 🎯 = valor (+EV) do modelo.</div>
   <div id="capstatus" class="capbar" style="display:none"></div>
   <div class="bar" id="filtros"></div>
   <div class="meta" id="meta"></div>

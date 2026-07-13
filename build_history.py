@@ -21,11 +21,16 @@ try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception: pass
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+from canonical import parse_history_key
+
 HIST = ROOT / "data" / "odds_history"
 OUT = ROOT / "valor" / "data" / "history.js"
 BRT = timezone(timedelta(hours=-3))
 
-BOARD6 = {"Cartões", "Faltas", "Finalizações", "Impedimentos", "Laterais", "Tiros de meta"}
+# mercados do board (inclui Escanteios/CG/Desarmes — mesa e histórico alinhados)
+BOARD6 = {"Cartões", "Faltas", "Finalizações", "Impedimentos", "Laterais", "Tiros de meta",
+          "Escanteios", "Chutes no gol", "Desarmes"}
 LIMIARES = {"head": 30, "bucket": 20, "roi": 50}
 LADO_PT = {"over": "Mais", "under": "Menos"}
 
@@ -101,8 +106,24 @@ def main():
             print(f"[history] pulei {f}: {type(e).__name__}")
 
     def merc_of(key):
-        parts = key.split("|")
-        return parts[4] if len(parts) >= 5 else None
+        return parse_history_key(key).get("mercado")
+
+    def row_ids(k, v):
+        """IDs estáveis pro explorador/gráficos (legado + sofa)."""
+        p = parse_history_key(k)
+        mercado = p.get("mercado") or ""
+        linha = p.get("linha")
+        lado = p.get("lado") or "over"
+        casa = p.get("casa") or k.split("|")[0]
+        if p.get("format") == "sofa" and p.get("sofa_id"):
+            gid = f"sofa:{p['sofa_id']}"
+        else:
+            day = p.get("day") or (v.get("kickoff") or "")[:10]
+            hn = v.get("home_norm") or p.get("hn") or ""
+            an = v.get("away_norm") or p.get("an") or ""
+            gid = f"{day}|{hn}|{an}"
+        gk = f"{gid}|{mercado}|{linha}|{lado}"
+        return casa, gid, gk, mercado, linha, lado
 
     # --- conjuntos ---
     settled = [(k, v) for k, v in keys.items()
@@ -113,9 +134,10 @@ def main():
         o, c = v.get("open_odd"), v.get("close_odd")
         ots, kts = ts(v.get("open_ts")), ts(v.get("kickoff"))
         if o and c and ots and kts and ots < kts:
+            casa, _, _, mercado, _, lado = row_ids(k, v)
             V.append({"clv_pct": v.get("clv_pct"), "won": v.get("won"),
                       "open_odd": o, "close_odd": c,
-                      "mercado": merc_of(k), "casa": k.split("|")[0], "lado": k.split("|")[6]})
+                      "mercado": mercado, "casa": casa, "lado": lado})
 
     n_valid, n_settled = len(V), len(settled)
     head_ok = n_valid >= LIMIARES["head"]
@@ -174,44 +196,51 @@ def main():
 
     recortes = {"mercado": cut("mercado"), "casa": cut("casa"), "lado": cut("lado")}
 
-    # --- tabela de liquidadas (o útil de hoje) ---
+    # --- tabela de liquidadas ---
     liquidadas = []
     for k, v in settled:
-        casa, djogo, h, a2, mercado, linha, lado = k.split("|")
+        casa, gid, gk, mercado, linha, lado = row_ids(k, v)
         ots, kts = ts(v.get("open_ts")), ts(v.get("kickoff"))
         clv_valido = bool(v.get("open_odd") and v.get("close_odd") and ots and kts and ots < kts)
+        home = v.get("home_raw") or v.get("home_norm") or ""
+        away = v.get("away_raw") or v.get("away_norm") or ""
         liquidadas.append({
-            "gk": f'{djogo}|{h}|{a2}|{mercado}|{linha}|{lado}',
-            "jogo": f'{v.get("home_raw") or h} x {v.get("away_raw") or a2}',
-            "data": djogo, "casa": casa, "mercado": mercado,
+            "gk": gk, "gid": gid,
+            "jogo": f"{home} x {away}".strip(" x"),
+            "data": (v.get("kickoff") or "")[:10], "casa": casa, "mercado": mercado,
             "linha": float(linha), "lado": LADO_PT.get(lado, lado),
             "open": v.get("open_odd"), "close": v.get("close_odd"),
             "clv": v.get("clv_pct"), "beat": v.get("beat_close"),
             "result": v.get("result"), "won": v.get("won"),
             "n_moves": v.get("n_moves", 0), "kickoff": v.get("kickoff"),
             "clv_valido": clv_valido,
+            "sofa_id": v.get("sofa_id"), "match_method": v.get("match_method"),
         })
     liquidadas.sort(key=lambda x: x["kickoff"] or "", reverse=True)
-    liquidadas = liquidadas[:200]
+    liquidadas = liquidadas[:300]
 
-    # --- linhas abertas com movimento (valor vivo de hoje) ---
+    # --- abertas (todas) p/ explorador; aba Abertas filtra n_moves no JS ---
     abertas = []
     for k, v in keys.items():
-        if v.get("status") not in ("open", "closed"): continue
-        if merc_of(k) not in BOARD6: continue
-        if not v.get("n_moves"): continue
-        casa, djogo, h, a2, mercado, linha, lado = k.split("|")
+        if v.get("status") not in ("open", "closed"):
+            continue
+        if merc_of(k) not in BOARD6:
+            continue
+        casa, gid, gk, mercado, linha, lado = row_ids(k, v)
         op, last = v.get("open_odd"), v.get("last_odd")
         drift = round((last / op - 1) * 100, 2) if (op and last) else None
+        home = v.get("home_raw") or v.get("home_norm") or ""
+        away = v.get("away_raw") or v.get("away_norm") or ""
         abertas.append({
-            "gk": f'{djogo}|{h}|{a2}|{mercado}|{linha}|{lado}',
-            "jogo": f'{v.get("home_raw") or h} x {v.get("away_raw") or a2}',
-            "data": djogo, "casa": casa, "mercado": mercado,
+            "gk": gk, "gid": gid,
+            "jogo": f"{home} x {away}".strip(" x"),
+            "data": (v.get("kickoff") or "")[:10], "casa": casa, "mercado": mercado,
             "linha": float(linha), "lado": LADO_PT.get(lado, lado),
             "open": op, "last": last, "min": v.get("min_odd"), "max": v.get("max_odd"),
             "drift_pct": drift, "n_moves": v.get("n_moves", 0), "kickoff": v.get("kickoff"),
+            "sofa_id": v.get("sofa_id"), "match_method": v.get("match_method"),
         })
-    abertas.sort(key=lambda x: x["kickoff"] or "")
+    abertas.sort(key=lambda x: (x["kickoff"] or "", -(x.get("n_moves") or 0)))
 
     # banner no MESMO universo das métricas (BOARD6), pra não superestimar o tamanho do banco
     b6 = {k: v for k, v in keys.items() if merc_of(k) in BOARD6}

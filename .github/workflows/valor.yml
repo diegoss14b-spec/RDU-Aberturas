@@ -57,22 +57,39 @@ jobs:
               last = dt.datetime.strptime(s['ts_brt'], '%Y-%m-%d %H:%M').replace(
                   tzinfo=dt.timezone(dt.timedelta(hours=-3)))
               age_min = (now - last).total_seconds() / 60
-              if age_min < 25:
+              if age_min < 20:
                   emit('skip', f'captura recente ({age_min:.0f}min)')
-              # 13/07: full a cada ~1h (cron horário) — densifica ticks p/ gráficos CLV
-              if os.environ.get('EVENT') == 'schedule':
-                  emit('full', f'horario 1h (ultima ha {age_min:.0f}min)')
-              # fallback: close se houver jogo iminente (outros eventos)
-              t = urllib.request.urlopen('https://valor-rdu.netlify.app/data/history.js', timeout=20).read().decode()
-              h = json.loads(t[len('window.HIST='):].rstrip(';'))
+
+              # close ANTES do full genérico: jogos em ≤75 min precisam de preço de fechamento
               soon = 0
-              for r in h.get('abertas') or []:
-                  ko = r.get('kickoff')
-                  if not ko: continue
-                  try: k = dt.datetime.fromisoformat(ko)
-                  except Exception: continue
-                  m = (k - now).total_seconds() / 60
-                  if 0 <= m <= 75: soon += 1
+              try:
+                  t = urllib.request.urlopen(
+                      'https://valor-rdu.netlify.app/data/history.js', timeout=20).read().decode()
+                  payload = t.split('=', 1)[1].rstrip().rstrip(';')
+                  h = json.loads(payload)
+                  for r in h.get('abertas') or []:
+                      ko = r.get('kickoff')
+                      if not ko: continue
+                      try: k = dt.datetime.fromisoformat(ko)
+                      except Exception: continue
+                      if k.tzinfo is None:
+                          k = k.replace(tzinfo=dt.timezone(dt.timedelta(hours=-3)))
+                      m = (k - now).total_seconds() / 60
+                      if 0 <= m <= 75: soon += 1
+              except Exception as e:
+                  print('close-check falhou (segue full se aplicável):', e)
+
+              # close se há jogo iminente E última captura já tem ≥30 min
+              # (evita close a cada cron se full/close acabou de rodar)
+              if soon and age_min >= 30:
+                  emit('close', f'{soon} jogos em ≤75min (ultima captura ha {age_min:.0f}min)')
+
+              # full horário densifica ticks (CLV/gráficos) quando não há close prioritário
+              if os.environ.get('EVENT') == 'schedule':
+                  if soon and age_min < 30:
+                      emit('skip', f'jogo iminente mas captura ha {age_min:.0f}min (<30)')
+                  emit('full', f'horario 1h (ultima ha {age_min:.0f}min)')
+
               if soon:
                   emit('close', f'{soon} jogos em ≤75min')
               emit('skip', 'sem jogo iminente')
