@@ -13,7 +13,8 @@ except Exception: pass
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "valor" / "data" / "moves.js"
-BOARD6 = {"Cartões", "Faltas", "Finalizações", "Impedimentos", "Laterais", "Tiros de meta"}
+BOARD_M = {"Cartões", "Faltas", "Finalizações", "Impedimentos", "Laterais", "Tiros de meta",
+           "Escanteios", "Chutes no gol", "Desarmes"}
 
 
 def ts_min(s):
@@ -34,7 +35,7 @@ def main():
                 t = json.loads(ln)
             except Exception:
                 continue
-            if t.get("mercado") not in BOARD6:
+            if t.get("mercado") not in BOARD_M:
                 continue
             tm = ts_min(t.get("ts") or "")
             odd = t.get("odd")
@@ -42,17 +43,56 @@ def main():
                 continue
             djogo = (t.get("kickoff") or "")[:10]
             gk = f'{djogo}|{t.get("home")}|{t.get("away")}|{t.get("mercado")}|{t.get("linha")}|{t.get("lado")}'
-            series.setdefault(gk, {}).setdefault(t.get("casa"), []).append([tm, odd])
+            series.setdefault(gk, {}).setdefault(t.get("casa"), []).append([tm, float(odd)])
             ko = ts_min(t.get("kickoff") or "")
             if ko: kicks[gk] = ko
             n_ticks += 1
 
-    # mantém só linhas com movimento real (alguma casa com 2+ pontos) e ordena por tempo
+    # enriquece com open→close das keys (mesmo sem tick intermediário = 2 pontos pro gráfico)
+    for f in sorted(glob.glob(str(ROOT / "data/odds_history/keys/*.json"))):
+        try:
+            keys = json.loads(Path(f).read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for k, v in keys.items():
+            parts = k.split("|")
+            if len(parts) < 7:
+                continue
+            casa, djogo, h, a, merc, linha, lado = parts[:7]
+            if merc not in BOARD_M:
+                continue
+            o, c = v.get("open_odd"), v.get("close_odd") or v.get("last_odd")
+            ot, ct = ts_min(v.get("open_ts") or ""), ts_min(v.get("close_ts") or v.get("last_ts") or "")
+            if not o or not c or ot is None:
+                continue
+            if ct is None:
+                ct = ot
+            gk = f"{djogo}|{h}|{a}|{merc}|{linha}|{lado}"
+            bucket = series.setdefault(gk, {}).setdefault(casa, [])
+            # só injeta se a série ainda está vazia/curta (não sobrescreve ticks densos)
+            if len(bucket) < 2:
+                bucket.append([ot, float(o)])
+                if ct != ot or float(c) != float(o):
+                    bucket.append([ct, float(c)])
+            ko = ts_min(v.get("kickoff") or "")
+            if ko:
+                kicks[gk] = ko
+
+    # mantém linhas com ≥2 pontos em alguma casa (movimento ou open≠close) e ordena
     out = {}
     for gk, casas in series.items():
-        if not any(len(v) >= 2 for v in casas.values()):
+        cleaned = {}
+        for c, pts in casas.items():
+            # dedup por minuto (último odd do minuto)
+            by_t = {}
+            for t, o in sorted(pts):
+                by_t[t] = o
+            arr = [[t, by_t[t]] for t in sorted(by_t)]
+            if arr:
+                cleaned[c] = arr
+        if not any(len(v) >= 2 for v in cleaned.values()):
             continue
-        out[gk] = {c: sorted(v) for c, v in casas.items()}
+        out[gk] = cleaned
         if gk in kicks:
             out[gk]["_ko"] = kicks[gk]
     OUT.parent.mkdir(parents=True, exist_ok=True)

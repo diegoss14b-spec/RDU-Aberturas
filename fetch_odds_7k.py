@@ -39,15 +39,54 @@ MAX_EVENTS = 120
 MIN_EVENTS = 8    # mínimo pro finish() (abaixo = exit 2)
 MIN_EFF = MIN_EVENTS  # modo close (ODDS_WINDOW_H) reduz — ver main()
 
+# Jogo inteiro (sem nome de time no market)
 def canon(nm):
     m = (nm or "").lower()
-    if "tempo" in m or "jogador" in m or "equipe" in m or "primeiro" in m or "antes" in m: return None
+    if "tempo" in m or "jogador" in m or "primeiro" in m or "antes" in m: return None
+    # "equipe" no nome de JOGO (ex. "Equipe com Mais Cartões") não é O/U de total
+    if m.startswith("equipe ") or " equipe com " in m: return None
+    # time no nome: "América MG: Total de …" → vai pra canon_team
+    if ":" in (nm or ""): return None
     if "cart" in m and "total" in m: return "Cartões"
-    if "falta" in m and "total" in m: return "Faltas"
+    if "falta" in m and ("total" in m or "partida" in m): return "Faltas"
     if ("chute" in m or "finaliza" in m or "remate" in m) and "total" in m and "gol" not in m: return "Finalizações"
+    if "chute" in m and "gol" in m and "total" in m: return "Chutes no gol"
     if "impedi" in m and "total" in m: return "Impedimentos"
     if ("lateral" in m or "arremesso" in m) and "total" in m: return "Laterais"
     if "tiro de meta" in m and "total" in m: return "Tiros de meta"
+    if "escanteio" in m or "canto" in m:
+        if "total" in m or "mais/menos" in m or "mais" in m: return "Escanteios"
+    return None
+
+# Time: "América MG: Total de Faltas da Equipe Mais/Menos" / "Londrina: Chutes no gol"
+_TEAM_PREFIX = re.compile(r"^([^:]{2,50})\s*:\s*(.+)$")
+_TEAM_STAT_RX = [
+    (re.compile(r"chutes?\s*no\s*gol|chutes?\s*a\s*gol", re.I), "Chutes no gol"),
+    (re.compile(r"finaliza", re.I), "Finalizações"),
+    (re.compile(r"total de chutes\b", re.I), "Finalizações"),
+    (re.compile(r"(?<!\w)chutes?(?!\s*(no|a)\s*gol)\b", re.I), "Finalizações"),
+    (re.compile(r"\bfaltas?\b", re.I), "Faltas"),
+    (re.compile(r"\bcart[oõ]es?\b", re.I), "Cartões"),
+    (re.compile(r"escanteio|cantos?", re.I), "Escanteios"),
+    (re.compile(r"impedi", re.I), "Impedimentos"),
+    (re.compile(r"lateral|arremesso", re.I), "Laterais"),
+    (re.compile(r"tiro de meta", re.I), "Tiros de meta"),
+    (re.compile(r"desarme", re.I), "Desarmes"),
+]
+
+def canon_team(nm):
+    """'{Time}: Total de Faltas da Equipe Mais/Menos' → ('Faltas', 'Time')."""
+    if not nm: return None
+    m = nm.strip()
+    mo = _TEAM_PREFIX.match(m)
+    if not mo: return None
+    team, rest = mo.group(1).strip(), mo.group(2).strip()
+    rl = rest.lower()
+    if "tempo" in rl or "jogador" in rl or "1º" in rl or "2º" in rl or "primeiro" in rl:
+        return None
+    for rx, c in _TEAM_STAT_RX:
+        if rx.search(rest):
+            return c, team
     return None
 
 def get_host():
@@ -161,20 +200,14 @@ def main():
         allm = gj(f"/api/eventlist/eu/markets/all?markets={eid}:ALL")
         time.sleep(random.uniform(0.15, 0.3))
         if not allm: continue
-        codes = {}
+        # :ALL já traz Selections com preço — não precisa 2ª ida (e cobre nomes com time no MarketType)
+        merc, merc_t = {}, {}
         for m in allm:
             mt = m.get("MarketType") or {}
-            c = canon(mt.get("Name"))
-            if c and mt.get("_id"): codes[mt["_id"]] = c
-        if not codes: continue
-        detm = gj(f"/api/eventlist/eu/markets/all?markets={eid}:" + "|".join(codes))
-        time.sleep(random.uniform(0.15, 0.3))
-        if not detm: continue
-        merc = {}
-        for m in detm:
-            mt = m.get("MarketType") or {}
-            c = codes.get(mt.get("_id")) or canon(mt.get("Name"))
-            if not c: continue
+            mname = mt.get("Name") or m.get("Name") or ""
+            c = canon(mname)
+            ct = None if c else canon_team(mname)
+            if not c and not ct: continue
             lines = {}
             for s in (m.get("Selections") or []):
                 pts = s.get("Points")
@@ -183,14 +216,28 @@ def main():
                 try: od = float(od)
                 except Exception: continue
                 if od <= 1: continue
-                side = "over" if (s.get("Side") == 1 or "mais" in (s.get("Name") or "").lower() or (s.get("OutcomeType") or "").lower() == "acima") else "under"
+                side = "over" if (s.get("Side") == 1 or "mais" in (s.get("Name") or "").lower()
+                                  or "acima" in (s.get("Name") or "").lower()
+                                  or (s.get("OutcomeType") or "").lower() in ("acima", "over")) else "under"
                 lines.setdefault(float(pts), {})[side] = round(od, 2)
-            arr = [{"linha": L, "over": v["over"], "under": v["under"]} for L, v in sorted(lines.items()) if "over" in v and "under" in v]
-            if arr: merc[c] = arr
-        if not merc: continue
+            arr = [{"linha": L, "over": v["over"], "under": v["under"]}
+                   for L, v in sorted(lines.items()) if "over" in v and "under" in v]
+            if not arr: continue
+            if c:
+                # se várias linhas/mercados do mesmo canon, mescla
+                prev = {x["linha"]: x for x in merc.get(c, [])}
+                for row in arr: prev[row["linha"]] = row
+                merc[c] = [prev[L] for L in sorted(prev)]
+            else:
+                c2, team = ct
+                prev = {x["linha"]: x for x in merc_t.get(c2, {}).get(team, [])}
+                for row in arr: prev[row["linha"]] = row
+                merc_t.setdefault(c2, {})[team] = [prev[L] for L in sorted(prev)]
+        if not merc and not merc_t: continue
         name = (e.get("EventName") or "").replace(" vs ", " - ")
         rec = {"casa": "7k", "event_id": eid, "name": name, "league": e.get("LeagueName"),
                "start": e.get("StartEventDate"), "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"), "mercados": merc}
+        if merc_t: rec["mercados_time"] = merc_t
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
         if n_out % 10 == 0: write_latest(n_out)

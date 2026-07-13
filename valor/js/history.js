@@ -1,12 +1,19 @@
-// Histórico & CLV — render a partir de window.HIST (gerado por build_history.py)
+// Histórico & CLV — métricas + explorador jogo → mercado → main line (gráfico até o fechamento)
 (function () {
   var H = window.HIST || { gerado: "?", limiares: { head: 30, bucket: 20, roi: 50 },
     banco: { monitoradas: 0, liquidadas: 0, clv_validas: 0, moveu_pct: 0 },
     head: { n_valid: 0, n_settled: 0, green_geral: null }, recortes: { mercado: [], casa: [], lado: [] },
     liquidadas: [], abertas: [] };
   var LIM = H.limiares || { head: 30, bucket: 20, roi: 50 };
-  var ABBR = { "Cartões": "CAR", "Faltas": "FAL", "Finalizações": "FIN", "Impedimentos": "IMP", "Laterais": "LAT", "Tiros de meta": "TM" };
-  var state = { aba: "liquidadas", merc: "todos", res: "todos" };
+  var ABBR = { "Cartões": "CAR", "Faltas": "FAL", "Finalizações": "FIN", "Impedimentos": "IMP",
+    "Laterais": "LAT", "Tiros de meta": "TM", "Escanteios": "ESC", "Chutes no gol": "CG", "Desarmes": "DES" };
+  var MV = window.MOVES || {};
+  var CASA_COR = { betano: "#6d28d9", superbet: "#2f6f57", estrelabet: "#c2410c", "7k": "#1d4ed8", pinnacle: "#0f766e" };
+  var LADO_EN = { "Mais": "over", "Menos": "under", over: "over", under: "under" };
+
+  // explorar | liquidadas | abertas
+  var state = { aba: "explorar", merc: "todos", res: "todos",
+    game: null, mercado: null, linha: null, casa: null };
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function br(x, d) { if (x == null || x !== x) return "—"; var n = Number(x); return (d != null ? n.toFixed(d) : String(n)).replace(".", ","); }
@@ -15,11 +22,258 @@
   function cls(x) { return x == null ? "" : (x > 0 ? "pos" : (x < 0 ? "neg" : "")); }
   function pm(ci) { if (!ci || ci[0] == null) return ""; return ' <span class="pm">±' + Math.round((ci[1] - ci[0]) / 2) + '</span>'; }
 
-  // --- gráficos de movimentação (window.MOVES de build_moves.py) ---
-  var MV = window.MOVES || {};
-  var CASA_COR = { betano: "#6d28d9", superbet: "#2f6f57", estrelabet: "#c2410c", "7k": "#1d4ed8" };
+  function chip(label, active, extra, onclick) {
+    var c = document.createElement("span");
+    c.className = "chip" + (extra ? " " + extra : "") + (active ? " on" : "");
+    c.innerHTML = label; c.onclick = onclick;
+    c.setAttribute("role", "button"); c.tabIndex = 0;
+    c.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onclick(); } };
+    return c;
+  }
 
-  function mvSeries(gk, casa) { var g = MV[gk]; return (g && g[casa] && g[casa].length >= 2) ? g[casa] : null; }
+  function gameId(r) {
+    // data|home|away a partir do gk
+    var p = (r.gk || "").split("|");
+    if (p.length >= 3) return p[0] + "|" + p[1] + "|" + p[2];
+    return (r.data || "") + "|" + (r.jogo || "");
+  }
+
+  function mvSeries(gk, casa) {
+    var g = MV[gk];
+    return (g && g[casa] && g[casa].length >= 2) ? g[casa] : null;
+  }
+
+  function anyMv(gk) {
+    var g = MV[gk];
+    if (!g) return false;
+    return Object.keys(g).some(function (c) { return c !== "_ko" && g[c] && g[c].length >= 2; });
+  }
+
+  // --- índices jogo → mercados → linhas ---
+  function buildGameIndex() {
+    var idx = {};
+    function add(r, settled) {
+      var gid = gameId(r);
+      if (!gid || gid === "|") return;
+      var g = idx[gid] || (idx[gid] = {
+        id: gid, jogo: r.jogo, data: r.data, kickoff: r.kickoff,
+        settled: false, mercados: {}, casas: {}
+      });
+      if (settled) g.settled = true;
+      if (r.casa) g.casas[r.casa] = 1;
+      var m = g.mercados[r.mercado] || (g.mercados[r.mercado] = { linhas: {} });
+      var L = String(r.linha);
+      var ln = m.linhas[L] || (m.linhas[L] = { linha: +r.linha, lados: {}, result: null });
+      if (r.result != null) ln.result = r.result;
+      var lado = r.lado;
+      var slot = ln.lados[lado] || (ln.lados[lado] = { rows: [], gk: r.gk });
+      slot.rows.push(r);
+      if (r.gk) slot.gk = r.gk;
+    }
+    (H.liquidadas || []).forEach(function (r) { add(r, true); });
+    (H.abertas || []).forEach(function (r) { add(r, false); });
+    return idx;
+  }
+
+  function pickMainLine(linhasObj) {
+    // main line = menor |open_over − open_under| entre casas (mais equilibrada)
+    var best = null, score = Infinity;
+    Object.keys(linhasObj).forEach(function (Lk) {
+      var ln = linhasObj[Lk];
+      var overs = (ln.lados["Mais"] || ln.lados["over"] || {}).rows || [];
+      var unders = (ln.lados["Menos"] || ln.lados["under"] || {}).rows || [];
+      if (!overs.length || !unders.length) return;
+      // média de |o-u| por casa se possível
+      var byCasa = {};
+      overs.forEach(function (r) { byCasa[r.casa] = byCasa[r.casa] || {}; byCasa[r.casa].o = r.open || r.last; });
+      unders.forEach(function (r) { byCasa[r.casa] = byCasa[r.casa] || {}; byCasa[r.casa].u = r.open || r.last; });
+      var gaps = [];
+      Object.keys(byCasa).forEach(function (c) {
+        var o = byCasa[c].o, u = byCasa[c].u;
+        if (o > 1 && u > 1) gaps.push(Math.abs(o - u));
+      });
+      if (!gaps.length) return;
+      var gap = gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length;
+      var near = Math.abs(((overs[0].open || overs[0].last || 2) + (unders[0].open || unders[0].last || 2)) / 2 - 1.9);
+      var sc = gap * 10 + near;
+      if (sc < score) { score = sc; best = +Lk; }
+    });
+    if (best != null) return best;
+    // fallback: mediana das linhas
+    var arr = Object.keys(linhasObj).map(Number).sort(function (a, b) { return a - b; });
+    return arr.length ? arr[Math.floor(arr.length / 2)] : null;
+  }
+
+  function lineHit(linha, result) {
+    if (result == null || linha == null) return null;
+    // over wins if result > linha; under if result < linha; push if equal (inteiro)
+    if (result > linha) return "Mais";
+    if (result < linha) return "Menos";
+    return "Push";
+  }
+
+  /** Casas com série (Mais e/ou Menos) pra gid|mercado|linha */
+  function casasComSerie(gid, mercado, linha) {
+    var base = gid + "|" + mercado + "|" + linha + "|";
+    var gO = MV[base + "over"] || {};
+    var gU = MV[base + "under"] || {};
+    var set = {};
+    Object.keys(gO).forEach(function (c) {
+      if (c !== "_ko" && gO[c] && gO[c].length >= 1) set[c] = 1;
+    });
+    Object.keys(gU).forEach(function (c) {
+      if (c !== "_ko" && gU[c] && gU[c].length >= 1) set[c] = 1;
+    });
+    return Object.keys(set);
+  }
+
+  /**
+   * Gráfico Odds vs Tempo — UMA casa (estilo referência).
+   * Pré-jogo: eixo X = tempo até o kickoff (abertura → fechamento).
+   * Séries: Mais (azul) e Menos (vermelho).
+   */
+  function houseChart(gid, mercado, linha, casa) {
+    var base = gid + "|" + mercado + "|" + linha + "|";
+    var gO = MV[base + "over"] || {};
+    var gU = MV[base + "under"] || {};
+    var sO = (gO[casa] || []).slice().sort(function (a, b) { return a[0] - b[0]; });
+    var sU = (gU[casa] || []).slice().sort(function (a, b) { return a[0] - b[0]; });
+    if (sO.length < 2 && sU.length < 2) {
+      return '<div class="ex-empty">Sem série suficiente em <b>' + esc(casa) +
+        "</b> pra essa linha.<br><span style=\"font-size:12px\">Precisa de ≥2 capturas (abertura → fechamento). " +
+        "Com o cron de 1h o banco enche rápido.</span></div>";
+    }
+
+    var all = sO.concat(sU);
+    var ts = all.map(function (x) { return x[0]; });
+    var os = all.map(function (x) { return x[1]; });
+    var t0 = Math.min.apply(null, ts), t1 = Math.max.apply(null, ts);
+    var ko = gO._ko || gU._ko || null;
+    // estende eixo até o kickoff (fechamento natural)
+    if (ko && ko > t1) t1 = ko;
+    // se só temos 2 pontos iguais, ainda desenha
+    var o0 = Math.min.apply(null, os), o1 = Math.max.apply(null, os);
+    if (o1 - o0 < 0.05) { o0 -= 0.15; o1 += 0.15; }
+    else { var pad = (o1 - o0) * 0.15 + 0.04; o0 -= pad; o1 += pad; }
+
+    var W = 680, H = 280, L = 52, R = 56, T = 28, B = 36;
+    var dt = (t1 - t0) || 1, dO = (o1 - o0) || 1;
+    function X(t) { return L + (t - t0) / dt * (W - L - R); }
+    function Y(o) { return T + (1 - (o - o0) / dO) * (H - T - B); }
+    function fmtT(m) {
+      var d = new Date(m * 60000);
+      return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + " " +
+        ("0" + d.getHours()).slice(-2) + "h" + ("0" + d.getMinutes()).slice(-2);
+    }
+    function fmtDelta(m) {
+      // minutos até o kickoff (negativo = antes)
+      if (!ko) return fmtT(m);
+      var mins = Math.round(m - ko);
+      if (mins === 0) return "KO";
+      if (mins < 0) {
+        var h = Math.floor((-mins) / 60), mm = (-mins) % 60;
+        return h > 0 ? ("−" + h + "h" + (mm ? mm : "")) : ("−" + mm + "m");
+      }
+      return "+" + mins + "m";
+    }
+
+    var COR_MAIS = "#2563eb";   // azul
+    var COR_MENOS = "#dc2626";  // vermelho
+    var sv = '<svg class="ex-svg" viewBox="0 0 ' + W + " " + H + '" width="100%" preserveAspectRatio="xMidYMid meet">';
+    // fundo
+    sv += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fafaf9"/>';
+    // grid horizontal
+    for (var i = 0; i <= 4; i++) {
+      var ov = o0 + dO * i / 4, y = Y(ov);
+      sv += '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + (W - R) + '" y2="' + y.toFixed(1) +
+        '" stroke="#e5e5e5" stroke-width="1"/>';
+      sv += '<text x="' + (L - 8) + '" y="' + (y + 3.5).toFixed(1) +
+        '" text-anchor="end" font-size="11" fill="#737373" font-family="ui-monospace,monospace">' +
+        ov.toFixed(2) + "</text>";
+    }
+    // grid vertical (ticks de tempo)
+    var nTicks = 5;
+    for (var j = 0; j <= nTicks; j++) {
+      var tv = t0 + (t1 - t0) * j / nTicks;
+      var x = X(tv);
+      sv += '<line x1="' + x.toFixed(1) + '" y1="' + T + '" x2="' + x.toFixed(1) + '" y2="' + (H - B) +
+        '" stroke="#f0f0f0" stroke-width="1"/>';
+      sv += '<text x="' + x.toFixed(1) + '" y="' + (H - 12) +
+        '" text-anchor="middle" font-size="10" fill="#737373">' + fmtDelta(tv) + "</text>";
+    }
+    // labels eixos
+    sv += '<text x="14" y="' + (H / 2) + '" text-anchor="middle" font-size="10" fill="#525252" ' +
+      'transform="rotate(-90 14 ' + (H / 2) + ')">ODD</text>';
+    sv += '<text x="' + ((L + W - R) / 2) + '" y="' + (H - 2) +
+      '" text-anchor="middle" font-size="10" fill="#525252">TEMPO (até o kickoff)</text>';
+
+    // kickoff
+    if (ko && ko >= t0 && ko <= t1) {
+      sv += '<line x1="' + X(ko).toFixed(1) + '" y1="' + T + '" x2="' + X(ko).toFixed(1) +
+        '" y2="' + (H - B) + '" stroke="#a3a3a3" stroke-width="1.5" stroke-dasharray="5,4"/>';
+      sv += '<text x="' + X(ko).toFixed(1) + '" y="' + (T + 12) +
+        '" text-anchor="middle" font-size="10" fill="#525252" font-weight="700">Fechamento / KO</text>';
+    }
+
+    function drawSeries(s, cor, label) {
+      if (!s || s.length < 1) return;
+      var pts = s.map(function (p) { return X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1); }).join(" ");
+      sv += '<polyline points="' + pts + '" fill="none" stroke="' + cor + '" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
+      s.forEach(function (p, idx) {
+        var r = (idx === 0 || idx === s.length - 1) ? 4 : 2.6;
+        sv += '<circle cx="' + X(p[0]).toFixed(1) + '" cy="' + Y(p[1]).toFixed(1) +
+          '" r="' + r + '" fill="' + cor + '" stroke="#fff" stroke-width="1"/>';
+      });
+      // label no último ponto
+      var last = s[s.length - 1];
+      sv += '<rect x="' + (X(last[0]) + 6).toFixed(1) + '" y="' + (Y(last[1]) - 18).toFixed(1) +
+        '" width="72" height="16" rx="4" fill="#fff" stroke="' + cor + '" stroke-width="1"/>';
+      sv += '<text x="' + (X(last[0]) + 42).toFixed(1) + '" y="' + (Y(last[1]) - 6.5).toFixed(1) +
+        '" text-anchor="middle" font-size="10" fill="' + cor + '" font-weight="700">' +
+        label + " " + Number(last[1]).toFixed(2) + "</text>";
+      // label abertura
+      if (s.length >= 1) {
+        var first = s[0];
+        sv += '<text x="' + X(first[0]).toFixed(1) + '" y="' + (Y(first[1]) - 8).toFixed(1) +
+          '" text-anchor="middle" font-size="9" fill="' + cor + '">' + Number(first[1]).toFixed(2) + "</text>";
+      }
+    }
+    drawSeries(sO, COR_MAIS, "Mais");
+    drawSeries(sU, COR_MENOS, "Menos");
+    sv += "</svg>";
+
+    // resumo numérico abertura → fechamento
+    function ends(s) {
+      if (!s || !s.length) return { o: null, c: null, n: 0 };
+      return { o: s[0][1], c: s[s.length - 1][1], n: s.length };
+    }
+    var eO = ends(sO), eU = ends(sU);
+    function drift(a, b) {
+      if (a == null || b == null || !a) return "—";
+      var d = (b / a - 1) * 100;
+      return (d > 0 ? "+" : "") + d.toFixed(1) + "%";
+    }
+    var sum =
+      '<div class="ex-sum">' +
+      '<div class="ex-sum-item"><span class="dot" style="background:' + COR_MAIS + '"></span><b>Mais</b> ' +
+      br(eO.o, 2) + " → " + br(eO.c, 2) + ' <span class="ex-drift">' + drift(eO.o, eO.c) + "</span>" +
+      ' <span class="pm">(' + eO.n + " pts)</span></div>" +
+      '<div class="ex-sum-item"><span class="dot" style="background:' + COR_MENOS + '"></span><b>Menos</b> ' +
+      br(eU.o, 2) + " → " + br(eU.c, 2) + ' <span class="ex-drift">' + drift(eU.o, eU.c) + "</span>" +
+      ' <span class="pm">(' + eU.n + " pts)</span></div>" +
+      "</div>";
+
+    var leg =
+      '<div class="ex-chart-head">' +
+      '<div class="ex-chart-title-row">Gráfico Odds vs Tempo · <b>' + esc(casa) + "</b> · linha " +
+      br(linha, 1) + " " + esc(mercado) + "</div>" +
+      '<div class="mv-legend">' +
+      '<span><span class="sw" style="background:' + COR_MAIS + ';height:3px"></span>Mais</span>' +
+      '<span><span class="sw" style="background:' + COR_MENOS + ';height:3px"></span>Menos</span>' +
+      '<span class="ex-leg-note">abertura → fechamento (pré-jogo)</span></div></div>';
+
+    return leg + sum + '<div class="mv-chart ex-chart ex-chart-ref">' + sv + "</div>";
+  }
 
   function sparkline(gk, casa) {
     var s = mvSeries(gk, casa);
@@ -36,71 +290,15 @@
     return '<svg class="spark ' + dir + '" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '"><polyline points="' + pts + '"/></svg>';
   }
 
-  function bigChart(gk) {
-    var g = MV[gk];
-    if (!g) return '<div class="pm">sem série pra essa linha</div>';
-    var casas = Object.keys(g).filter(function (c) { return c !== "_ko" && g[c].length; });
-    if (!casas.length) return '<div class="pm">sem série pra essa linha</div>';
-    var all = [];
-    casas.forEach(function (c) { all = all.concat(g[c]); });
-    var ts = all.map(function (x) { return x[0]; }), os = all.map(function (x) { return x[1]; });
-    var t0 = Math.min.apply(null, ts), t1 = Math.max.apply(null, ts);
-    if (g._ko && g._ko > t1 && g._ko - t1 < 48 * 60) t1 = g._ko;   // estende até o kickoff se perto
-    var o0 = Math.min.apply(null, os), o1 = Math.max.apply(null, os);
-    var pad = (o1 - o0) * 0.15 + 0.02; o0 -= pad; o1 += pad;
-    var W = 640, H = 170, L = 44, R = 10, T = 10, B = 22;
-    var dt = (t1 - t0) || 1, dO = (o1 - o0) || 1;
-    function X(t) { return L + (t - t0) / dt * (W - L - R); }
-    function Y(o) { return T + (1 - (o - o0) / dO) * (H - T - B); }
-    function fmtT(m) { var d = new Date(m * 60000); return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + " " + ("0" + d.getHours()).slice(-2) + "h"; }
-    var sv = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H + '" style="font-family:var(--mono)">';
-    // grid horizontal (3 linhas) + labels de odd
-    for (var i = 0; i <= 2; i++) {
-      var ov = o0 + dO * i / 2, y = Y(ov);
-      sv += '<line x1="' + L + '" y1="' + y + '" x2="' + (W - R) + '" y2="' + y + '" stroke="#e7e2d8" stroke-width="1"/>';
-      sv += '<text x="' + (L - 6) + '" y="' + (y + 3) + '" text-anchor="end" font-size="9" fill="#9a94a6">' + ov.toFixed(2) + "</text>";
-    }
-    // labels de tempo (início/fim)
-    sv += '<text x="' + L + '" y="' + (H - 6) + '" font-size="9" fill="#9a94a6">' + fmtT(t0) + "</text>";
-    sv += '<text x="' + (W - R) + '" y="' + (H - 6) + '" text-anchor="end" font-size="9" fill="#9a94a6">' + fmtT(t1) + "</text>";
-    // kickoff
-    if (g._ko && g._ko >= t0 && g._ko <= t1) {
-      sv += '<line x1="' + X(g._ko) + '" y1="' + T + '" x2="' + X(g._ko) + '" y2="' + (H - B) + '" stroke="#c2410c" stroke-width="1" stroke-dasharray="3,3"/>';
-      sv += '<text x="' + X(g._ko) + '" y="' + (T + 8) + '" text-anchor="middle" font-size="8" fill="#c2410c">kickoff</text>';
-    }
-    casas.forEach(function (c) {
-      var cor = CASA_COR[c] || "#6b6577";
-      var s = g[c].slice().sort(function (a, b) { return a[0] - b[0]; });
-      var pts = s.map(function (x) { return X(x[0]).toFixed(1) + "," + Y(x[1]).toFixed(1); }).join(" ");
-      sv += '<polyline points="' + pts + '" fill="none" stroke="' + cor + '" stroke-width="1.8"/>';
-      s.forEach(function (x) { sv += '<circle cx="' + X(x[0]).toFixed(1) + '" cy="' + Y(x[1]).toFixed(1) + '" r="2.4" fill="' + cor + '"/>'; });
-    });
-    sv += "</svg>";
-    var leg = '<div class="mv-legend">' + casas.map(function (c) {
-      return '<span><span class="sw" style="background:' + (CASA_COR[c] || "#6b6577") + '"></span>' + esc(c) + "</span>";
-    }).join("") + "</div>";
-    return leg + '<div class="mv-chart">' + sv + "</div>";
-  }
-
-  function chip(label, active, extra, onclick) {
-    var c = document.createElement("span");
-    c.className = "chip" + (extra ? " " + extra : "") + (active ? " on" : "");
-    c.innerHTML = label; c.onclick = onclick;
-    c.setAttribute("role", "button"); c.tabIndex = 0;
-    c.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onclick(); } };
-    return c;
-  }
-
-  // --- banner de maturidade do banco (sempre) ---
+  // --- banner / headline (CLV) ---
   function banner() {
     var b = H.banco || {}, nv = (H.head || {}).n_valid || 0;
-    var cls = nv >= LIM.head ? "cap-green" : (nv > 0 ? "cap-yellow" : "cap-red");
     var el = document.createElement("div");
-    el.className = "capbar " + cls;
-    el.innerHTML = "Banco de odds: <b>" + (b.monitoradas || 0) + "</b> linhas monitoradas · <b>" +
-      (b.liquidadas || 0) + "</b> liquidadas · <b>" + (b.clv_validas || 0) + "</b> com CLV pré-jogo válido · " +
-      br(b.moveu_pct, 1) + "% já moveram" +
-      '<div class="cap-note">CLV pré-jogo válido = abertura vista <b>antes</b> do apito. Só essas entram nas taxas de valor.</div>';
+    el.className = "capbar " + (nv >= LIM.head ? "cap-green" : (nv > 0 ? "cap-yellow" : "cap-red"));
+    el.innerHTML = "Banco de odds: <b>" + (b.monitoradas || 0) + "</b> linhas · <b>" +
+      (b.liquidadas || 0) + "</b> liquidadas · <b>" + (b.clv_validas || 0) + "</b> CLV pré-jogo · " +
+      br(b.moveu_pct, 1) + "% moveram" +
+      '<div class="cap-note">Explore um <b>jogo → mercado → main line</b> pra ver a curva até o fechamento e se a linha bateu.</div>';
     return el;
   }
 
@@ -109,96 +307,235 @@
       (sub ? '<div class="s">' + esc(sub) + '</div>' : "") + '</div>';
   }
 
-  // --- cabeçalho de métricas ---
   function headline() {
     var h = H.head || {}, wrap = document.createElement("div");
-    var placarTile = statTile("Placar (green)", pct(h.green_geral, 1), "",
-      "não é CLV · alta variância · N=" + (h.n_settled || 0));
-
     if ((h.n_valid || 0) < LIM.head) {
-      var e = document.createElement("div"); e.className = "empty";
-      e.innerHTML = '<div class="big">⏳</div><b>Ainda sem CLV confiável.</b><br>' +
-        '<span style="font-size:12px;line-height:1.6;display:inline-block;margin-top:8px;max-width:460px">' +
-        'As ' + (h.n_settled || 0) + ' linhas liquidadas foram vistas <b>depois</b> do apito (abertura = fechamento), então não medem valor de fechamento. ' +
-        'O CLV aparece conforme o cron de 4/4h capturar linhas <b>horas antes</b> do jogo. ' +
-        'Precisamos de ≥' + LIM.head + ' linhas com abertura pré-jogo (temos ' + (h.n_valid || 0) + ').</span>';
+      var e = document.createElement("div"); e.className = "empty"; e.style.padding = "20px";
+      e.innerHTML = '<div class="big" style="font-size:28px">⏳</div><b>CLV agregado ainda sem amostra pré-jogo suficiente</b><br>' +
+        '<span style="font-size:12px">≥' + LIM.head + ' linhas com abertura antes do apito (temos ' + (h.n_valid || 0) + '). ' +
+        'O explorador de jogos funciona mesmo assim.</span>';
       wrap.appendChild(e);
-      var row = document.createElement("div"); row.className = "stat-row";
-      row.innerHTML = placarTile; wrap.appendChild(row);
       return wrap;
     }
-
     var tiles = "";
-    var ciTxt = (h.beat_ci && h.beat_ci[0] != null) ? ("IC " + br(h.beat_ci[0], 0) + "–" + br(h.beat_ci[1], 0) + "%") : "";
     tiles += statTile("Bateu o fechamento", pct(h.beat_close_rate, 0),
-      h.beat_close_rate == null ? "wait" : (h.beat_close_rate >= 50 ? "pos" : "neg"),
-      ciTxt + " · N=" + (h.n_valid || 0));
-    tiles += statTile("CLV médio", sign(h.clv_medio, 1), cls(h.clv_medio),
-      "mediana " + sign(h.clv_mediana, 1));
-    tiles += placarTile;
+      h.beat_close_rate == null ? "wait" : (h.beat_close_rate >= 50 ? "pos" : "neg"), "N=" + (h.n_valid || 0));
+    tiles += statTile("CLV médio", sign(h.clv_medio, 1), cls(h.clv_medio), "mediana " + sign(h.clv_mediana, 1));
+    tiles += statTile("Placar (green)", pct(h.green_geral, 1), "", "N=" + (h.n_settled || 0));
     if (h.roi_abertura != null) {
-      tiles += statTile("ROI na abertura", sign(h.roi_abertura, 1), cls(h.roi_abertura),
-        "vs fecha " + sign(h.roi_fechamento, 1) + " · Δ " + sign(h.roi_delta, 1) + " · hipotético 1u");
+      tiles += statTile("ROI abertura", sign(h.roi_abertura, 1), cls(h.roi_abertura),
+        "vs fecha " + sign(h.roi_fechamento, 1));
     }
     var row = document.createElement("div"); row.className = "stat-row"; row.innerHTML = tiles;
     wrap.appendChild(row);
-
-    // barras: green quando bateu × não bateu o fechamento
-    if (h.green_bateu != null && h.green_nao != null) {
-      var bars = document.createElement("div"); bars.className = "bars";
-      function ciTxt(ci) { return (ci && ci[0] != null) ? (" · IC " + br(ci[0], 0) + "–" + br(ci[1], 0) + "%") : ""; }
-      function barc(lab, v, ci, no) {
-        return '<div class="barc' + (no ? " no" : "") + '"><div class="lab">' + esc(lab) + " — " + pct(v, 1) + ciTxt(ci) +
-          "</div><div style=\"background:var(--line2);border-radius:5px\"><div class=\"fill\" style=\"width:" +
-          Math.max(0, Math.min(100, v)) + '%"></div></div></div>';
-      }
-      bars.innerHTML = barc("Green quando BATEU o fechamento (N=" + h.n_bateu + ")", h.green_bateu, h.green_bateu_ci, false) +
-        barc("Green quando NÃO bateu (N=" + h.n_nao + ")", h.green_nao, h.green_nao_ci, true);
-      wrap.appendChild(bars);
-      if (h.green_diff_conclusiva === false) {
-        var note = document.createElement("div"); note.className = "meta";
-        note.style.marginTop = "-6px"; note.style.marginBottom = "12px";
-        note.innerHTML = "⚠ As faixas de confiança se sobrepõem — a diferença ainda <b>não é conclusiva</b> (amostra pequena).";
-        wrap.appendChild(note);
-      }
-    }
-
-    // recortes
-    var rec = H.recortes || {};
-    [["mercado", "Por mercado"], ["casa", "Por casa"], ["lado", "Por lado"]].forEach(function (p) {
-      var rows = rec[p[0]] || [];
-      if (!rows.length) return;
-      var t = '<div class="hist-scroll" style="margin-bottom:10px"><table class="lad hist-tbl"><thead><tr>' +
-        '<th class="jg">' + p[1] + '</th><th>N</th><th>Bateu</th><th>CLV</th><th>Green</th></tr></thead><tbody>';
-      rows.forEach(function (r) {
-        var small = r.small;
-        t += '<tr class="' + (small ? "sm" : "") + '" title="' + (small ? "amostra pequena (&lt;" + LIM.bucket + ")" : "") + '">' +
-          '<td class="jg">' + esc(r.nome) + '</td><td>' + r.n + '</td>' +
-          (small ? '<td>—</td><td>—</td><td>—</td>' :
-            '<td>' + pct(r.beat, 0) + pm(r.beat_ci) + '</td><td class="' + cls(r.clv) + '">' + sign(r.clv, 1) + '</td><td>' + pct(r.green, 0) + pm(r.green_ci) + '</td>') +
-          '</tr>';
-      });
-      t += "</tbody></table></div>";
-      var box = document.createElement("div"); box.innerHTML = t; wrap.appendChild(box.firstChild);
-    });
     return wrap;
   }
 
-  // --- filtros (aba + mercado + resultado) ---
-  function filtros(dataset) {
-    // coerção: mercado filtrado que não existe no dataset atual volta a "todos"
-    // (evita esconder tudo com filtro herdado da outra aba, sem chip de reset visível)
-    if (state.merc !== "todos" && !dataset.some(function (r) { return r.mercado === state.merc; })) state.merc = "todos";
-    var box = document.createElement("div"); box.className = "bar";
-    box.appendChild(chip("Liquidadas <span class='ct2'>" + (H.liquidadas || []).length + "</span>", state.aba === "liquidadas", "", function () { if (state.aba !== "liquidadas") { state.merc = "todos"; state.res = "todos"; } state.aba = "liquidadas"; render(); }));
-    box.appendChild(chip("Abertas (movendo) <span class='ct2'>" + (H.abertas || []).length + "</span>", state.aba === "abertas", "", function () { if (state.aba !== "abertas") { state.merc = "todos"; state.res = "todos"; } state.aba = "abertas"; render(); }));
-    // mercados presentes no dataset atual
-    var mkts = {};
-    dataset.forEach(function (r) { mkts[r.mercado] = 1; });
-    if (Object.keys(mkts).length > 1) {
-      box.appendChild(chip("Todos mercados", state.merc === "todos", "", function () { state.merc = "todos"; render(); }));
+  // --- EXPLORAR ---
+  function renderExplorar(root) {
+    var idx = buildGameIndex();
+    var games = Object.keys(idx).map(function (k) { return idx[k]; });
+    games.sort(function (a, b) {
+      return (b.kickoff || b.data || "").localeCompare(a.kickoff || a.data || "");
+    });
+
+    // se game selecionado sumiu, limpa
+    if (state.game && !idx[state.game]) {
+      state.game = state.mercado = state.linha = null;
+    }
+
+    if (!state.game) {
+      // lista de jogos
+      var filt = document.createElement("div"); filt.className = "bar";
+      filt.appendChild(chip("Todos", state.merc === "todos", "", function () { state.merc = "todos"; render(); }));
+      var mkts = {};
+      games.forEach(function (g) { Object.keys(g.mercados).forEach(function (m) { mkts[m] = 1; }); });
       Object.keys(ABBR).forEach(function (m) {
         if (!mkts[m]) return;
+        filt.appendChild(chip(m, state.merc === m, "", function () { state.merc = m; render(); }));
+      });
+      root.appendChild(filt);
+
+      var list = games.filter(function (g) {
+        if (state.merc === "todos") return true;
+        return !!g.mercados[state.merc];
+      });
+      var meta = document.createElement("div"); meta.className = "meta";
+      meta.innerHTML = list.length + " jogo" + (list.length === 1 ? "" : "s") + " no histórico · toque pra abrir o gráfico";
+      root.appendChild(meta);
+
+      var box = document.createElement("div"); box.className = "ex-games";
+      list.forEach(function (g) {
+        var nMerc = Object.keys(g.mercados).length;
+        var card = document.createElement("button");
+        card.type = "button";
+        card.className = "ex-game-card" + (g.settled ? " settled" : " open");
+        card.innerHTML =
+          '<div class="ex-g-top"><div class="ex-g-name">' + esc(g.jogo) + '</div>' +
+          '<div class="ex-g-when">' + esc((g.kickoff || g.data || "").slice(0, 16).replace("T", " ")) + "</div></div>" +
+          '<div class="ex-g-meta">' +
+          (g.settled ? '<span class="ex-badge done">liquidado</span>' : '<span class="ex-badge live">aberto</span>') +
+          '<span class="ex-g-m">' + nMerc + " mercado" + (nMerc === 1 ? "" : "s") + "</span>" +
+          '<span class="ex-g-c">' + Object.keys(g.casas).join(" · ") + "</span></div>";
+        card.onclick = function () {
+          state.game = g.id;
+          state.mercado = null;
+          state.linha = null;
+          state.casa = null;
+          var ms = Object.keys(g.mercados);
+          if (ms.indexOf("Cartões") >= 0) state.mercado = "Cartões";
+          else if (ms.length) state.mercado = ms[0];
+          if (state.mercado) {
+            state.linha = pickMainLine(g.mercados[state.mercado].linhas);
+          }
+          render();
+        };
+        box.appendChild(card);
+      });
+      if (!list.length) {
+        box.innerHTML = '<div class="empty"><div class="big">📭</div>Nenhum jogo no histórico ainda.</div>';
+      }
+      root.appendChild(box);
+      return;
+    }
+
+    // detalhe do jogo
+    var g = idx[state.game];
+    var head = document.createElement("div");
+    head.className = "ex-detail-head";
+    var back = document.createElement("button");
+    back.type = "button"; back.className = "ex-back";
+    back.textContent = "← Jogos";
+    back.onclick = function () { state.game = state.mercado = state.linha = state.casa = null; render(); };
+    head.appendChild(back);
+    var title = document.createElement("div");
+    title.innerHTML = '<div class="ex-d-name">' + esc(g.jogo) + '</div>' +
+      '<div class="ex-d-sub">' + esc(g.data || "") +
+      (g.settled ? ' · liquidado' : ' · em aberto') +
+      " · " + Object.keys(g.casas).join(", ") + "</div>";
+    head.appendChild(title);
+    root.appendChild(head);
+
+    // chips de mercado
+    var mbar = document.createElement("div"); mbar.className = "bar";
+    Object.keys(g.mercados).forEach(function (m) {
+      mbar.appendChild(chip(m, state.mercado === m, "", function () {
+        state.mercado = m;
+        state.linha = pickMainLine(g.mercados[m].linhas);
+        state.casa = null;
+        render();
+      }));
+    });
+    root.appendChild(mbar);
+
+    if (!state.mercado || !g.mercados[state.mercado]) {
+      var em = document.createElement("div"); em.className = "empty"; em.textContent = "Escolha um mercado.";
+      root.appendChild(em);
+      return;
+    }
+
+    var mkt = g.mercados[state.mercado];
+    var linhas = Object.keys(mkt.linhas).map(Number).sort(function (a, b) { return a - b; });
+    if (state.linha == null || !mkt.linhas[String(state.linha)]) {
+      state.linha = pickMainLine(mkt.linhas);
+    }
+
+    // chips de linha
+    var lbar = document.createElement("div"); lbar.className = "bar";
+    var mainL = pickMainLine(mkt.linhas);
+    linhas.forEach(function (L) {
+      var lab = br(L, 1) + (L === mainL ? " · main" : "");
+      lbar.appendChild(chip(lab, +state.linha === +L, L === mainL ? "ord" : "", function () {
+        state.linha = L; state.casa = null; render();
+      }));
+    });
+    root.appendChild(lbar);
+
+    var ln = mkt.linhas[String(state.linha)];
+    if (!ln) return;
+
+    // chips de CASA (gráfico separado por casa)
+    var casasSerie = casasComSerie(g.id, state.mercado, state.linha);
+    var overRows = (ln.lados["Mais"] || {}).rows || [];
+    var underRows = (ln.lados["Menos"] || {}).rows || [];
+    var casasAll = {};
+    overRows.forEach(function (r) { casasAll[r.casa] = 1; });
+    underRows.forEach(function (r) { casasAll[r.casa] = 1; });
+    casasSerie.forEach(function (c) { casasAll[c] = 1; });
+    var casaList = Object.keys(casasAll);
+    if (!state.casa || casaList.indexOf(state.casa) < 0) {
+      // prefere casa com mais pontos na série
+      var bestC = null, bestN = -1;
+      casaList.forEach(function (c) {
+        var base = g.id + "|" + state.mercado + "|" + state.linha + "|";
+        var n = ((MV[base + "over"] || {})[c] || []).length + ((MV[base + "under"] || {})[c] || []).length;
+        if (n > bestN) { bestN = n; bestC = c; }
+      });
+      state.casa = bestC || casaList[0] || null;
+    }
+
+    var cbar = document.createElement("div"); cbar.className = "bar";
+    var labCasa = document.createElement("span");
+    labCasa.className = "ex-bar-lab"; labCasa.textContent = "Casa:";
+    cbar.appendChild(labCasa);
+    casaList.forEach(function (c) {
+      cbar.appendChild(chip(c, state.casa === c, "", function () {
+        state.casa = c; render();
+      }));
+    });
+    root.appendChild(cbar);
+
+    // painel resultado + open/close da casa
+    var panel = document.createElement("div");
+    panel.className = "ex-panel";
+    var hit = lineHit(state.linha, ln.result);
+    var resultHtml = "";
+    if (ln.result != null) {
+      resultHtml =
+        '<div class="ex-result ' + (hit === "Mais" ? "over" : (hit === "Menos" ? "under" : "push")) + '">' +
+        '<div class="ex-res-k">Resultado no jogo</div>' +
+        '<div class="ex-res-v">' + br(ln.result, 0) + " " + esc(state.mercado.toLowerCase()) + "</div>" +
+        '<div class="ex-res-hit">Linha ' + br(state.linha, 1) + " → <b>" +
+        (hit === "Push" ? "Push (exata)" : (hit + " bateu")) + "</b></div></div>";
+    } else {
+      resultHtml = '<div class="ex-result wait"><div class="ex-res-k">Resultado</div><div class="ex-res-v">aguardando liquidação</div></div>';
+    }
+
+    var o = overRows.filter(function (r) { return r.casa === state.casa; })[0];
+    var u = underRows.filter(function (r) { return r.casa === state.casa; })[0];
+    var tbl = '<table class="lad ex-odds"><thead><tr><th>Lado</th><th>Abertura</th><th>Fechamento</th><th>Δ%</th><th>CLV</th></tr></thead><tbody>';
+    function rowSide(lab, r, tdCls) {
+      if (!r) return "<tr><td>" + lab + "</td><td colspan='4' class='pm'>—</td></tr>";
+      var close = r.close != null ? r.close : r.last;
+      var d = (r.open && close) ? ((close / r.open - 1) * 100) : null;
+      return "<tr><td><b>" + lab + "</b></td>" +
+        '<td class="' + tdCls + '">' + br(r.open, 2) + "</td>" +
+        '<td class="' + tdCls + '">' + br(close, 2) + "</td>" +
+        '<td class="' + cls(d) + '">' + sign(d, 1) + "</td>" +
+        '<td class="' + (r.clv_valido === false ? "" : cls(r.clv)) + '">' +
+        (r.clv_valido === false ? "—" : sign(r.clv, 1)) + "</td></tr>";
+    }
+    tbl += rowSide("Mais", o, "o") + rowSide("Menos", u, "u") + "</tbody></table>";
+
+    panel.innerHTML =
+      '<div class="ex-panel-grid">' + resultHtml +
+      '<div class="ex-odds-wrap"><div class="ex-panel-title">' + esc(state.casa || "—") +
+      " · linha " + br(state.linha, 1) + " · " + esc(state.mercado) +
+      "</div>" + tbl + "</div></div>" +
+      (state.casa ? houseChart(g.id, state.mercado, state.linha, state.casa) :
+        '<div class="ex-empty">Escolha uma casa.</div>');
+
+    root.appendChild(panel);
+  }
+
+  // --- tabelas legadas ---
+  function filtros(dataset) {
+    if (state.merc !== "todos" && !dataset.some(function (r) { return r.mercado === state.merc; })) state.merc = "todos";
+    var box = document.createElement("div"); box.className = "bar";
+    if (Object.keys(dataset.reduce(function (a, r) { a[r.mercado] = 1; return a; }, {})).length > 1) {
+      box.appendChild(chip("Todos mercados", state.merc === "todos", "", function () { state.merc = "todos"; render(); }));
+      Object.keys(ABBR).forEach(function (m) {
+        if (!dataset.some(function (r) { return r.mercado === m; })) return;
         box.appendChild(chip(m, state.merc === m, "", function () { state.merc = m; render(); }));
       });
     }
@@ -226,39 +563,31 @@
       '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Fecha</th><th>CLV</th><th>Res.</th><th>Mov.</th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var invalid = !r.clv_valido;
-      t += '<tr class="' + (invalid ? "sm" : "") + (mvSeries(r.gk, r.casa) ? " has-mv" : "") + '" data-gk="' + esc(r.gk || "") + '"' + (invalid ? ' title="abertura pós-apito — sem CLV real"' : "") + '>' +
-        '<td class="jg" title="' + esc(r.jogo) + ' · ' + esc(r.data) + ' · ' + esc(r.casa) + '">' + esc(r.jogo) + '</td>' +
-        '<td title="' + esc(r.mercado) + '">' + (ABBR[r.mercado] || esc(r.mercado)) + '</td>' +
-        '<td class="ln">' + br(r.linha, 1) + '</td>' +
-        '<td>' + esc(r.lado) + '</td>' +
-        '<td class="o">' + br(r.open, 2) + '</td>' +
-        '<td class="u">' + br(r.close, 2) + '</td>' +
-        '<td class="' + (invalid ? "" : cls(r.clv)) + '">' + (invalid ? "—" : sign(r.clv, 1)) + '</td>' +
-        '<td class="' + (r.won ? "hist-mv up" : "hist-mv dn") + '" title="total no jogo: ' + esc(r.result) + '">' + (r.won ? "green" : "red") + '</td>' +
-        '<td>' + sparkline(r.gk, r.casa) + '</td>' +
-        '</tr>';
+      t += '<tr class="' + (invalid ? "sm" : "") + (anyMv(r.gk) ? " has-mv" : "") + '" data-gk="' + esc(r.gk || "") + '">' +
+        '<td class="jg">' + esc(r.jogo) + "</td>" +
+        "<td>" + (ABBR[r.mercado] || esc(r.mercado)) + "</td>" +
+        '<td class="ln">' + br(r.linha, 1) + "</td><td>" + esc(r.lado) + "</td>" +
+        '<td class="o">' + br(r.open, 2) + '</td><td class="u">' + br(r.close, 2) + "</td>" +
+        '<td class="' + (invalid ? "" : cls(r.clv)) + '">' + (invalid ? "—" : sign(r.clv, 1)) + "</td>" +
+        '<td class="' + (r.won ? "hist-mv up" : "hist-mv dn") + '">' + (r.won ? "green" : "red") + "</td>" +
+        "<td>" + sparkline(r.gk, r.casa) + "</td></tr>";
     });
     return t + "</tbody></table></div>";
   }
 
   function tblAbertas(rows) {
-    if (!rows.length) return '<div class="empty"><div class="big">🕓</div>Nenhuma linha aberta com movimento agora.<br><span style="font-size:12px">O movimento aparece quando uma linha é capturada em mais de uma rodada antes do jogo.</span></div>';
+    if (!rows.length) return '<div class="empty"><div class="big">🕓</div>Nenhuma linha aberta com movimento.</div>';
     var t = '<div class="hist-scroll"><table class="lad hist-tbl"><thead><tr>' +
       '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Agora</th><th>Δ%</th><th>Obs</th><th>Mov.</th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var d = r.drift_pct;
       var mv = d == null ? "flat" : (d < 0 ? "up" : (d > 0 ? "dn" : "flat"));
-      t += '<tr class="' + (mvSeries(r.gk, r.casa) ? "has-mv" : "") + '" data-gk="' + esc(r.gk || "") + '">' +
-        '<td class="jg" title="' + esc(r.jogo) + ' · ' + esc(r.data) + ' · ' + esc(r.casa) + '">' + esc(r.jogo) + '</td>' +
-        '<td title="' + esc(r.mercado) + '">' + (ABBR[r.mercado] || esc(r.mercado)) + '</td>' +
-        '<td class="ln">' + br(r.linha, 1) + '</td>' +
-        '<td>' + esc(r.lado) + '</td>' +
-        '<td class="o">' + br(r.open, 2) + '</td>' +
-        '<td class="u">' + br(r.last, 2) + '</td>' +
-        '<td class="hist-mv ' + mv + '">' + sign(d, 1) + '</td>' +
-        '<td>' + (r.n_moves || 0) + '</td>' +
-        '<td>' + sparkline(r.gk, r.casa) + '</td>' +
-        '</tr>';
+      t += '<tr class="' + (anyMv(r.gk) ? "has-mv" : "") + '" data-gk="' + esc(r.gk || "") + '">' +
+        '<td class="jg">' + esc(r.jogo) + "</td><td>" + (ABBR[r.mercado] || esc(r.mercado)) + "</td>" +
+        '<td class="ln">' + br(r.linha, 1) + "</td><td>" + esc(r.lado) + "</td>" +
+        '<td class="o">' + br(r.open, 2) + '</td><td class="u">' + br(r.last, 2) + "</td>" +
+        '<td class="hist-mv ' + mv + '">' + sign(d, 1) + "</td><td>" + (r.n_moves || 0) + "</td>" +
+        "<td>" + sparkline(r.gk, r.casa) + "</td></tr>";
     });
     return t + "</tbody></table></div>";
   }
@@ -270,44 +599,53 @@
     root.appendChild(banner());
     root.appendChild(headline());
 
+    // nav principal
+    var nav = document.createElement("div"); nav.className = "bar";
+    nav.appendChild(chip("🔎 Explorar jogo", state.aba === "explorar", "", function () {
+      state.aba = "explorar"; render();
+    }));
+    nav.appendChild(chip("Liquidadas <span class='ct2'>" + (H.liquidadas || []).length + "</span>",
+      state.aba === "liquidadas", "", function () {
+        state.aba = "liquidadas"; state.merc = "todos"; state.res = "todos"; render();
+      }));
+    nav.appendChild(chip("Abertas <span class='ct2'>" + (H.abertas || []).length + "</span>",
+      state.aba === "abertas", "", function () {
+        state.aba = "abertas"; state.merc = "todos"; state.res = "todos"; render();
+      }));
+    root.appendChild(nav);
+
+    if (state.aba === "explorar") {
+      renderExplorar(root);
+      return;
+    }
+
     var base = state.aba === "liquidadas" ? (H.liquidadas || []) : (H.abertas || []);
     root.appendChild(filtros(base));
     var vis = applyFilters(base);
-
     var meta = document.createElement("div"); meta.className = "meta";
-    meta.innerHTML = vis.length + (state.aba === "liquidadas" ? " linha" + (vis.length === 1 ? "" : "s") + " liquidada" + (vis.length === 1 ? "" : "s")
-      : " linha" + (vis.length === 1 ? "" : "s") + " aberta" + (vis.length === 1 ? "" : "s") + " com movimento") +
-      ' · atualizado ' + esc(H.gerado || "?");
+    meta.innerHTML = vis.length + " linha" + (vis.length === 1 ? "" : "s") +
+      " · atualizado " + esc(H.gerado || "?");
     root.appendChild(meta);
-
     var tbl = document.createElement("div");
     tbl.innerHTML = state.aba === "liquidadas" ? tblLiquidadas(vis) : tblAbertas(vis);
     root.appendChild(tbl);
 
-    // clique numa linha com série -> expande/recolhe o gráfico de movimentação
-    tbl.querySelectorAll("tr.has-mv").forEach(function (tr) {
+    // clique em linha → abre explorador naquele jogo/mercado/linha
+    tbl.querySelectorAll("tr.has-mv, tr[data-gk]").forEach(function (tr) {
       tr.style.cursor = "pointer";
-      tr.title = (tr.title ? tr.title + " · " : "") + "clique pra ver o gráfico";
       tr.onclick = function () {
-        var nxt = tr.nextElementSibling;
-        if (nxt && nxt.classList.contains("mv-chart-row")) {   // já aberto -> fecha
-          nxt.remove(); tr.classList.remove("mv-open"); return;
-        }
-        // fecha outros abertos
-        tbl.querySelectorAll(".mv-chart-row").forEach(function (x) { x.remove(); });
-        tbl.querySelectorAll("tr.mv-open").forEach(function (x) { x.classList.remove("mv-open"); });
-        var cr = document.createElement("tr");
-        cr.className = "mv-chart-row";
-        var td = document.createElement("td");
-        td.colSpan = tr.children.length;
-        td.innerHTML = bigChart(tr.getAttribute("data-gk"));
-        cr.appendChild(td);
-        tr.parentNode.insertBefore(cr, tr.nextSibling);
-        tr.classList.add("mv-open");
+        var gk = tr.getAttribute("data-gk") || "";
+        var p = gk.split("|");
+        if (p.length < 6) return;
+        state.aba = "explorar";
+        state.game = p[0] + "|" + p[1] + "|" + p[2];
+        state.mercado = p[3];
+        state.linha = parseFloat(p[4]);
+        render();
       };
     });
   }
 
   render();
-  window.__renderHist = render; // p/ re-render ao trocar de view, se necessário
+  window.__renderHist = render;
 })();

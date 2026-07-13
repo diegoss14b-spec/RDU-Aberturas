@@ -52,27 +52,97 @@ def get(url, tries=4):
         time.sleep(1.5)
     return None
 
+# Allowlist EXATA de marketName de JOGO INTEIRO.
+# Totais por time ("Total de Finalizações América MG") vão em mercados_time
+# (UI: coluna do mandante/visitante) — não misturam com a linha da partida.
+_EXACT = {
+    "total de cartões": "Cartões",
+    "total de cartoes": "Cartões",
+    "total de faltas": "Faltas",
+    "total de escanteios": "Escanteios",
+    "total de finalizações": "Finalizações",
+    "total de finalizacoes": "Finalizações",
+    "total de chutes": "Finalizações",
+    "total de chutes no gol": "Chutes no gol",
+    "total de impedimentos": "Impedimentos",
+    "total de arremessos laterais": "Laterais",
+    "total de laterais": "Laterais",
+    "total de tiros de meta": "Tiros de meta",
+    "total de desarmes": "Desarmes",
+}
+# Padrões de TOTAL POR TIME (UI Superbet: "Total de … da Equipe" com aba por time).
+# A) "Total de Finalizações América MG"
+# B) "América MG - Total de Faltas" / "América MG - Chutes no Gol" / "América MG - Desarmes"
+_TEAM_STAT_SUFFIX = [  # prefixo "total de … " + time
+    ("total de chutes no gol ", "Chutes no gol"),
+    ("total de finalizações ", "Finalizações"),
+    ("total de finalizacoes ", "Finalizações"),
+    ("total de arremessos laterais ", "Laterais"),
+    ("total de tiros de meta ", "Tiros de meta"),
+    ("total de cartões ", "Cartões"),
+    ("total de cartoes ", "Cartões"),
+    ("total de faltas ", "Faltas"),
+    ("total de escanteios ", "Escanteios"),
+    ("total de chutes ", "Finalizações"),
+    ("total de impedimentos ", "Impedimentos"),
+    ("total de laterais ", "Laterais"),
+    ("total de desarmes ", "Desarmes"),
+]
+# após "Time - …": trecho canônico (ordem: chutes no gol antes de chutes)
+_TEAM_STAT_AFTER = [
+    (re.compile(r"^total de chutes no gol$|^chutes no gol$|^chutes a gol$", re.I), "Chutes no gol"),
+    (re.compile(r"^total de finaliza[cç][oõ]es$|^finaliza[cç][oõ]es$", re.I), "Finalizações"),
+    (re.compile(r"^total de faltas$|^faltas$", re.I), "Faltas"),
+    (re.compile(r"^total de cart[oõ]es$|^cart[oõ]es$", re.I), "Cartões"),
+    (re.compile(r"^total de escanteios$|^escanteios$|^cantos$", re.I), "Escanteios"),
+    (re.compile(r"^total de impedimentos$|^impedimentos$", re.I), "Impedimentos"),
+    (re.compile(r"^total de (arremessos )?laterais$|^laterais$", re.I), "Laterais"),
+    (re.compile(r"^total de tiros de meta$|^tiros de meta$", re.I), "Tiros de meta"),
+    (re.compile(r"^total de desarmes$|^desarmes$", re.I), "Desarmes"),
+    (re.compile(r"^total de chutes$|^chutes$", re.I), "Finalizações"),
+]
+_TEAM_REJECT = re.compile(r"vermelh|1[ºo°]\s*tempo|2[ºo°]\s*tempo|minuto|asi[aá]tic|impar|ímpar|jogador|goleiro", re.I)
+# "Time - resto" (evita combos com ; e nomes de jogador "Sobrenome, Nome - …")
+_TEAM_DASH = re.compile(r"^([^,;]{2,40}?)\s+[-–—]\s+(.+)$")
+
 def canon(mn):
-    m = (mn or "").lower()
-    if "cart" in m: return "Cartões"
-    if "falta" in m: return "Faltas"
-    if "escanteio" in m or "corner" in m: return "Escanteios"
-    if "chute" in m and ("gol" in m or "alvo" in m or "no gol" in m): return "Chutes no gol"
-    if "chute" in m or "finaliza" in m or "remate" in m: return "Finalizações"
-    if "impedi" in m: return "Impedimentos"
-    if "lateral" in m or "arremesso" in m: return "Laterais"
-    if "tiro de meta" in m or "tiro-de-meta" in m or "tiros de meta" in m: return "Tiros de meta"
-    if "desarme" in m: return "Desarmes"
+    """Só aceita mercado de total de jogo inteiro com nome exato (sem sufixo de time)."""
+    if not mn: return None
+    m = mn.strip()
+    if ";" in m or "&" in m: return None
+    return _EXACT.get(m.lower())
+
+def canon_team(mn):
+    """Total por time → (canon, nome_time).
+    Aceita 'Total de Finalizações América MG' e 'América MG - Total de Faltas'."""
+    if not mn: return None
+    m = mn.strip()
+    if ";" in m or "&" in m: return None
+    ml = m.lower()
+    if ml in _EXACT: return None
+    # A) Total de STAT + time
+    for pref, c in _TEAM_STAT_SUFFIX:
+        if ml.startswith(pref):
+            team = m[len(pref):].strip()
+            if not team or _TEAM_REJECT.search(team): return None
+            return c, team
+    # B) Time - STAT
+    mo = _TEAM_DASH.match(m)
+    if mo:
+        team, rest = mo.group(1).strip(), mo.group(2).strip()
+        if not team or _TEAM_REJECT.search(team) or _TEAM_REJECT.search(rest):
+            return None
+        # rejeita se "time" parece jogador (muito curto com iniciais raras ok; vírgula já barrada)
+        for rx, c in _TEAM_STAT_AFTER:
+            if rx.match(rest.strip()):
+                return c, team
     return None
 
 OUTC = re.compile(r"(mais|menos) de\s+([\d.]+)", re.I)
 
 def is_full_game(mn):
-    m = (mn or "")
-    if ";" in m or "&" in m: return False
-    ml = m.lower()
-    if "1º tempo" in ml or "2º tempo" in ml or "1° tempo" in ml or "primeiro tempo" in ml: return False
-    return m.strip().lower().startswith("total de")
+    """Compat: True se marketName está na allowlist de jogo inteiro."""
+    return canon(mn) is not None
 
 def main():
     struct = get(f"{BASE}/struct") or {}
@@ -124,31 +194,45 @@ def main():
         if not det or not det.get("data"): continue
         ev = det["data"][0]
         odds = ev.get("odds") or []
-        mk = {}
+        mk, mk_t = {}, {}  # jogo inteiro · por time
         for o in odds:
             if o.get("status") != "active": continue
-            c = canon(o.get("marketName")) if is_full_game(o.get("marketName")) else None
-            if not c: continue
             mo = OUTC.search(o.get("name") or o.get("info") or "")
             if not mo: continue
             side = "over" if mo.group(1).lower() == "mais" else "under"
             line = float(mo.group(2))
             price = o.get("price")
             if not price or price <= 1: continue
-            key = (c, line)
-            mk.setdefault(c, {}).setdefault(line, {})[side] = round(price, 2)
+            mn = o.get("marketName")
+            c = canon(mn)
+            if c:
+                mk.setdefault(c, {}).setdefault(line, {})[side] = round(price, 2)
+                continue
+            ct = canon_team(mn)
+            if ct:
+                c, team = ct
+                mk_t.setdefault(c, {}).setdefault(team, {}).setdefault(line, {})[side] = round(price, 2)
         # só manter linhas com os 2 lados
         merc = {}
         for c, lines in mk.items():
             arr = [{"linha": L, "over": v["over"], "under": v["under"]}
                    for L, v in sorted(lines.items()) if "over" in v and "under" in v]
             if arr: merc[c] = arr
-        if not merc: continue
+        merc_t = {}
+        for c, teams in mk_t.items():
+            by_team = {}
+            for team, lines in teams.items():
+                arr = [{"linha": L, "over": v["over"], "under": v["under"]}
+                       for L, v in sorted(lines.items()) if "over" in v and "under" in v]
+                if arr: by_team[team] = arr
+            if by_team: merc_t[c] = by_team
+        if not merc and not merc_t: continue
         name = (ev.get("matchName") or "").replace("·", " - ")
         league = tnames.get(str(ev.get("tournamentId")), "")
         ts = ev.get("unixDateMillis") or ev.get("matchTimestamp")
         rec = {"casa": "Superbet", "event_id": eid, "name": name, "league": league,
                "start": ts, "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"), "mercados": merc}
+        if merc_t: rec["mercados_time"] = merc_t
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
         if n_out % 15 == 0: write_latest(n_out)

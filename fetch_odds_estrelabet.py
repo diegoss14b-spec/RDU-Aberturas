@@ -40,18 +40,95 @@ MAX_EVENTS = 200
 MIN_EVENTS = 8    # mínimo pro finish() (abaixo = exit 2)
 MIN_EFF = MIN_EVENTS  # modo close (ODDS_WINDOW_H) reduz — ver main()
 
-EXCL = ("jogador", "técnico", "tecnico", "substituto", "cometidas", " - ", "1º tempo", "2º tempo",
-        "1° tempo", "handicap", "ímpar", "impar", "/par", "a gol", "exatos", "exato", "vermelho",
-        "primeira", "primeiro", "última", "ultimo", "último", "ambas", "corrida", "escanteio", "ao gol")
+# Mecanismo Altenar/EstrelaBet (validado França vs Espanha 14/07):
+#   JOGO : "Total cartões" | "Total de Faltas" | "Totais chutes" | "Totais chutes a Gol"
+#          | "Total de Impedimentos" | "Total de Escanteios" | "Total de desarmes"
+#   TIME A: "{Time} total cartões" | "{Time} Total de faltas" | "{Time} total de escanteios"
+#           | "{Time} total de impedimentos" | "{Time} Total Desarmes"
+#   TIME B: "Total de chutes {Time}" | "Total de chutes a Gol {Time}"
+# (América-MG Série B só abre cartões/escanteios; jogos big-offer abrem o pacote completo.)
+_EXCL_PART = ("jogador", "técnico", "tecnico", "substituto", "cometidas",
+              "1º tempo", "2º tempo", "1° tempo", "1ª tempo", "2ª tempo",
+              "handicap", "ímpar", "impar", "/par", "exatos", "exato", "vermelho",
+              "primeira", "primeiro", "última", "ultimo", "último", "ambas", "corrida",
+              "escala", "1x2", "chance", "inclui", "substituto", "escalação")
+# nomes de partida (lower). "totais chutes" = forma plural da Estrela no pacote stats.
+_MATCH = {
+    "total cartões": "Cartões", "total de cartões": "Cartões",
+    "total de faltas": "Faltas", "total faltas": "Faltas",
+    "total de finalizações": "Finalizações", "total de chutes": "Finalizações",
+    "total chutes": "Finalizações", "totais chutes": "Finalizações",
+    "total de remates": "Finalizações",
+    "total de chutes no gol": "Chutes no gol", "total de chutes a gol": "Chutes no gol",
+    "totais chutes a gol": "Chutes no gol", "totais chutes no gol": "Chutes no gol",
+    "total de impedimentos": "Impedimentos",
+    "total de laterais": "Laterais", "total de arremessos laterais": "Laterais",
+    "total de tiros de meta": "Tiros de meta",
+    "total de escanteios": "Escanteios", "total escanteios": "Escanteios",
+    "total de desarmes": "Desarmes", "total desarmes": "Desarmes",
+}
+_STAT_TOKENS = (
+    r"cart[oõ]es|faltas|finaliza[cç][oõ]es|"
+    r"chutes\s+a\s+gol|chutes\s+no\s+gol|chutes|remates|"
+    r"impedimentos|laterais|arremessos laterais|tiros de meta|escanteios|desarmes"
+)
+# A) "{Time} total [de] {stat}"
+_TEAM_A = re.compile(
+    rf"^(.+?)\s+total\s+(?:de\s+)?({_STAT_TOKENS})$", re.I,
+)
+# B) "Total [de] {stat} {Time}"  (chutes na Estrela: "Total de chutes França")
+_TEAM_B = re.compile(
+    rf"^total\s+(?:de\s+)?({_STAT_TOKENS})\s+(.+)$", re.I,
+)
+_STAT_MAP = {
+    "cartões": "Cartões", "cartoes": "Cartões", "faltas": "Faltas",
+    "finalizações": "Finalizações", "finalizacoes": "Finalizações",
+    "chutes": "Finalizações", "remates": "Finalizações",
+    "chutes no gol": "Chutes no gol", "chutes a gol": "Chutes no gol",
+    "impedimentos": "Impedimentos",
+    "laterais": "Laterais", "arremessos laterais": "Laterais",
+    "tiros de meta": "Tiros de meta", "escanteios": "Escanteios",
+    "desarmes": "Desarmes",
+}
+
+def _norm_stat(stat):
+    s = (stat or "").strip().lower()
+    s = re.sub(r"\s+", " ", s)
+    if s in _STAT_MAP: return _STAT_MAP[s]
+    su = (s.replace("ç", "c").replace("õ", "o").replace("á", "a")
+           .replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u"))
+    for k, v in _STAT_MAP.items():
+        ku = (k.replace("ç", "c").replace("õ", "o").replace("á", "a")
+               .replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u"))
+        if su == ku: return v
+    return None
+
 def canon(nm):
-    l = (nm or "").lower()
-    if any(b in l for b in EXCL): return None
-    if "cart" in l and "total" in l: return "Cartões"
-    if "falta" in l and "total" in l: return "Faltas"
-    if ("chute" in l or "finaliza" in l or "remate" in l) and "total" in l: return "Finalizações"
-    if "impedi" in l and "total" in l: return "Impedimentos"
-    if ("lateral" in l or "arremesso" in l) and "total" in l: return "Laterais"
-    if "tiro de meta" in l and "total" in l: return "Tiros de meta"
+    """Total de JOGO INTEIRO (nome sem time)."""
+    if not nm: return None
+    l = nm.strip().lower()
+    if any(b in l for b in _EXCL_PART): return None
+    if " - " in l: return None
+    return _MATCH.get(l)
+
+def canon_team(nm):
+    """Time → (canon, nome_time). Aceita A '{Time} total de faltas' e B 'Total de chutes {Time}'."""
+    if not nm: return None
+    m = nm.strip()
+    ml = m.lower()
+    if any(b in ml for b in _EXCL_PART): return None
+    if ml in _MATCH: return None
+    mo = _TEAM_A.match(m)
+    if mo:
+        team, stat = mo.group(1).strip(), mo.group(2)
+        c = _norm_stat(stat)
+        if c and team: return c, team
+    mo = _TEAM_B.match(m)
+    if mo:
+        stat, team = mo.group(1), mo.group(2).strip()
+        c = _norm_stat(stat)
+        # evita "Total de chutes a Gol" sem time (já é match)
+        if c and team and len(team) >= 2: return c, team
     return None
 
 OUTC = re.compile(r"(mais|menos|acima|abaixo|over|under)\s*(?:de)?\s*([\d.]+)", re.I)
@@ -108,10 +185,12 @@ def main():
         if not d: continue
         allm = (d.get("markets") or []) + (d.get("childMarkets") or [])
         odds = {o["id"]: o for o in (d.get("odds") or [])}
-        merc = {}
+        merc, merc_t = {}, {}
         for m in allm:
-            c = canon(m.get("name"))
-            if not c: continue
+            mname = m.get("name")
+            c = canon(mname)
+            ct = None if c else canon_team(mname)
+            if not c and not ct: continue
             lines = {}
             for oid in flat_ids(m.get("desktopOddIds") or m.get("mobileOddIds")):
                 o = odds.get(oid)
@@ -123,18 +202,24 @@ def main():
                 try: L = float(o.get("line") or mo.group(2))
                 except Exception: continue
                 lines.setdefault(L, {})[side] = round(float(price), 2)
-            arr = [{"linha": L, "over": v["over"], "under": v["under"]} for L, v in sorted(lines.items()) if "over" in v and "under" in v]
-            if arr: merc.setdefault(c, [])  # garante chave
-            if arr:
-                # se já existe o canon (ex 2 mercados de cartões), mantém a lista com mais linhas
+            arr = [{"linha": L, "over": v["over"], "under": v["under"]}
+                   for L, v in sorted(lines.items()) if "over" in v and "under" in v]
+            if not arr: continue
+            if c:
                 if len(arr) > len(merc.get(c, [])): merc[c] = arr
+            else:
+                c2, team = ct
+                prev = {x["linha"]: x for x in merc_t.get(c2, {}).get(team, [])}
+                for row in arr: prev[row["linha"]] = row
+                merc_t.setdefault(c2, {})[team] = [prev[L] for L in sorted(prev)]
         merc = {k: v for k, v in merc.items() if v}
-        if not merc: continue
+        if not merc and not merc_t: continue
         name = (d.get("name") or e.get("name") or "").replace(" vs. ", " - ").replace(" vs ", " - ")
         league = champs.get(e.get("champId")) or (d.get("champ") or {}).get("name", "")
         rec = {"casa": "EstrelaBet", "event_id": eid, "name": name, "league": league,
                "start": e.get("startDate") or d.get("startDate"),
                "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"), "mercados": merc}
+        if merc_t: rec["mercados_time"] = merc_t
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
         if n_out % 15 == 0: write_latest(n_out)

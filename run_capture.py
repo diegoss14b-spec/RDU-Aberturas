@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""run_capture.py — orquestrador da captura das 4 casas (P0 do brief: sem falha silenciosa).
-Roda os 4 fetchers em sequência com timeout próprio, lê os data/odds/_status/{casa}.json
+"""run_capture.py — orquestrador da captura das casas (P0 do brief: sem falha silenciosa).
+Roda os fetchers em paralelo com timeout próprio, lê os data/odds/_status/{casa}.json
 que cada um grava, e escreve data/odds/_status/summary.json com o veredito:
   deploy_allowed = (n_ok >= 2) E (total de eventos >= 8)
 Exit: 0 se deploy_allowed, 3 se captura insuficiente (job fica vermelho — de propósito).
@@ -19,7 +19,10 @@ FETCHERS = [  # (casa, script, timeout_s)
     ("superbet",   "fetch_odds_superbet.py",   8 * 60),
     ("estrelabet", "fetch_odds_estrelabet.py", 10 * 60),   # 11/07: +proxy BR → mais lenta
     ("7k",         "fetch_odds_7k.py",        12 * 60),
+    ("pinnacle",   "fetch_odds_pinnacle.py",   5 * 60),   # 13/07: escanteios (+cartões qdo abrir)
 ]
+# calendário canônico (não conta pra deploy_allowed; best-effort)
+FIXTURE_FETCH = ("sofa", "fetch_fixtures_sofascore.py", 4 * 60)
 
 
 def run_one(casa, script, tmo):
@@ -54,9 +57,12 @@ def main():
     # PARALELO (11/07): sequencial custava 15-20 min de wall-time (billable no Actions);
     # as 4 casas em paralelo = max(casa) ≈ 8-13 min. Fetchers são processos isolados.
     from concurrent.futures import ThreadPoolExecutor
-    print("===== captura paralela das 4 casas =====", flush=True)
-    with ThreadPoolExecutor(max_workers=4) as ex:
+    print("===== captura paralela das casas + sofa fixtures =====", flush=True)
+    with ThreadPoolExecutor(max_workers=6) as ex:
         futs = {casa: ex.submit(run_one, casa, script, tmo) for casa, script, tmo in FETCHERS}
+        # fixtures sofa em paralelo (falha não derruba odds)
+        fx_casa, fx_script, fx_tmo = FIXTURE_FETCH
+        futs[fx_casa] = ex.submit(run_one, fx_casa, fx_script, fx_tmo)
         for casa, fut in futs.items():
             results[casa] = fut.result()
 

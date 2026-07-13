@@ -32,7 +32,7 @@ from value_pricers import CardsPricer, ShotsPricer, FoulsPricer, CornersPricer
 BRT = timezone(timedelta(hours=-3))
 # mercados do board (ordem de exibição) + qual tem modelo de valor
 # 12/07: Escanteios entra (Diego pediu no comparador de valor — modelo v2 de 11 ligas)
-MERCADOS = ["Cartões", "Faltas", "Finalizações", "Escanteios", "Impedimentos", "Laterais", "Tiros de meta"]
+MERCADOS = ["Cartões", "Faltas", "Finalizações", "Chutes no gol", "Escanteios", "Impedimentos", "Laterais", "Tiros de meta", "Desarmes"]
 MERC_SET = set(MERCADOS)
 MODELO = {"Cartões": "cartoes", "Faltas": "faltas", "Finalizações": "finalizacoes", "Escanteios": "escanteios"}
 # limiares do flag de valor (secundário)
@@ -45,6 +45,16 @@ def _gscore(ah, aa, bh, ba):
     # semelhança do confronto; aceita ordem trocada (mercados totais são simétricos)
     return max(min(ratio(ah, bh), ratio(aa, ba)), min(ratio(ah, ba), ratio(aa, bh)))
 
+# ---- SofaScore como base canônica (sistema "vivo") ----
+# Ideia: horário + contexto (liga) + 1 lado reconhecível bastam.
+# Diferença de grafia NÃO pode impedir captura/merge.
+SOFA_TIME_TOL_MIN = 45          # |Δ kickoff| aceito no par (min)
+SOFA_PAIR_MIN = 72              # 2 lados razoáveis
+SOFA_ONE_SIDE = 86              # 1 lado forte no horário certo
+SOFA_ONE_SIDE_TIME = 25         # janela do atalho 1 lado
+SOFA_SLOT_TIME = 20             # janela "só tem 1 jogo nesse horário"
+SOFA_TOKEN_MIN = 4              # token mínimo p/ substring (ceara, londrina…)
+
 # ---- normalização de nome de time / liga (igual ao build_value_bets) ----
 STOP = {"fc", "cf", "ec", "sc", "ca", "ac", "afc", "club", "clube", "futebol"}
 STATE = re.compile(r"[- ]?(pr|sp|rj|mg|rs|go|ce|pe|ba|mt|ms|pa|to|al|se|rn|pb|pi|ap|ac|ro|rr|df)$")
@@ -54,6 +64,10 @@ ALIASES = {
     "bragantino": "red bull bragantino", "rb bragantino": "red bull bragantino",
     "vasco": "vasco da gama", "athletico": "athletico paranaense",
     "gremio novorizontino": "novorizontino", "operario": "operario ferroviario",
+    # Pinnacle (EN) ↔ casas BR
+    "france": "franca", "spain": "espanha", "england": "inglaterra", "argentina": "argentina",
+    "america mineiro": "america mg", "athletic club": "athletic club mg",
+    "ceara": "ceara", "londrina": "londrina",
 }
 def norm_team(name):
     s = unidecode((name or "").lower()).strip()
@@ -92,9 +106,28 @@ BETANO_MK = {
     "Chutes no gol": "Chutes no gol", "Total de Impedimentos": "Impedimentos",
     "Total de laterais": "Laterais", "Total de tiros de meta": "Tiros de meta",
 }
+# Betano time: "América-MG Total de Cartões" / "Londrina-PR Total de chutes"
+_BETANO_TEAM = re.compile(
+    r"^(.+?)\s+Total de\s+(Cart[oõ]es|Faltas|chutes|Escanteios|Impedimentos|laterais|tiros de meta|Chutes no gol)$",
+    re.I,
+)
+_BETANO_STAT = {
+    "cartões": "Cartões", "cartoes": "Cartões", "faltas": "Faltas", "chutes": "Finalizações",
+    "escanteios": "Escanteios", "impedimentos": "Impedimentos", "laterais": "Laterais",
+    "tiros de meta": "Tiros de meta", "chutes no gol": "Chutes no gol",
+}
+
+def _betano_team(name):
+    mo = _BETANO_TEAM.match((name or "").strip())
+    if not mo: return None
+    team, stat = mo.group(1).strip(), mo.group(2).strip().lower()
+    for k, v in _BETANO_STAT.items():
+        if stat == k or unidecode(stat) == unidecode(k):
+            return v, team
+    return None
 
 def load_betano():
-    """-> lista de eventos normalizados {casa, name, league, start, captured, mercados:{canon:[{linha,over,under}]}}"""
+    """-> lista de eventos normalizados {casa, name, league, start, captured, mercados, mercados_time?}"""
     ptr = ROOT / "data/odds/betano_latest.json"
     src = None
     if ptr.exists():
@@ -107,24 +140,38 @@ def load_betano():
     for ln in src.read_text(encoding="utf-8").strip().split("\n"):
         if not ln.strip(): continue
         e = json.loads(ln)
-        mk = {}
+        mk, mk_t = {}, {}
         for aba in ("cartoes", "estatisticas", "principais_ou", "escanteios"):
             for m in (e.get("markets", {}).get(aba) or []):
-                canon = BETANO_MK.get(m.get("market"))
-                if not canon: continue
+                mname = m.get("market") or ""
                 L = m.get("line")
-                lst = mk.setdefault(canon, {})
-                if L not in lst and m.get("over") and m.get("under"):
-                    lst[L] = {"linha": L, "over": round(m["over"], 2), "under": round(m["under"], 2)}
+                if not (m.get("over") and m.get("under") and L is not None): continue
+                row = {"linha": L, "over": round(m["over"], 2), "under": round(m["under"], 2)}
+                canon = BETANO_MK.get(mname)
+                if canon:
+                    lst = mk.setdefault(canon, {})
+                    if L not in lst: lst[L] = row
+                    continue
+                parsed = _betano_team(mname)
+                if parsed and parsed[0]:
+                    c, team = parsed
+                    lst = mk_t.setdefault(c, {}).setdefault(team, {})
+                    if L not in lst: lst[L] = row
         mk = {c: sorted(v.values(), key=lambda x: x["linha"]) for c, v in mk.items() if v}
-        if mk:
-            out.append({"casa": "Betano", "name": e.get("name"), "league": e.get("league"),
-                        "start": e.get("start"), "captured": e.get("captured_at"), "mercados": mk})
+        merc_t = {c: {t: sorted(lines.values(), key=lambda x: x["linha"])
+                      for t, lines in teams.items() if lines}
+                  for c, teams in mk_t.items()}
+        merc_t = {c: t for c, t in merc_t.items() if t}
+        if mk or merc_t:
+            rec = {"casa": "Betano", "name": e.get("name"), "league": e.get("league"),
+                   "start": e.get("start"), "captured": e.get("captured_at"), "mercados": mk}
+            if merc_t: rec["mercados_time"] = merc_t
+            out.append(rec)
     return out, src.name
 
 
 def load_normalized(book, latest_name):
-    """lê um JSONL já-normalizado {casa,name,league,start,mercados:{canon:[{linha,over,under}]}}
+    """lê um JSONL já-normalizado {casa,name,league,start,mercados,mercados_time?}
     (Superbet, 7k, EstrelaBet). -> mesma forma que load_betano."""
     ptr = ROOT / "data/odds" / latest_name
     if not ptr.exists(): return []
@@ -135,18 +182,220 @@ def load_normalized(book, latest_name):
     for ln in src.read_text(encoding="utf-8").strip().split("\n"):
         if not ln.strip(): continue
         e = json.loads(ln)
-        if e.get("mercados"):
-            out.append({"casa": e.get("casa", book), "name": e.get("name"), "league": e.get("league"),
-                        "start": e.get("start"), "captured": e.get("captured_at"), "mercados": e["mercados"]})
+        if e.get("mercados") or e.get("mercados_time"):
+            rec = {"casa": e.get("casa", book), "name": e.get("name"), "league": e.get("league"),
+                   "start": e.get("start"), "captured": e.get("captured_at"),
+                   "mercados": e.get("mercados") or {}}
+            if e.get("mercados_time"): rec["mercados_time"] = e["mercados_time"]
+            out.append(rec)
     return out
 
 
+def _assign_side(team_name, home, away):
+    """Casa/fora por fuzzy/token; retorna 'home' | 'away' | None."""
+    if not team_name: return None
+    tn = norm_team(team_name)
+    rh = _side_hit(tn, home) if home else 0
+    ra = _side_hit(tn, away) if away else 0
+    if rh >= 68 and rh >= ra: return "home"
+    if ra >= 68 and ra > rh: return "away"
+    return None
+
+
+def _tokens(s):
+    """tokens úteis do nome normalizado (ignora miúdos)."""
+    return [t for t in (s or "").split() if len(t) >= SOFA_TOKEN_MIN]
+
+
+def _side_hit(book_side, sofa_side):
+    """Quão bem um lado da casa casa com um lado do sofa (0–100).
+    Usa fuzzy + contenção de token (ceara ⊂ ceara sc / athletic ⊂ athletic club)."""
+    if not book_side or not sofa_side:
+        return 0
+    r = ratio(book_side, sofa_side)
+    # token: se o token principal do book aparece no sofa (ou vice-versa)
+    bt, st = _tokens(book_side), _tokens(sofa_side)
+    if bt and st:
+        for a in bt:
+            for b in st:
+                if a == b or a in b or b in a:
+                    r = max(r, 92)
+                    break
+    return r
+
+
+def _league_fp(lg):
+    """Assinatura grossa de liga p/ filtrar candidatos (serie b ≠ premier)."""
+    l = _n(lg or "")
+    if "serie b" in l or "série b" in l or "serie-b" in l or "br-b" in l:
+        return "br-b"
+    if "serie c" in l or "série c" in l:
+        return "br-c"
+    if ("brasileir" in l or "serie a" in l or "br-a" in l) and "serie b" not in l and "série b" not in l:
+        return "br-a"
+    if "world cup" in l or "copa do mundo" in l or l.strip() == "wc" or "fifa" in l:
+        return "wc"
+    if "copa" in l and "brasil" in l:
+        return "br-cdb"
+    if "premier league" in l or ( "premier" in l and "ingl" in l):
+        return "epl"
+    if "laliga" in l or "la liga" in l:
+        return "laliga"
+    if "champions" in l:
+        return "ucl"
+    if "allsvenskan" in l:
+        return "allsv"
+    if "uruguay" in l or "uruguai" in l or "auf" in l:
+        return "uy"
+    if "ecuad" in l or "ligapro" in l:
+        return "ec"
+    if "china" in l or "csl" in l:
+        return "csl"
+    if "russia" in l or "russian" in l:
+        return "ru"
+    return None
+
+
+def load_sofa_fixtures():
+    """Carrega data/fixtures/sofa_latest.json → lista de fixtures com _hn/_an/_lfp."""
+    ptr = ROOT / "data" / "fixtures" / "sofa_latest.json"
+    if not ptr.exists():
+        return []
+    try:
+        meta = json.loads(ptr.read_text(encoding="utf-8"))
+        src = ROOT / "data" / "fixtures" / meta["file"]
+        data = json.loads(src.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    out = []
+    for f in data.get("fixtures") or []:
+        f = dict(f)
+        f["_hn"] = norm_team(f.get("home"))
+        f["_an"] = norm_team(f.get("away"))
+        f["_lfp"] = _league_fp(f.get("league") or "") or _league_fp(f.get("label") or "")
+        out.append(f)
+    return out
+
+
+def _kickoff_delta_min(start_dt, fixture):
+    """|Δ| em minutos entre start da casa e fixture sofa."""
+    if not start_dt or not fixture.get("start_ts"):
+        return 9999
+    try:
+        fs = datetime.fromtimestamp(int(fixture["start_ts"]), tz=timezone.utc)
+        if start_dt.tzinfo is None:
+            sdt = start_dt.replace(tzinfo=BRT).astimezone(timezone.utc)
+        else:
+            sdt = start_dt.astimezone(timezone.utc)
+        return abs((sdt - fs).total_seconds()) / 60.0
+    except Exception:
+        return 9999
+
+
+def match_to_sofa(hn, an, day_brt, start_dt, fixtures, book_league=""):
+    """Encaixa evento de casa num fixture SofaScore.
+    Retorna (fixture, score, method) ou (None, 0, None).
+
+    Sistema vivo (Diego):
+      - SofaScore é a base de nomes/horário
+      - Série B 20:30 + 'Ceará' → Ceará x Athletic, mesmo com visitante grafado diferente
+      - Terminologia NÃO pode impedir merge se horário+contexto batem
+    """
+    if not fixtures or not hn:
+        return None, 0, None
+    cands = [f for f in fixtures if f.get("day_brt") == day_brt]
+    if not cands:
+        return None, 0, None
+
+    book_lfp = _league_fp(book_league)
+    # se dá pra filtrar por liga, prefere candidatos da mesma família
+    same_lg = [f for f in cands if book_lfp and f.get("_lfp") == book_lfp] if book_lfp else []
+    pool = same_lg if same_lg else cands
+
+    best, best_sc, best_m = None, -1, None
+
+    def _consider(f, sc, method):
+        nonlocal best, best_sc, best_m
+        if sc > best_sc:
+            best, best_sc, best_m = f, sc, method
+
+    for f in pool:
+        dt_min = _kickoff_delta_min(start_dt, f)
+        # HH:MM exato BRT
+        if dt_min > 500 and start_dt:
+            try:
+                t_brt = (start_dt.astimezone(BRT) if start_dt.tzinfo else start_dt).strftime("%H:%M")
+                if t_brt == f.get("time_brt"):
+                    dt_min = 0
+            except Exception:
+                pass
+
+        pair = _gscore(hn, an, f["_hn"], f["_an"]) if an else 0
+        # melhor lado book↔sofa (ordem livre)
+        rh = max(_side_hit(hn, f["_hn"]), _side_hit(hn, f["_an"]))
+        ra = max(_side_hit(an, f["_hn"]), _side_hit(an, f["_an"])) if an else 0
+        one = max(rh, ra)
+        both_ok = rh >= 70 and ra >= 70
+
+        # A) dois lados + horário
+        if dt_min <= SOFA_TIME_TOL_MIN and (pair >= SOFA_PAIR_MIN or both_ok):
+            _consider(f, max(pair, (rh + ra) / 2) + max(0, 40 - dt_min), "pair")
+
+        # B) um lado forte + horário (Ceará 20:30 / Athletic Club MG)
+        if dt_min <= SOFA_ONE_SIDE_TIME and one >= SOFA_ONE_SIDE:
+            rivals = 0
+            for g in pool:
+                if g is f:
+                    continue
+                try:
+                    d2 = abs(int(f["start_ts"]) - int(g["start_ts"])) / 60.0
+                except Exception:
+                    d2 = 999
+                if d2 > SOFA_ONE_SIDE_TIME:
+                    continue
+                og = max(_side_hit(hn, g["_hn"]), _side_hit(hn, g["_an"]),
+                         _side_hit(an, g["_hn"]) if an else 0,
+                         _side_hit(an, g["_an"]) if an else 0)
+                if og >= SOFA_ONE_SIDE - 2:
+                    rivals += 1
+            if rivals == 0:
+                bonus = 5 if book_lfp and f.get("_lfp") == book_lfp else 0
+                _consider(f, one + max(0, 25 - dt_min) + bonus, "one_side")
+
+        # C) slot único: no horário X só existe 1 fixture da liga e há QUALQUER token em comum
+        if dt_min <= SOFA_SLOT_TIME and one >= 75:
+            slot = []
+            for g in pool:
+                try:
+                    d2 = abs(int(f["start_ts"]) - int(g["start_ts"])) / 60.0
+                except Exception:
+                    d2 = 999
+                if d2 <= SOFA_SLOT_TIME:
+                    slot.append(g)
+            if len(slot) == 1:
+                _consider(f, 80 + one * 0.2 + max(0, 20 - dt_min), "slot_unique")
+
+    # D) fallback em TODOS do dia (sem filtro de liga) se pool filtrado falhou
+    if best is None and same_lg and pool is same_lg:
+        return match_to_sofa(hn, an, day_brt, start_dt, cands, book_league="")
+
+    if best is None:
+        return None, 0, None
+    return best, best_sc, best_m
+
+
 def parse_start(s):
-    """aceita ms numérico (Betano/Superbet/7k) OU string ISO (EstrelaBet) -> datetime BRT."""
+    """ms numérico (Betano/Superbet) · s epoch · ISO (Estrela/Pinnacle) → datetime BRT."""
     if s is None: return None
     try:
-        if isinstance(s, (int, float)) or (isinstance(s, str) and s.isdigit()):
-            return datetime.fromtimestamp(int(s) / 1000, tz=BRT)
+        if isinstance(s, (int, float)) or (isinstance(s, str) and str(s).strip().isdigit()):
+            n = int(float(s))
+            # 13 dígitos = ms; 10 = segundos
+            if n > 1e12:
+                n = n / 1000.0
+            elif n > 1e11:  # ms ainda
+                n = n / 1000.0
+            return datetime.fromtimestamp(n, tz=BRT)
         return datetime.fromisoformat(str(s).replace("Z", "+00:00")).astimezone(BRT)
     except Exception:
         return None
@@ -205,40 +454,113 @@ def main():
     betano, src = load_betano()
     eventos = betano + load_normalized("Superbet", "superbet_latest.json") \
                      + load_normalized("7k", "7k_latest.json") \
-                     + load_normalized("EstrelaBet", "estrelabet_latest.json")
+                     + load_normalized("EstrelaBet", "estrelabet_latest.json") \
+                     + load_normalized("Pinnacle", "pinnacle_latest.json")
     casas_ativas = sorted(set(e["casa"] for e in eventos))
-    # agrupa por jogo entre casas — dedup FUZZY (cada casa grafa o mesmo confronto diferente):
-    # (A) mesmo horário exato + nomes ≥ GROUP_FUZZ_TIME, ou (B) mesmo dia + nomes ≥ GROUP_FUZZ_NAME
+    # SofaScore = base canônica de nomes/horários; casas encaixam por horário + fuzzy
+    sofa_fx = load_sofa_fixtures()
+    print(f"fixtures sofa={len(sofa_fx)}")
+    n_sofa_hit = n_fuzzy = 0
+    # agrupa por jogo: (1) sofa_id se match, (2) fallback fuzzy entre casas
     jogos = []
+    by_sofa = {}  # sofa_id -> j
     for e in eventos:
         parts = [p.strip() for p in (e.get("name") or "").split(" - ")]
         dt = parse_start(e.get("start"))
-        day = dt.strftime("%Y-%m-%d") if dt else "?"
-        ini = dt.strftime("%d/%m %H:%M") if dt else "?"
+        # day/ini em BRT (parse_start devolve aware ou naive — normaliza)
+        if dt is not None:
+            if dt.tzinfo is None:
+                dt_brt = dt.replace(tzinfo=BRT)
+            else:
+                dt_brt = dt.astimezone(BRT)
+            day = dt_brt.strftime("%Y-%m-%d")
+            ini = dt_brt.strftime("%d/%m %H:%M")
+        else:
+            day, ini = "?", "?"
         hn = norm_team(parts[0]) if len(parts) == 2 else norm_team(e["name"])
         an = norm_team(parts[1]) if len(parts) == 2 else ""
+
         j = None
-        if len(parts) == 2:
+        fx, sc, method = (None, 0, None)
+        if len(parts) == 2 and sofa_fx:
+            fx, sc, method = match_to_sofa(hn, an, day, dt, sofa_fx, book_league=e.get("league") or "")
+            if fx is not None:
+                j = by_sofa.get(fx["sofa_id"])
+                if j is None:
+                    j = {
+                        "jogo": f"{fx['home']} - {fx['away']}",
+                        "liga": fx.get("league") or e.get("league") or "",
+                        "inicio": fx.get("inicio") or ini,
+                        "home": fx["home"],
+                        "away": fx["away"],
+                        "sofa_id": fx["sofa_id"],
+                        "casas": set(), "mercados": {}, "times": {}, "valor": [],
+                        "_parts": [fx["home"], fx["away"]],
+                        "_league": fx.get("league") or e.get("league") or "",
+                        "_hn": fx["_hn"], "_an": fx["_an"],
+                        "_day": fx.get("day_brt") or day, "_ini": fx.get("inicio") or ini,
+                    }
+                    by_sofa[fx["sofa_id"]] = j
+                    jogos.append(j)
+                n_sofa_hit += 1
+
+        # fallback: fuzzy entre casas (sem sofa)
+        if j is None and len(parts) == 2:
             for jj in jogos:
-                if jj["_day"] != day: continue
-                s = _gscore(hn, an, jj["_hn"], jj["_an"])
-                if (jj["_ini"] == ini and s >= GROUP_FUZZ_TIME) or s >= GROUP_FUZZ_NAME:
-                    j = jj; break
+                if jj.get("sofa_id"):  # não misturar órfão com grupo sofa
+                    # mas permite se fuzzy fortíssimo no mesmo horário
+                    s = _gscore(hn, an, jj["_hn"], jj["_an"])
+                    if jj["_day"] == day and ((jj["_ini"] == ini and s >= GROUP_FUZZ_TIME) or s >= 95):
+                        j = jj
+                        n_sofa_hit += 1  # colou em grupo sofa por fuzzy
+                        break
+                else:
+                    if jj["_day"] != day:
+                        continue
+                    s = _gscore(hn, an, jj["_hn"], jj["_an"])
+                    if (jj["_ini"] == ini and s >= GROUP_FUZZ_TIME) or s >= GROUP_FUZZ_NAME:
+                        j = jj
+                        n_fuzzy += 1
+                        break
+
         if j is None:
             j = {"jogo": e["name"], "liga": e["league"], "inicio": ini,
-                 "casas": set(), "mercados": {}, "valor": [], "_parts": parts, "_league": e["league"],
+                 "home": parts[0].strip() if len(parts) == 2 else "",
+                 "away": parts[1].strip() if len(parts) == 2 else "",
+                 "casas": set(), "mercados": {}, "times": {}, "valor": [],
+                 "_parts": parts, "_league": e["league"],
                  "_hn": hn, "_an": an, "_day": day, "_ini": ini}
             jogos.append(j)
-        for canon, linhas in e["mercados"].items():
-            if canon not in MERC_SET: continue          # só os 6 mercados de interesse
-            linhas = [l for l in linhas                 # sanity: odds/linha válidas (brief P0 §2.7)
-                      if isinstance(l.get("linha"), (int, float))
-                      and l.get("over") and l.get("under")
-                      and 1.01 < l["over"] <= 50 and 1.01 < l["under"] <= 50]
+            n_fuzzy += 1
+        def _sane(linhas):
+            return [l for l in linhas
+                    if isinstance(l.get("linha"), (int, float))
+                    and l.get("over") and l.get("under")
+                    and 1.01 < l["over"] <= 50 and 1.01 < l["under"] <= 50]
+        for canon, linhas in (e.get("mercados") or {}).items():
+            if canon not in MERC_SET: continue
+            linhas = _sane(linhas)
             if not linhas: continue
             j["mercados"].setdefault(canon, {})[e["casa"]] = linhas
-        if j["mercados"]: j["casas"].add(e["casa"])
+        # totais por time → times[mercado][home|away].casas[casa]
+        for canon, by_team in (e.get("mercados_time") or {}).items():
+            if canon not in MERC_SET: continue
+            slot = j["times"].setdefault(canon, {
+                "home": {"nome": j.get("home") or "", "casas": {}},
+                "away": {"nome": j.get("away") or "", "casas": {}},
+            })
+            for tname, linhas in by_team.items():
+                side = _assign_side(tname, hn, an)
+                if not side: continue
+                linhas = _sane(linhas)
+                if not linhas: continue
+                if tname and not slot[side]["nome"]:
+                    slot[side]["nome"] = tname
+                # se já existe de outra fonte, prefere o nome do confronto
+                slot[side]["casas"][e["casa"]] = linhas
+        if j["mercados"] or j["times"]: j["casas"].add(e["casa"])
 
+    print(f"match: sofa_hit={n_sofa_hit} · fuzzy/orphan={n_fuzzy} · grupos={len(jogos)}")
     # flag de VALOR (secundário) onde há modelo
     n_valor = 0
     for j in jogos:
@@ -272,12 +594,24 @@ def main():
         j["casas"] = sorted(j["casas"])
         j["n_mercados"] = len(j["mercados"])
         j["tem_valor"] = len(j["valor"]) > 0
+        # limpa slots de times vazios
+        times_clean = {}
+        for c, sides in (j.get("times") or {}).items():
+            ok = {}
+            for s in ("home", "away"):
+                sc = sides.get(s) or {}
+                if sc.get("casas"):
+                    ok[s] = {"nome": sc.get("nome") or (j.get("home") if s == "home" else j.get("away")) or "",
+                             "casas": sc["casas"]}
+            if ok: times_clean[c] = ok
+        j["times"] = times_clean
 
-    lista = sorted([j for j in jogos if j["mercados"]], key=lambda j: (not j["tem_valor"], j["inicio"]))
+    lista = sorted([j for j in jogos if j["mercados"] or j.get("times")],
+                   key=lambda j: (not j["tem_valor"], j["inicio"]))
     out = {"gerado": datetime.now(BRT).strftime("%Y-%m-%d %H:%M"), "casas": casas_ativas,
            "mercados": MERCADOS, "fonte": src, "jogos": lista}
     # transparência da captura (brief P0 §2.4): quem entrou e quem falhou nesta rodada
-    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k"}
+    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle"}
     _stdir = ROOT / "data" / "odds" / "_status"
     if _stdir.exists():
         cap = {"casas_ok": [], "casas_fail": []}
