@@ -190,9 +190,11 @@ def main():
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
     out_path = OUTDIR / f"7k_{stamp}.jsonl"
-    latest = OUTDIR / "7k_latest.json"
-    def write_latest(n): latest.write_text(json.dumps({"file": out_path.name, "n": n, "at": now.isoformat(timespec="seconds")}, ensure_ascii=False), encoding="utf-8")
-    write_latest(0)
+    from capture_common import write_odds_latest
+    def write_latest(n, promote=False):
+        write_odds_latest("7k", out_path.name, n,
+                          at=now.isoformat(timespec="seconds"), promote_full=promote)
+    write_latest(0, promote=False)
     f = open(out_path, "w", encoding="utf-8")
     n_out = 0
     for e in cand:
@@ -240,8 +242,8 @@ def main():
         if merc_t: rec["mercados_time"] = merc_t
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
-        if n_out % 10 == 0: write_latest(n_out)
-    f.close(); write_latest(n_out)
+        if n_out % 10 == 0: write_latest(n_out, promote=False)
+    f.close(); write_latest(n_out, promote=None)
     print(f"[7k] {n_out} jogos com mercado de estatística salvos em {out_path.name}")
     return n_out
 

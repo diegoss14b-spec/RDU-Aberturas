@@ -229,18 +229,15 @@ def main():
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
     out_path = OUTDIR / f"pinnacle_{stamp}.jsonl"
-    latest = OUTDIR / "pinnacle_latest.json"
+    from capture_common import write_odds_latest
 
-    def write_latest(n):
-        latest.write_text(
-            json.dumps(
-                {"file": out_path.name, "n": n, "at": now.isoformat(timespec="seconds")},
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
+    def write_latest(n, promote=False):
+        write_odds_latest(
+            "pinnacle", out_path.name, n,
+            at=now.isoformat(timespec="seconds"), promote_full=promote,
         )
 
-    write_latest(0)
+    write_latest(0, promote=False)
 
     # parent_id → rec acumulado (Corners + Bookings no mesmo jogo)
     by_parent = {}
@@ -341,7 +338,7 @@ def main():
             if "Escanteios" in rec["mercados"] or "Escanteios" in (rec.get("mercados_time") or {}):
                 n_with_corners += 1
 
-    write_latest(n_out)
+    write_latest(n_out, promote=None)
     print(
         f"[pinnacle] {n_out} jogos salvos ({n_with_corners} escanteios · {n_with_cards} cartões) "
         f"· fetch_ok={n_fetch_ok} → {out_path.name}"

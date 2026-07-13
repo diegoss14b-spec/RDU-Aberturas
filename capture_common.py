@@ -86,11 +86,121 @@ def in_window(start_anything, window_h):
     now = datetime.now(timezone.utc)
     return now <= dt <= now + timedelta(hours=float(window_h))
 
+ODDS_DIR = ROOT / "data" / "odds"
+
+
+def is_close_mode():
+    """True quando ODDS_WINDOW_H está setado (modo close / janela curta)."""
+    return odds_window() is not None
+
+
+def write_odds_latest(casa, file_name, n, at=None, *, promote_full=None):
+    """Atualiza ponteiros de odds da casa.
+
+    - sempre: {casa}_latest.json  (última captura qualquer — history_ingest)
+    - full + n>0: também {casa}_latest_full.json  (inventário da mesa)
+    - close + n>0: também {casa}_latest_close.json (só acompanhamento)
+
+    promote_full=None → auto (full se não for close e n>0).
+    Em writes intermediários (arquivo em construção), passe promote_full=False
+    para não publicar inventário incompleto no board.
+    """
+    ODDS_DIR.mkdir(parents=True, exist_ok=True)
+    if at is None:
+        at = datetime.now(BRT).isoformat(timespec="seconds")
+    payload = {"file": file_name, "n": int(n or 0), "at": at,
+               "mode": "close" if is_close_mode() else "full"}
+    blob = json.dumps(payload, ensure_ascii=False)
+    (ODDS_DIR / f"{casa}_latest.json").write_text(blob, encoding="utf-8")
+
+    if promote_full is None:
+        promote_full = (not is_close_mode()) and (int(n or 0) > 0)
+    if promote_full:
+        (ODDS_DIR / f"{casa}_latest_full.json").write_text(blob, encoding="utf-8")
+    elif is_close_mode() and int(n or 0) > 0:
+        (ODDS_DIR / f"{casa}_latest_close.json").write_text(blob, encoding="utf-8")
+    return payload
+
+
+def resolve_odds_pointer(casa, prefer_full=True, max_age_h=None):
+    """Resolve ponteiro → (meta dict, Path jsonl | None).
+
+    prefer_full=True: board usa latest_full (fallback latest).
+    prefer_full=False: history usa latest (qualquer modo).
+    max_age_h: se setado, descarta ponteiro mais velho que isso (horas).
+    """
+    names = []
+    if prefer_full:
+        names.append(f"{casa}_latest_full.json")
+    names.append(f"{casa}_latest.json")
+    for name in names:
+        ptr = ODDS_DIR / name
+        if not ptr.exists():
+            continue
+        try:
+            meta = json.loads(ptr.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        fn = meta.get("file")
+        if not fn:
+            continue
+        src = ODDS_DIR / fn
+        if not src.exists():
+            continue
+        if max_age_h is not None:
+            at = meta.get("at") or ""
+            try:
+                # aceita ISO com/sem tz ou 'YYYY-MM-DD_HHMM'
+                s = str(at).replace("_", "T", 1) if "_" in str(at) and "T" not in str(at) else str(at)
+                dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=BRT)
+                age_h = (datetime.now(timezone.utc) - dt.astimezone(timezone.utc)).total_seconds() / 3600
+                if age_h > float(max_age_h):
+                    continue
+            except Exception:
+                pass
+        meta = dict(meta)
+        meta["_pointer"] = name
+        meta["_stale"] = prefer_full and name.endswith("_latest.json") and not (ODDS_DIR / f"{casa}_latest_full.json").exists()
+        # se estamos lendo full mas o modo do pointer era close, marcar
+        if prefer_full and meta.get("mode") == "close":
+            meta["_stale"] = True
+        return meta, src
+    return None, None
+
+
+def classify_error(error):
+    """Classifica falha para painel/ops: Timeout | HTTP429 | Geo | Parse | Auth | Other."""
+    if error is None:
+        return None
+    if isinstance(error, BaseException):
+        name = type(error).__name__
+        msg = str(error)
+    else:
+        name, msg = "str", str(error)
+    low = (msg or "").lower()
+    if "timeout" in low or name in ("Timeout", "TimeoutError", "ReadTimeout", "ConnectTimeout"):
+        return "Timeout"
+    if "429" in low or "rate" in low:
+        return "HTTP429"
+    if "403" in low or "401" in low or "geo" in low or "blocked" in low or "forbidden" in low:
+        return "Geo"
+    if "auth" in low or "token" in low or "jwt" in low:
+        return "Auth"
+    if "parse" in low or "json" in low or "empty" in low:
+        return "Parse"
+    if name and name not in ("str", "Exception"):
+        return name
+    return "Other"
+
+
 def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, sample=None):
     """Grava o status estruturado e retorna o exit code (0 ok / 2 soft-fail)."""
     ok = (error is None) and (n_events >= min_events)
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
+    err_s = (str(error)[:300] if error else None)
     st = {
         "casa": casa, "ok": ok,
         "ts_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -98,14 +208,17 @@ def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, samp
         "n_events": n_events, "n_markets": n_markets,
         "min_events": min_events,
         "duration_sec": round(time.time() - t0, 1) if t0 else None,
-        "error": (str(error)[:300] if error else None),
-        "error_class": (type(error).__name__ if isinstance(error, BaseException) else ("str" if error else None)),
+        "error": err_s,
+        "error_class": classify_error(error) if error else None,
+        "mode": "close" if is_close_mode() else "full",
         "sample_events": (sample or [])[:3],
         "proxy_br": bool(os.environ.get("DECODO_USER")),
     }
     (STATUS_DIR / f"{casa}.json").write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
     try:
-        print(f"[{casa}] status: ok={ok} n_events={n_events} (min {min_events})" + (f" · ERRO: {st['error']}" if error else ""))
+        print(f"[{casa}] status: ok={ok} n_events={n_events} (min {min_events})"
+              + (f" mode={st['mode']}" if st.get("mode") else "")
+              + (f" · ERRO: {st['error']}" if error else ""))
     except Exception:
         pass
     return 0 if ok else 2

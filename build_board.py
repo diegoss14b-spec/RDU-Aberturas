@@ -96,16 +96,21 @@ def _betano_team(name):
             return v, team
     return None
 
+# board SEMPRE prefere inventário full (close não encolhe a mesa)
+# stale-keep: aceita full de até 12h se a rodada atual falhou
+BOARD_MAX_AGE_H = 12
+
+
 def load_betano():
     """-> lista de eventos normalizados {casa, name, league, start, captured, mercados, mercados_time?}"""
-    ptr = ROOT / "data/odds/betano_latest.json"
-    src = None
-    if ptr.exists():
-        fn = json.loads(ptr.read_text(encoding="utf-8")).get("file")
-        if fn: src = ROOT / "data/odds" / fn
-    if not src or not src.exists():
-        cs = sorted((ROOT / "data/odds").glob("betano_*.jsonl")); src = cs[-1] if cs else None
-    if not src: return [], None
+    from capture_common import resolve_odds_pointer
+    meta, src = resolve_odds_pointer("betano", prefer_full=True, max_age_h=BOARD_MAX_AGE_H)
+    if not src:
+        cs = sorted((ROOT / "data/odds").glob("betano_*.jsonl"))
+        src = cs[-1] if cs else None
+        meta = {}
+    if not src:
+        return [], None
     out = []
     for ln in src.read_text(encoding="utf-8").strip().split("\n"):
         if not ln.strip(): continue
@@ -136,19 +141,21 @@ def load_betano():
             rec = {"casa": "Betano", "name": e.get("name"), "league": e.get("league"),
                    "start": e.get("start"), "captured": e.get("captured_at"), "mercados": mk}
             if merc_t: rec["mercados_time"] = merc_t
+            if meta.get("_stale") or meta.get("mode") == "close":
+                rec["_stale"] = True
             out.append(rec)
     return out, src.name
 
 
-def load_normalized(book, latest_name):
-    """lê um JSONL já-normalizado {casa,name,league,start,mercados,mercados_time?}
-    (Superbet, 7k, EstrelaBet). -> mesma forma que load_betano."""
-    ptr = ROOT / "data/odds" / latest_name
-    if not ptr.exists(): return []
-    fn = json.loads(ptr.read_text(encoding="utf-8")).get("file")
-    src = ROOT / "data/odds" / fn if fn else None
-    if not src or not src.exists(): return []
+def load_normalized(book, casa_id):
+    """lê JSONL via ponteiro full (stale-keep até BOARD_MAX_AGE_H).
+    casa_id = id do arquivo (superbet, 7k, estrelabet, pinnacle)."""
+    from capture_common import resolve_odds_pointer
+    meta, src = resolve_odds_pointer(casa_id, prefer_full=True, max_age_h=BOARD_MAX_AGE_H)
+    if not src:
+        return []
     out = []
+    stale = bool(meta.get("_stale") or meta.get("mode") == "close")
     for ln in src.read_text(encoding="utf-8").strip().split("\n"):
         if not ln.strip(): continue
         e = json.loads(ln)
@@ -157,6 +164,7 @@ def load_normalized(book, latest_name):
                    "start": e.get("start"), "captured": e.get("captured_at"),
                    "mercados": e.get("mercados") or {}}
             if e.get("mercados_time"): rec["mercados_time"] = e["mercados_time"]
+            if stale: rec["_stale"] = True
             out.append(rec)
     return out
 
@@ -223,10 +231,10 @@ def main():
         return bid if best >= FUZZ_MIN else None
 
     betano, src = load_betano()
-    eventos = betano + load_normalized("Superbet", "superbet_latest.json") \
-                     + load_normalized("7k", "7k_latest.json") \
-                     + load_normalized("EstrelaBet", "estrelabet_latest.json") \
-                     + load_normalized("Pinnacle", "pinnacle_latest.json")
+    eventos = betano + load_normalized("Superbet", "superbet") \
+                     + load_normalized("7k", "7k") \
+                     + load_normalized("EstrelaBet", "estrelabet") \
+                     + load_normalized("Pinnacle", "pinnacle")
     casas_ativas = sorted(set(e["casa"] for e in eventos))
     # SofaScore = base canônica de nomes/horários; casas encaixam por horário + fuzzy
     sofa_fx = load_sofa_fixtures()

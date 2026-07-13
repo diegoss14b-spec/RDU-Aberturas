@@ -185,7 +185,7 @@ jobs:
         run: |
           git config user.name "valor-bot"
           git config user.email "actions@github.com"
-          git add -A data/odds/_status data/odds/*_latest.json data/odds_history valor/data/history.js valor/data/moves.js valor/data/ops.js || true
+          git add -A data/odds/_status data/odds/*_latest.json data/odds/*_latest_full.json data/odds/*_latest_close.json data/odds_history valor/data/history.js valor/data/moves.js valor/data/ops.js || true
           git diff --cached --quiet || git commit -m "odds: snapshot $(date -u +%Y%m%d_%H%M) [$MODE] [skip ci]"
           git pull --rebase origin main || true
           git push || echo "push falhou (sem mudanças ou conflito)"

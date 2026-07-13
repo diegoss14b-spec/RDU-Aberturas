@@ -171,9 +171,11 @@ def main():
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
     out_path = OUTDIR / f"estrelabet_{stamp}.jsonl"
-    latest = OUTDIR / "estrelabet_latest.json"
-    def write_latest(n): latest.write_text(json.dumps({"file": out_path.name, "n": n, "at": now.isoformat(timespec="seconds")}, ensure_ascii=False), encoding="utf-8")
-    write_latest(0)
+    from capture_common import write_odds_latest
+    def write_latest(n, promote=False):
+        write_odds_latest("estrelabet", out_path.name, n,
+                          at=now.isoformat(timespec="seconds"), promote_full=promote)
+    write_latest(0, promote=False)
     f = open(out_path, "w", encoding="utf-8")
     n_out = n_det = 0
     for e in events:
@@ -222,8 +224,8 @@ def main():
         if merc_t: rec["mercados_time"] = merc_t
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
-        if n_out % 15 == 0: write_latest(n_out)
-    f.close(); write_latest(n_out)
+        if n_out % 15 == 0: write_latest(n_out, promote=False)
+    f.close(); write_latest(n_out, promote=None)
     print(f"[estrelabet] {n_det} detalhes · {n_out} jogos com mercado de estatística salvos em {out_path.name}")
     return n_out
 

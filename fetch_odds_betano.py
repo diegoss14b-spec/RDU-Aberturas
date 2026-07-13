@@ -117,8 +117,8 @@ def main():
                 time.sleep(0.45)
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             n_ok += 1
-    (OUT / "betano_latest.json").write_text(json.dumps({"file": fp.name, "n": n_ok, "at": stamp},
-                                                       ensure_ascii=False), encoding="utf-8")
+    from capture_common import write_odds_latest
+    write_odds_latest("betano", fp.name, n_ok, at=stamp)  # full pointer só se n>0 e não-close
     log(f"✅ {n_ok} eventos capturados → {fp.name}")
     return n_ok
 
