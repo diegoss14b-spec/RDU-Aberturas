@@ -209,6 +209,60 @@ tr.mv-open td{background:var(--purple-soft)!important}
 .vb-conf-bar{display:inline-block;width:36px;height:4px;background:var(--line);border-radius:2px;overflow:hidden;vertical-align:middle}
 .vb-conf-bar>i{display:block;height:100%;background:currentColor;border-radius:2px}
 .vb-filt{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+/* --- Operação --- */
+.op-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:10px 0 12px}
+.op-kpis-sm{grid-template-columns:repeat(4,1fr)}
+@media (max-width:800px){.op-kpis,.op-kpis-sm{grid-template-columns:1fr 1fr}}
+.op-kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;box-shadow:0 1px 2px rgba(26,22,38,.04)}
+.op-kpi-good{border-color:#cdeede;background:linear-gradient(180deg,#fff 60%,#f3fbf6)}
+.op-kpi-mid{border-color:#f0e2bd;background:linear-gradient(180deg,#fff 60%,#fdf8ec)}
+.op-kpi-bad{border-color:#f2c9c9;background:linear-gradient(180deg,#fff 60%,#fdf4f4)}
+.op-kpi-lab{font:600 10px var(--disp);letter-spacing:.4px;text-transform:uppercase;color:var(--faint)}
+.op-kpi-val{font:700 22px var(--disp);letter-spacing:-.4px;margin-top:4px;line-height:1.1}
+.op-kpi-val-sm{font-size:18px}
+.op-kpi-sub{font:500 11px var(--sans);color:var(--dim);margin-top:4px;line-height:1.35}
+.op-avisos{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.op-av{border-radius:10px;padding:8px 12px;font:600 12px var(--sans);line-height:1.45;border:1px solid var(--line)}
+.op-av-info{background:var(--purple-soft);border-color:#d4c8f5;color:#4c1d95}
+.op-av-warn{background:var(--gold-soft);border-color:#f0e2bd;color:#7a5a12}
+.op-av-bad{background:#fdeeee;border-color:#f2c9c9;color:var(--red)}
+.op-sec{margin-bottom:16px}
+.op-sec-h{font:700 13px var(--disp);letter-spacing:-.2px;margin-bottom:8px}
+.op-table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.op-table{width:100%;border-collapse:collapse;font:12px var(--sans)}
+.op-table th{font:600 9.5px var(--disp);letter-spacing:.4px;text-transform:uppercase;color:var(--faint);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel);white-space:nowrap}
+.op-table td{padding:8px 10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+.op-table tr:last-child td{border-bottom:0}
+.op-num{font-family:var(--mono);font-weight:700;white-space:nowrap}
+.op-err{font-size:11px;color:var(--red);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.op-pill{font:700 9px var(--disp);letter-spacing:.4px;text-transform:uppercase;padding:2px 7px;border-radius:6px}
+.op-pill-ok{background:var(--green-soft);color:var(--green)}
+.op-pill-fail{background:#fdeeee;color:var(--red)}
+.op-good{color:var(--green);font-weight:700}
+.op-mid{color:#a16207;font-weight:700}
+.op-bad{color:var(--red);font-weight:700}
+.op-muted{color:var(--faint);font-weight:500}
+.op-note{font-size:11px;margin-top:6px}
+.op-heat-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:6px}
+.op-heat{border-collapse:separate;border-spacing:3px;font:10px var(--sans)}
+.op-heat th{font:600 9px var(--disp);color:var(--faint);padding:2px 3px;text-align:center;white-space:nowrap}
+.op-heat th:first-child,.op-heat tr th:first-child{text-align:left;color:var(--dim);min-width:72px}
+.op-heat td{width:16px;height:16px;border-radius:4px;background:var(--line2)}
+.op-heat td.ht-ok{background:#22c55e}
+.op-heat td.ht-fail{background:#ef4444}
+.op-heat td.ht-na{background:#e7e2d8}
+.op-mercs{display:flex;flex-direction:column;gap:8px}
+.op-merc{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 11px}
+.op-merc-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin-bottom:5px}
+.op-bar{height:6px;background:var(--line2);border-radius:4px;overflow:hidden}
+.op-bar>i{display:block;height:100%;background:var(--purple);border-radius:4px}
+.op-merc-casas{font:500 11px var(--sans);color:var(--dim);margin-top:5px}
+.op-soon{display:flex;flex-direction:column;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.op-soon-row{display:grid;grid-template-columns:78px 1fr auto;gap:8px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--line2);font-size:12px}
+.op-soon-row:last-child{border-bottom:0}
+.op-soon-t{font:700 11px var(--mono);color:var(--dim);white-space:nowrap}
+.op-soon-j{font:600 12.5px var(--disp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:600px){.op-soon-row{grid-template-columns:1fr;gap:2px}.op-table .op-err{display:none}}
 [hidden]{display:none!important}
 </style>
 </head><body>
@@ -218,6 +272,7 @@ tr.mv-open td{background:var(--purple-soft)!important}
     <span class="chip on" data-view="board" role="button" tabindex="0">Mesa de Aberturas</span>
     <span class="chip val" data-view="valor" role="button" tabindex="0">🎯 Valor (+EV)</span>
     <span class="chip" data-view="hist" role="button" tabindex="0">Histórico &amp; CLV</span>
+    <span class="chip" data-view="ops" role="button" tabindex="0">Operação</span>
   </div>
   <div id="view-board">
   <div class="sub">Jogos com mercados de <b>Cartões · Faltas · Finalizações · Chutes no gol · Escanteios · Impedimentos · Laterais · Tiros de meta · Desarmes</b> abertos nas casas. Onde temos modelo, marcamos <b style="color:var(--green)">valor</b> — o foco é saber <b>o que dá pra analisar</b>.</div>
@@ -229,28 +284,37 @@ tr.mv-open td{background:var(--purple-soft)!important}
   </div><!-- /view-board -->
   <div id="view-valor" hidden></div>
   <div id="view-hist" hidden><div id="hist-root"></div></div>
+  <div id="view-ops" hidden></div>
   <div class="foot">Rei do Under · Mesa de Aberturas</div>
 </div>
 <script src="data/board.js"></script>
 <script src="data/history.js"></script>
 <script src="data/moves.js"></script>
+<script src="data/ops.js"></script>
 <script src="js/board.js"></script>
 <script src="js/valor.js"></script>
 <script src="js/history.js"></script>
+<script src="js/ops.js"></script>
 <script>
-  // seletor de view: alterna Mesa de Aberturas / Valor (+EV) / Histórico & CLV
+  // seletor de view: Mesa / Valor / Histórico / Operação
   (function () {
     var sel = document.getElementById("viewsel");
     if (!sel) return;
-    var vb = document.getElementById("view-board"), vv = document.getElementById("view-valor"), vh = document.getElementById("view-hist");
+    var views = {
+      board: document.getElementById("view-board"),
+      valor: document.getElementById("view-valor"),
+      hist: document.getElementById("view-hist"),
+      ops: document.getElementById("view-ops")
+    };
     sel.querySelectorAll(".chip").forEach(function (c) {
       function go() {
         var v = c.getAttribute("data-view");
         sel.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x === c); });
-        if (vb) vb.hidden = (v !== "board");
-        if (vv) vv.hidden = (v !== "valor");
-        if (vh) vh.hidden = (v !== "hist");
+        Object.keys(views).forEach(function (k) {
+          if (views[k]) views[k].hidden = (k !== v);
+        });
         if (v === "valor" && window.renderValor) window.renderValor();
+        if (v === "ops" && window.renderOps) window.renderOps();
         window.scrollTo(0, 0);
       }
       c.onclick = go;
