@@ -44,6 +44,13 @@ jobs:
           if os.environ.get('EVENT') == 'workflow_dispatch':
               emit('full', 'manual')
 
+          # :00 do cron principal = SEMPRE full (é aqui que o board é montado e deployado).
+          # A densificação close (soon → close) vale só pros slots :15/:30/:45. Antes, o check
+          # de soon-close vinha ANTES do check de :00, então jogo iminente no topo da hora
+          # derrubava o full → o board ficava horas sem atualizar (bug 14/07). Prioriza o full.
+          if os.environ.get('EVENT') == 'schedule' and now.minute == 0:
+              emit('full', 'horario 1h (full prioritario)')
+
           def gh(path):
               req = urllib.request.Request(
                   f"https://api.github.com/repos/{os.environ['REPO']}/contents/{path}",
