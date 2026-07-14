@@ -27,7 +27,9 @@ except Exception:
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from value_pricers import CardsPricer, ShotsPricer, FoulsPricer, CornersPricer
+# MODELOS NOVOS (candidatos MAE 2026-07-13): pricers dos candidatos no lugar dos antigos.
+# value_pricers continua importado (abaixo, como _vp) só pelo name_idx de resolução nome→id.
+from candidate_pricer import CardsPricer, ShotsPricer, FoulsPricer, CornersPricer
 from canonical import (
     norm_team, gscore as _gscore, side_hit as _side_hit, match_to_sofa,
     load_sofa_fixtures, parse_start, n as _n, SOFA_TOKEN_MIN,
