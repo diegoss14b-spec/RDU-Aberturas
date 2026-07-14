@@ -37,6 +37,7 @@ H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0",
      "Origin": "https://www.estrelabet.bet.br", "Referer": "https://www.estrelabet.bet.br/"}
 HOURS = 96
 MAX_EVENTS = 200
+WORKERS = 8       # detalhes em paralelo — proxy BR é ~3x mais lento/req (sem rate-limit); 200 seq estouram o timeout na nuvem
 MIN_EVENTS = 8    # mínimo pro finish() (abaixo = exit 2)
 MIN_EFF = MIN_EVENTS  # modo close (ODDS_WINDOW_H) reduz — ver main()
 
@@ -176,14 +177,24 @@ def main():
         write_odds_latest("estrelabet", out_path.name, n,
                           at=now.isoformat(timespec="seconds"), promote_full=promote)
     write_latest(0, promote=False)
+
+    # Detalhes em PARALELO. O proxy BR (nuvem) é ~3x mais lento por request mas NÃO rate-limita
+    # (todos 200 mesmo sequencial) → 200 fetches em série estouravam o timeout e davam exit=2.
+    # 8 workers derrubam ~10min→~1,5min. Local (direto) fica ~30s.
+    from concurrent.futures import ThreadPoolExecutor
+    ids = [e.get("id") for e in events if e.get("id")]
+    details = {}
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        for eid, d in ex.map(lambda i: (i, get(f"{BASE}/GetEventDetails?{PARAMS}&eventId={i}")), ids):
+            if d:
+                details[eid] = d
+    n_det = len(ids)
+
     f = open(out_path, "w", encoding="utf-8")
-    n_out = n_det = 0
+    n_out = 0
     for e in events:
         eid = e.get("id")
-        if not eid: continue
-        d = get(f"{BASE}/GetEventDetails?{PARAMS}&eventId={eid}")
-        n_det += 1
-        time.sleep(random.uniform(0.2, 0.4))
+        d = details.get(eid)
         if not d: continue
         allm = (d.get("markets") or []) + (d.get("childMarkets") or [])
         odds = {o["id"]: o for o in (d.get("odds") or [])}
