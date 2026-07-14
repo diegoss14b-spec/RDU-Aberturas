@@ -2,8 +2,10 @@
 """run_capture.py — orquestrador da captura das casas (P0 do brief: sem falha silenciosa).
 Roda os fetchers em paralelo com timeout próprio, lê os data/odds/_status/{casa}.json
 que cada um grava, e escreve data/odds/_status/summary.json com o veredito:
-  deploy_allowed = (n_ok >= 2) E (total de eventos >= 8)
+  deploy_allowed = (n_ok >= 2) E (total de eventos >= MIN_EVENTS_DEPLOY)
 Exit: 0 se deploy_allowed, 3 se captura insuficiente (job fica vermelho — de propósito).
+MIN_EVENTS_DEPLOY baixado de 8→2 (14/07) pra Mesa seguir atualizando nos períodos de poucos
+jogos (recesso de clube / fim de Copa); subir de volta quando a temporada normalizar.
 Falha de UMA casa NÃO derruba as outras (cada fetcher é um subprocesso isolado)."""
 import json, sys, subprocess, time
 from pathlib import Path
@@ -82,7 +84,8 @@ def main():
             casas_ok.append(casa); total_events += st.get("n_events") or 0
         else:
             casas_fail.append({"casa": casa, "error": st.get("error") or f"exit={results.get(casa)}"})
-    deploy_allowed = len(casas_ok) >= 2 and total_events >= 8
+    MIN_EVENTS_DEPLOY = 2   # mín. de jogos p/ publicar (baixado de 8 em 14/07 — ver docstring)
+    deploy_allowed = len(casas_ok) >= 2 and total_events >= MIN_EVENTS_DEPLOY
     reason = ("ok" if deploy_allowed else
               f"captura insuficiente: {len(casas_ok)} casas ok, {total_events} eventos")
     summary = {"ts_brt": datetime.now(BRT).strftime("%Y-%m-%d %H:%M"),
