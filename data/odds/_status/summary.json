@@ -1,16 +1,20 @@
 {
- "ts_brt": "2026-07-13 20:06",
+ "ts_brt": "2026-07-13 21:09",
  "casas_ok": [
   "betano",
   "superbet",
-  "estrelabet",
   "7k",
   "pinnacle"
  ],
- "casas_fail": [],
- "n_ok": 5,
- "n_fail": 0,
- "total_events": 14,
- "deploy_allowed": true,
- "reason": "ok"
+ "casas_fail": [
+  {
+   "casa": "estrelabet",
+   "error": "exit=2"
+  }
+ ],
+ "n_ok": 4,
+ "n_fail": 1,
+ "total_events": 2,
+ "deploy_allowed": false,
+ "reason": "captura insuficiente: 4 casas ok, 2 eventos"
 }
