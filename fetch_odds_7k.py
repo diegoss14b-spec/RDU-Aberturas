@@ -157,6 +157,55 @@ def _get_jwts_browser():
         ctx.close(); b.close()
     return grabbed
 
+# _pick_family fica no NÍVEL DO MÓDULO (era aninhada em main) pra o teste exercitar o
+# código REAL: o teste antigo replicava a lógica numa cópia e por isso não teria pegado
+# o bug de índice da tupla de score (15/07). Não usa nada do escopo de main.
+def _pick_family(fams):
+    """Escolhe uma família canônica por regra determinística.
+
+    Ordem: 2 vias ANTES de 3 vias → mais linhas O/U válidas → nome com
+    'total'/'mais/menos' → market_type_id lexicograficamente menor.
+
+    O critério de 2-vias vem PRIMEIRO (achado 15/07): a 7k publica as duas
+    famílias do mesmo mercado (ex. "Escanteios Mais/Menos (2-Vias)" com 73 linhas
+    E "Escanteios 3- Vias Mais/Menos" com 42). O 3-vias tem o total EXATO como
+    terceiro resultado (over e under perdem) → é inútil pro flag de valor, que o
+    build_board exclui. Se ele fosse escolhido por ter mais linhas num jogo, a
+    Mesa mostraria a escada pior E perderia o valor daquele jogo — foi o que
+    aconteceu no Corinthians×Remo. Só sobra o 3-vias quando não há 2-vias.
+    """
+    if not fams:
+        return None, []
+    scored = []
+    for fk, blob in fams.items():
+        by = blob["by_line"]
+        n = len(by)
+        nm = (blob["meta"].get("market_type_name") or "").lower()
+        flat = nm.replace(" ", "").replace("-", "")
+        is3 = 1 if ("3vias" in flat or "3way" in flat or "tresvias" in flat
+                    or "trêsvias" in flat) else 0
+        prefer = 1 if ("total" in nm or "mais/menos" in nm or "mais menos" in nm) else 0
+        # penaliza nomes ambíguos de período (já filtrados em canon, reforço)
+        if any(x in nm for x in ("1º", "2º", "primeiro", "segundo", "tempo", "ht")):
+            prefer -= 5
+        scored.append((is3, -n, -prefer, str(fk), fk, blob))
+    scored.sort()
+    # tupla = (is3, -n, -prefer, str(fk), fk, blob) — índices 4 e 5
+    best_fk, best = scored[0][4], scored[0][5]
+    arr = [best["by_line"][L] for L in sorted(best["by_line"])]
+    # anota meta na 1ª linha (board pode ignorar campos extras)
+    if arr:
+        arr = [{**row,
+                "market_type_id": best["meta"].get("market_type_id"),
+                "market_type_name": best["meta"].get("market_type_name"),
+                "scope": best["meta"].get("scope"),
+                } for row in arr]
+    dropped = [{"family": s[4], "n_lines": -s[1],
+                "name": (s[5]["meta"].get("market_type_name") or "")}
+               for s in scored[1:]]
+    return arr, dropped
+
+
 def main():
     now = datetime.now(BRT)
     host = get_host()
@@ -254,39 +303,6 @@ def main():
                 else:
                     for row in arr:
                         prev["by_line"][row["linha"]] = row
-
-        def _pick_family(fams):
-            """Escolhe uma família canônica por regra determinística.
-
-            Preferência: mais linhas O/U válidas; empate → nome com 'total'/'mais/menos';
-            empate → market_type_id lexicograficamente menor.
-            """
-            if not fams:
-                return None, []
-            scored = []
-            for fk, blob in fams.items():
-                by = blob["by_line"]
-                n = len(by)
-                nm = (blob["meta"].get("market_type_name") or "").lower()
-                prefer = 1 if ("total" in nm or "mais/menos" in nm or "mais menos" in nm) else 0
-                # penaliza nomes ambíguos de período (já filtrados em canon, reforço)
-                if any(x in nm for x in ("1º", "2º", "primeiro", "segundo", "tempo", "ht")):
-                    prefer -= 5
-                scored.append((-n, -prefer, str(fk), fk, blob))
-            scored.sort()
-            best_fk, best = scored[0][3], scored[0][4]
-            arr = [best["by_line"][L] for L in sorted(best["by_line"])]
-            # anota meta na 1ª linha (board pode ignorar campos extras)
-            if arr:
-                arr = [{**row,
-                        "market_type_id": best["meta"].get("market_type_id"),
-                        "market_type_name": best["meta"].get("market_type_name"),
-                        "scope": best["meta"].get("scope"),
-                        } for row in arr]
-            dropped = [{"family": s[3], "n_lines": -s[0],
-                        "name": (s[4]["meta"].get("market_type_name") or "")}
-                       for s in scored[1:]]
-            return arr, dropped
 
         merc, merc_t = {}, {}
         fam_log = []

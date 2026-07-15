@@ -279,6 +279,24 @@ def game_state(inicio_str, now=None):
     return "finished"
 
 
+def three_way(ln_):
+    """A linha vem de um mercado de TRÊS VIAS (over / exato / under)?
+
+    Na 7k existe o OU621 "Escanteios 3- Vias Mais/Menos": o total EXATO é um terceiro
+    resultado que faz over E under PERDEREM — não é devolução de aposta. Precificar isso
+    com massa de push (EV = p*odd + p_push - 1) credita uma devolução que não existe e
+    infla o EV; e o par over/under sozinho tem margem irreal (~0,4%, porque o terceiro
+    resultado leva probabilidade que o de-vig não vê), o que ainda infla o edge.
+    Enquanto não capturarmos a odd do 'exato' e liquidarmos os 3 resultados, esses
+    mercados ficam FORA do flag de valor (seguem no board, como oferta visível).
+    Achado da auditoria 15/07: 2 sinais sobreviventes do Corinthians×Remo vinham daqui.
+    """
+    nm = (ln_.get("market_type_name") or "").lower()
+    nm = nm.replace(" ", "").replace("-", "").replace("_", "")
+    return ("3vias" in nm or "3way" in nm or "tresvias" in nm or "trêsvias" in nm
+            or "3caminhos" in nm)
+
+
 def main():
     baseline_status, baseline_source = "baseline", "value_pricers"
     if FORCE_LEGACY:
@@ -511,6 +529,7 @@ def main():
     n_shadow = 0
     n_skip_ko = 0
     n_skip_stale = 0
+    n_skip_3way = 0
     now_brt = datetime.now(BRT)
     ladder_rej_all = []
     shadow_rows = []  # arquivo paralelo, nunca em BOARD.valor
@@ -538,6 +557,9 @@ def main():
                 for casa, linhas in j["mercados"][canon].items():
                     casa_stale = casa in stale_set
                     for ln_ in linhas:
+                        if three_way(ln_):
+                            n_skip_3way += 1
+                            continue
                         # produção
                         pr = PRICERS[model].price(lg, hid, aid, ln_["linha"])
                         if pr and actionable_game and not casa_stale:
@@ -641,7 +663,7 @@ def main():
         },
     }
     print(f"[board] valor flags={n_valor} · skip kickoff/started={n_skip_ko} · skip stale casa={n_skip_stale}"
-          f" · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
+          f" · skip 3-vias={n_skip_3way} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
     # transparência da captura (brief P0 §2.4): quem entrou e quem falhou nesta rodada
     _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle"}
     _stdir = ROOT / "data" / "odds" / "_status"

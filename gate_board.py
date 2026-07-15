@@ -99,6 +99,23 @@ def main():
     if n_bad_margin_valor:
         reasons.append(f"{n_bad_margin_valor} flags de valor com margem negativa no par")
 
+    # P0: nenhum flag de valor vindo de mercado de 3 VIAS (over/exato/under).
+    # O 'exato' faz over e under perderem — não é push. Precificar com massa de push
+    # infla o EV, e o par over/under sozinho dá margem irreal (~0,4%) que infla o edge.
+    # O build_board já exclui na fonte; isto aqui é a defesa em profundidade.
+    n_3way_valor = 0
+    for j in (new.get("jogos") or []):
+        for v in (j.get("valor") or []):
+            merc = (j.get("mercados") or {}).get(v.get("mercado") or "") or {}
+            for ln in (merc.get(v.get("casa") or "") or []):
+                if abs(float(ln.get("linha") or -1) - float(v.get("linha") or -2)) > 1e-9:
+                    continue
+                nm = (ln.get("market_type_name") or "").lower().replace(" ", "").replace("-", "")
+                if "3vias" in nm or "3way" in nm or "tresvias" in nm or "trêsvias" in nm:
+                    n_3way_valor += 1
+    if n_3way_valor:
+        reasons.append(f"{n_3way_valor} flags de valor em mercado de 3 vias (exato ≠ push)")
+
     # P0: nenhum valor acionável com kickoff passado (defesa em profundidade)
     n_past_valor = 0
     for j in (new.get("jogos") or []):

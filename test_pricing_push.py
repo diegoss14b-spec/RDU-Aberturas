@@ -19,6 +19,7 @@ import sys
 import unittest
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -269,6 +270,35 @@ class TestPromotedDefault(unittest.TestCase):
         self.assertEqual(bb.MODEL_SOURCE, "candidate_pricer")
 
 
+class TestThreeWayForaDoValor(unittest.TestCase):
+    """3 vias (over/exato/under) nunca pode virar flag de valor — o 'exato' faz over E
+    under perderem, então não é push. Bug achado no board de 15/07 02:44: 2 sinais do
+    Corinthians×Remo vinham do OU621 'Escanteios 3- Vias Mais/Menos' com p_push creditado
+    (EV inflado) e margem irreal de 0,41% (o de-vig não enxerga o 3º resultado)."""
+
+    def test_detecta_o_nome_real_da_7k(self):
+        from build_board import three_way
+        # o nome REAL vem com espaçamento torto: "Escanteios 3- Vias Mais/Menos"
+        self.assertTrue(three_way({"market_type_name": "Escanteios 3- Vias Mais/Menos"}))
+        self.assertTrue(three_way({"market_type_name": "Cartões 3-Vias Mais/Menos"}))
+        self.assertTrue(three_way({"market_type_name": "Faltas 3 Vias"}))
+        self.assertTrue(three_way({"market_type_name": "Corners 3-Way Over/Under"}))
+
+    def test_nao_derruba_mercado_normal(self):
+        from build_board import three_way
+        self.assertFalse(three_way({"market_type_name": "Total de Escanteios"}))
+        self.assertFalse(three_way({"market_type_name": "Escanteios Mais/Menos"}))
+        self.assertFalse(three_way({}))                      # sem meta (Betano/Pinnacle)
+        self.assertFalse(three_way({"market_type_name": None}))
+
+    def test_gate_bloqueia_valor_de_3vias(self):
+        """O gate tem que REPROVAR um board com flag de valor vindo de 3 vias."""
+        import gate_board
+        src = Path(gate_board.__file__).read_text(encoding="utf-8")
+        self.assertIn("3 vias", src)
+        self.assertIn("market_type_name", src)
+
+
 class TestFetch7kFamily(unittest.TestCase):
     def test_canon_rejects_period(self):
         from fetch_odds_7k import canon
@@ -278,7 +308,9 @@ class TestFetch7kFamily(unittest.TestCase):
         self.assertEqual(canon("Escanteios Mais/Menos"), "Escanteios")
 
     def test_pick_family_prefers_more_lines(self):
-        # exercita a lógica via simulação local do _pick_family
+        # chama a função REAL (antes este teste replicava a lógica numa cópia — e por
+        # isso não pegaria um bug de índice na tupla de score)
+        from fetch_odds_7k import _pick_family
         fams = {
             "id_a": {
                 "meta": {"market_type_id": "a", "market_type_name": "Total de Escanteios"},
@@ -294,15 +326,45 @@ class TestFetch7kFamily(unittest.TestCase):
                 },
             },
         }
-        # replica score do fetch
-        scored = []
-        for fk, blob in fams.items():
-            n = len(blob["by_line"])
-            nm = (blob["meta"].get("market_type_name") or "").lower()
-            prefer = 1 if ("total" in nm or "mais/menos" in nm) else 0
-            scored.append((-n, -prefer, str(fk), fk, blob))
-        scored.sort()
-        self.assertEqual(scored[0][3], "id_a")
+        arr, dropped = _pick_family(fams)
+        self.assertEqual(arr[0]["market_type_name"], "Total de Escanteios")   # 2 linhas > 1
+        self.assertEqual(len(arr), 2)
+        self.assertEqual(dropped[0]["n_lines"], 1)      # índice certo da tupla de score
+
+    def test_pick_family_2vias_ganha_de_3vias_mesmo_com_menos_linhas(self):
+        """A 7k publica as DUAS famílias do mesmo mercado. O 3-vias (total exato = 3º
+        resultado) é inútil pro flag de valor, então o 2-vias vence mesmo tendo menos
+        linhas. Bug real de 15/07: Corinthians×Remo pegou o 3-vias e gerou EV inflado."""
+        from fetch_odds_7k import _pick_family
+        fams = {
+            "OU621": {
+                "meta": {"market_type_id": "OU621",
+                         "market_type_name": "Escanteios 3- Vias Mais/Menos"},
+                "by_line": {float(i): {"linha": float(i), "over": 2.0, "under": 1.8}
+                            for i in range(8, 18)},          # 10 linhas
+            },
+            "OU12": {
+                "meta": {"market_type_id": "OU12",
+                         "market_type_name": "Escanteios Mais/Menos (2-Vias)"},
+                "by_line": {8.5: {"linha": 8.5, "over": 1.9, "under": 1.9}},   # 1 linha
+            },
+        }
+        arr, dropped = _pick_family(fams)
+        self.assertEqual(arr[0]["market_type_name"], "Escanteios Mais/Menos (2-Vias)")
+        self.assertEqual(dropped[0]["name"], "Escanteios 3- Vias Mais/Menos")
+        self.assertEqual(dropped[0]["n_lines"], 10)
+
+    def test_pick_family_so_3vias_ainda_e_exibida(self):
+        """Se o jogo SÓ tem 3-vias, ela continua no board (oferta visível) — quem tira do
+        flag de valor é o build_board.three_way."""
+        from fetch_odds_7k import _pick_family
+        fams = {"OU621": {"meta": {"market_type_id": "OU621",
+                                   "market_type_name": "Escanteios 3- Vias Mais/Menos"},
+                          "by_line": {9.0: {"linha": 9.0, "over": 2.0, "under": 1.8}}}}
+        arr, _ = _pick_family(fams)
+        self.assertEqual(len(arr), 1)
+        from build_board import three_way
+        self.assertTrue(three_way(arr[0]))
 
 
 if __name__ == "__main__":
