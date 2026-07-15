@@ -32,6 +32,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
+          # QUAL cron disparou (o GitHub informa a expressão exata). NÃO usar now.minute:
+          # o agendador do GitHub atrasa o cron em vários minutos (medido 14/07: dispara
+          # :01/:07/:12/:16/:31/:34/:48 — quase nunca :00), então minute==0 nunca casava
+          # e o full JAMAIS rodava (25 close × 2 full em 27 rodadas; os 2 full eram manuais).
+          SCHEDULE: ${{ github.event.schedule }}
         run: |
           python3 - <<'EOF'
           import json, os, base64, urllib.request, datetime as dt
@@ -44,12 +49,13 @@ jobs:
           if os.environ.get('EVENT') == 'workflow_dispatch':
               emit('full', 'manual')
 
-          # :00 do cron principal = SEMPRE full (é aqui que o board é montado e deployado).
-          # A densificação close (soon → close) vale só pros slots :15/:30/:45. Antes, o check
-          # de soon-close vinha ANTES do check de :00, então jogo iminente no topo da hora
-          # derrubava o full → o board ficava horas sem atualizar (bug 14/07). Prioriza o full.
-          if os.environ.get('EVENT') == 'schedule' and now.minute == 0:
-              emit('full', 'horario 1h (full prioritario)')
+          # O cron HORÁRIO ("0 * * * *") = SEMPRE full — é o único momento em que o board é
+          # montado e deployado. Identificado pela EXPRESSÃO do cron (github.event.schedule),
+          # não pelo relógio: o GitHub atrasa o disparo e minute==0 quase nunca acontece.
+          # A densificação close fica só no cron ":15,30,45".
+          FULL_CRON = '0 * * * *'
+          if os.environ.get('EVENT') == 'schedule' and os.environ.get('SCHEDULE') == FULL_CRON:
+              emit('full', f"cron horario ({os.environ.get('SCHEDULE')})")
 
           def gh(path):
               req = urllib.request.Request(
@@ -92,12 +98,10 @@ jobs:
               if soon and age_min >= 12:
                   emit('close', f'{soon} jogos em ≤90min (ultima captura ha {age_min:.0f}min)')
 
-              # full só no horário :00 (cron principal) — crons :15/:30/:45 não full
-              minute = now.minute
+              # Só chega aqui, vindo de cron, o de densificação (:15/:30/:45) — o horário já
+              # saiu como full lá em cima. Sem jogo iminente, ele não tem o que fazer.
               if os.environ.get('EVENT') == 'schedule':
-                  if minute != 0:
-                      emit('skip', f'slot {minute:02d}min sem jogo iminente')
-                  emit('full', f'horario 1h (ultima ha {age_min:.0f}min)')
+                  emit('skip', f"cron densificacao sem jogo iminente (ultima ha {age_min:.0f}min)")
 
               if soon:
                   emit('close', f'{soon} jogos em ≤90min')
