@@ -176,21 +176,47 @@ def main():
         "fixtures": fixtures,
     }
     outp = OUT / f"sofa_{stamp}.json"
+    # snapshot diagnóstico sempre grava (mesmo vazio)
     outp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
-    (OUT / "sofa_latest.json").write_text(
-        json.dumps({"file": outp.name, "n": len(fixtures), "at": payload["gerado"]}, ensure_ascii=False),
-        encoding="utf-8",
-    )
-    print(f"[sofa] {len(fixtures)} fixtures em janela {DAYS_AHEAD}d → {outp.name}")
+
+    # P1 brief: zero fixtures NÃO promove sofa_latest por cima do último saudável
+    MIN_PROMOTE = 1
+    prev_ptr = OUT / "sofa_latest.json"
+    prev_n = 0
+    if prev_ptr.exists():
+        try:
+            prev_n = int(json.loads(prev_ptr.read_text(encoding="utf-8")).get("n") or 0)
+        except Exception:
+            prev_n = 0
+
+    n = len(fixtures)
+    if n >= MIN_PROMOTE:
+        prev_ptr.write_text(
+            json.dumps({"file": outp.name, "n": n, "at": payload["gerado"]}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"[sofa] {n} fixtures em janela {DAYS_AHEAD}d → {outp.name} (promovido latest)")
+    else:
+        # grava diagnóstico mas mantém pointer anterior
+        diag = OUT / f"sofa_{stamp}_EMPTY.json"
+        diag.write_text(json.dumps({
+            "gerado": payload["gerado"], "n": 0, "reason": "empty_window",
+            "snapshot": outp.name, "kept_prev_n": prev_n,
+        }, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"[sofa] ⚠ 0 fixtures — NÃO promovi sofa_latest (prev n={prev_n}). diag={diag.name}")
     for f in fixtures[:8]:
         print(f"  {f['inicio']} · {f['home']} - {f['away']} · {f['league']}")
-    return len(fixtures)
+    return n
 
 
 if __name__ == "__main__":
     try:
         n = main() or 0
-        sys.exit(0 if n >= 0 else 1)
+        # exit ≠ 0 se vazio (hard fail configurável — brief P1 §7.2)
+        if n < 1:
+            print("[sofa] exit 2: janela sem fixtures (snapshot vazio não promoveu latest)")
+            sys.exit(2)
+        sys.exit(0)
     except Exception as e:
         print("[sofa] FAIL", e)
         sys.exit(1)

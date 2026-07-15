@@ -143,15 +143,20 @@ def main():
                         )
                         k = keys.get(key)
                         pre_ko = is_pre_kickoff(now, kick_iso) if kick_iso else True
-                        changed = (k is None) or (abs((k.get("last_odd") or 0) - odd) >= 0.01)
+                        is_new = k is None
+                        # price_move só se já existia e odd mudou ≥0.01 (1ª obs: n_moves=0)
+                        price_moved = (not is_new) and (
+                            abs((k.get("last_odd") or 0) - odd) >= 0.01
+                        )
 
-                        if k is None:
+                        if is_new:
                             # open só “vale” se 1ª vista pré-kickoff; senão marca post
                             keys[key] = k = {
                                 "open_odd": odd, "open_ts": now_iso, "open_is_first_seen": True,
                                 "close_odd": None, "close_ts": None,
                                 "last_odd": odd, "last_ts": now_iso,
-                                "n_obs": 0, "n_moves": 0,
+                                "n_obs": 0, "n_moves": 0,  # 1ª obs → n_moves permanece 0
+                                "n_price_moves": 0, "n_line_moves": 0,
                                 "max_odd": odd, "min_odd": odd,
                                 "kickoff": kick_iso,
                                 "home_raw": ev["home_raw"], "away_raw": ev["away_raw"],
@@ -175,8 +180,9 @@ def main():
                         # P1: não poluir last com odd pós-kickoff (preserva close real)
                         if k.get("status") == "open":
                             if pre_ko:
-                                if changed:
+                                if price_moved:
                                     k["n_moves"] = (k.get("n_moves") or 0) + 1
+                                    k["n_price_moves"] = (k.get("n_price_moves") or 0) + 1
                                 k["last_odd"] = odd
                                 k["last_ts"] = now_iso
                                 k["max_odd"] = max(k.get("max_odd") or odd, odd)
@@ -186,9 +192,10 @@ def main():
 
                         k["capture_quality"] = compute_capture_quality(k, now)
 
-                        if changed and pre_ko:
+                        # tick de preço: 1ª obs (open) ou movimento real
+                        if pre_ko and (is_new or price_moved):
                             tick_f.write(json.dumps({
-                                "ts": now_iso, "kind": "price",
+                                "ts": now_iso, "kind": "price" if price_moved else "open",
                                 "casa": casa, "kickoff": k.get("kickoff"),
                                 "home": h, "away": a, "mercado": mercado,
                                 "linha": linha, "lado": lado, "odd": odd,

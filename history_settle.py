@@ -25,8 +25,14 @@ HIST = ROOT / "data" / "odds_history"
 RES_AUTO = HIST / "results" / "results_auto.json"
 RES_MANUAL = HIST / "results" / "manual_results.csv"
 # mercado canônico -> campo no results_auto
-FIELD = {"Cartões": "cards", "Faltas": "fouls", "Finalizações": "shots",
-         "Impedimentos": "offsides", "Laterais": "throw_ins", "Tiros de meta": "goal_kicks"}
+# Escanteios/SOT/Desarmes: mapeados se o export tiver o campo; senão status=unavailable
+FIELD = {
+    "Cartões": "cards", "Faltas": "fouls", "Finalizações": "shots",
+    "Impedimentos": "offsides", "Laterais": "throw_ins", "Tiros de meta": "goal_kicks",
+    "Escanteios": "corners", "Chutes no gol": "shots_on_goal", "Desarmes": "tackles",
+}
+# mercados sem fonte no results_auto atual → unavailable (não inventa zero)
+UNAVAILABLE_IF_MISSING = {"Escanteios", "Chutes no gol", "Desarmes"}
 
 def nrm(s):
     return norm_team(s)
@@ -84,12 +90,30 @@ def main():
             a = k.get("away_norm") or nrm(k.get("away_raw") or meta.get("an") or "")
             fld = FIELD.get(mercado)
             r = find_result(results, djogo, h, a) if fld else None
-            res = (r or {}).get(fld)
+            res = (r or {}).get(fld) if r and fld else None
             if res is None:
-                n_nores += 1; continue
+                # mercado sem estatística na fonte → unavailable (honesto, não zero)
+                if mercado in UNAVAILABLE_IF_MISSING or fld is None:
+                    if k.get("status") != "unavailable":
+                        k["status"] = "unavailable"
+                        k["result"] = None
+                        k["won"] = None
+                        n_nores += 1
+                        changed = True
+                    else:
+                        n_nores += 1
+                else:
+                    n_nores += 1
+                continue
+            try:
+                res = float(res)
+            except (TypeError, ValueError):
+                n_nores += 1
+                continue
             k["result"] = res
-            if res == linha:                       # linha inteira empatou = push (stake devolvido)
-                k["won"] = None
+            # push: total == linha (inteira ou .0); meia linha nunca push em contagem discreta
+            if abs(res - linha) < 1e-9:
+                k["won"] = None  # push — stake devolvido
             else:
                 over_won = res > linha
                 k["won"] = over_won if lado == "over" else (not over_won)

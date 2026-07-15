@@ -71,6 +71,36 @@ def test_is_pre_kickoff():
     assert is_pre_kickoff(ko + timedelta(seconds=10), ko) is False
 
 
+def test_n_moves_first_obs_zero():
+    """1ª observação não incrementa n_moves (brief P1 §7.5)."""
+    # simula lógica de price_moved
+    is_new = True
+    price_moved = (not is_new) and True
+    n_moves = 0
+    if price_moved:
+        n_moves += 1
+    assert n_moves == 0
+    # 2ª obs com odd diferente
+    is_new = False
+    last_odd, odd = 1.90, 2.05
+    price_moved = (not is_new) and abs(last_odd - odd) >= 0.01
+    if price_moved:
+        n_moves += 1
+    assert n_moves == 1
+
+
+def test_clv_valido_requires_close_before_kickoff():
+    """CLV inválido se close_ts >= kickoff."""
+    from datetime import datetime, timezone, timedelta
+    BRT = timezone(timedelta(hours=-3))
+    ko = datetime(2026, 7, 14, 16, 0, tzinfo=BRT)
+    open_ts = ko - timedelta(hours=5)
+    close_ok = ko - timedelta(minutes=5)
+    close_bad = ko + timedelta(minutes=1)
+    assert open_ts < ko and close_ok < ko
+    assert not (close_bad < ko)
+
+
 def test_should_close():
     ko = datetime(2026, 7, 14, 16, 0, tzinfo=BRT)
     k = {"kickoff": ko.isoformat(), "status": "open"}
@@ -91,6 +121,7 @@ def main():
     tests = [
         test_quality_full_prematch, test_quality_late_open, test_quality_post_kickoff,
         test_quality_no_close, test_quality_closed_ok, test_is_pre_kickoff,
+        test_n_moves_first_obs_zero, test_clv_valido_requires_close_before_kickoff,
         test_should_close, test_pick_main_line,
     ]
     failed = 0

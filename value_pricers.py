@@ -4,8 +4,12 @@ value_pricers.py — reprecifica Cartões / Faltas / Finalizações em Python, b
 com os precificadores do navegador. Lê as CONSTANTES VIVAS das páginas (fica em sincronia
 se recalibrar) e os DADOS DOS TIMES das mesmas fontes que as páginas usam.
 
-Cada pricer.price(...) -> {"mu": float, "p_over": float, "p_under": float} ou None (sem cobertura).
-Over de linha X.5 = total >= floor(X)+1  ->  P(over) = 1 - CDF(floor(L)).
+Cada pricer.price(...) -> dict canônico ou None (sem cobertura):
+  {mu, p_over_win, p_under_win, p_push, p_over, p_under}
+  p_over/p_under são aliases de win-only (NÃO 1-p_over quando há push).
+
+Linha inteira L: push = P(X=L); over_win = P(X>L); under_win = P(X<L).
+Meia linha: p_push=0; over = 1-CDF(floor(L)); under = CDF(floor(L)).
 
 Convenção de liga por modelo (o resolver de evento cuida do mapeamento):
   Cartões:      A, B, PL, BU, LL, SA, L1
@@ -15,6 +19,7 @@ Convenção de liga por modelo (o resolver de evento cuida do mapeamento):
 import json, math, re
 from pathlib import Path
 from collections import defaultdict, deque
+from pricing_math import ou_probs_from_cdf, price_dict
 
 ROOT = Path(__file__).resolve().parent
 DEPLOY = ROOT / "netlify-deploy"
@@ -80,8 +85,8 @@ class CardsPricer:
         if not h or not a: return None
         raw = (h["h_y_iss"] + a["a_y_rec"]) / 2 + (a["a_y_iss"] + h["h_y_rec"]) / 2
         mu = max(0.5, self.ybar + self.beta * (raw - self.ybar))
-        po = 1.0 - pois_cdf(math.floor(line), mu)
-        return {"mu": mu, "p_over": po, "p_under": 1.0 - po}
+        po, pu, pp = ou_probs_from_cdf(pois_cdf, mu, line)
+        return price_dict(mu, po, pu, pp)
 
 
 # ---------------- FINALIZAÇÕES / TOTAL DE CHUTES (Binomial Negativa) ----------------
@@ -118,8 +123,8 @@ class ShotsPricer:
         vcmu = (h["fH"] + a["aA"]) / 2 + (a["fA"] + h["aH"]) / 2
         lgtot = self.lgavg[lg]["lgH"] + self.lgavg[lg]["lgA"]
         mu = max(1.0, lgtot + self.beta * (vcmu - lgtot))
-        po = 1.0 - nb_cdf(math.floor(line), mu, self.phi)
-        return {"mu": mu, "p_over": po, "p_under": 1.0 - po}
+        po, pu, pp = ou_probs_from_cdf(nb_cdf, mu, line, self.phi)
+        return price_dict(mu, po, pu, pp)
 
 
 # ---------------- ESCANTEIOS (Ridge por lado + blend liga, Poisson) ----------------
@@ -166,8 +171,8 @@ class CornersPricer:
         ph = self._side("home", h, a, lgtot); pa = self._side("away", a, h, lgtot)
         bl = self.C["blend"]
         mu = max(1.0, (1 - bl) * (ph + pa) + bl * lgtot)
-        po = 1.0 - pois_cdf(math.floor(line), mu)
-        return {"mu": mu, "p_over": po, "p_under": 1.0 - po}
+        po, pu, pp = ou_probs_from_cdf(pois_cdf, mu, line)
+        return price_dict(mu, po, pu, pp)
 
 
 # ---------------- FALTAS (Binomial Negativa, μ recência de matches.json) ----------------
@@ -218,8 +223,8 @@ class FoulsPricer:
         if None in (fch, fsh, fca, fsa) or lg is None: return None
         mu = (fch + fsa) / 2 + (fca + fsh) / 2
         mup = lg + self.beta * (mu - lg)
-        po = 1.0 - nb_cdf(math.floor(line), mup, self.phi)
-        return {"mu": mup, "p_over": po, "p_under": 1.0 - po}
+        po, pu, pp = ou_probs_from_cdf(nb_cdf, mup, line, self.phi)
+        return price_dict(mup, po, pu, pp)
 
 
 if __name__ == "__main__":

@@ -203,10 +203,14 @@ def main():
         time.sleep(random.uniform(0.15, 0.3))
         if not allm: continue
         # :ALL já traz Selections com preço — não precisa 2ª ida (e cobre nomes com time no MarketType)
-        merc, merc_t = {}, {}
+        # Famílias por (canon, market_type_id) — NÃO mesclar MarketTypes diferentes
+        # só porque canon(name) colidiu (brief §4 auditoria 2026-07-14).
+        families = {}       # canon -> {family_key: {meta, lines_by_L}}
+        families_t = {}     # canon -> team -> {family_key: ...}
         for m in allm:
             mt = m.get("MarketType") or {}
             mname = mt.get("Name") or m.get("Name") or ""
+            mt_id = mt.get("_id") or mt.get("Id") or mt.get("id") or mname
             c = canon(mname)
             ct = None if c else canon_team(mname)
             if not c and not ct: continue
@@ -225,21 +229,86 @@ def main():
             arr = [{"linha": L, "over": v["over"], "under": v["under"]}
                    for L, v in sorted(lines.items()) if "over" in v and "under" in v]
             if not arr: continue
+            fam_key = str(mt_id)
+            meta = {
+                "market_type_id": mt_id,
+                "market_type_name": mname,
+                "period": mt.get("Period") or m.get("Period") or "full",
+                "scope": "match" if c else "team",
+            }
             if c:
-                # se várias linhas/mercados do mesmo canon, mescla
-                prev = {x["linha"]: x for x in merc.get(c, [])}
-                for row in arr: prev[row["linha"]] = row
-                merc[c] = [prev[L] for L in sorted(prev)]
+                slot = families.setdefault(c, {})
+                prev = slot.get(fam_key)
+                if prev is None:
+                    slot[fam_key] = {"meta": meta, "by_line": {row["linha"]: row for row in arr}}
+                else:
+                    # mesma família: mescla linhas (mesmo MarketType)
+                    for row in arr:
+                        prev["by_line"][row["linha"]] = row
             else:
                 c2, team = ct
-                prev = {x["linha"]: x for x in merc_t.get(c2, {}).get(team, [])}
-                for row in arr: prev[row["linha"]] = row
-                merc_t.setdefault(c2, {})[team] = [prev[L] for L in sorted(prev)]
+                slot = families_t.setdefault(c2, {}).setdefault(team, {})
+                prev = slot.get(fam_key)
+                if prev is None:
+                    slot[fam_key] = {"meta": meta, "by_line": {row["linha"]: row for row in arr}}
+                else:
+                    for row in arr:
+                        prev["by_line"][row["linha"]] = row
+
+        def _pick_family(fams):
+            """Escolhe uma família canônica por regra determinística.
+
+            Preferência: mais linhas O/U válidas; empate → nome com 'total'/'mais/menos';
+            empate → market_type_id lexicograficamente menor.
+            """
+            if not fams:
+                return None, []
+            scored = []
+            for fk, blob in fams.items():
+                by = blob["by_line"]
+                n = len(by)
+                nm = (blob["meta"].get("market_type_name") or "").lower()
+                prefer = 1 if ("total" in nm or "mais/menos" in nm or "mais menos" in nm) else 0
+                # penaliza nomes ambíguos de período (já filtrados em canon, reforço)
+                if any(x in nm for x in ("1º", "2º", "primeiro", "segundo", "tempo", "ht")):
+                    prefer -= 5
+                scored.append((-n, -prefer, str(fk), fk, blob))
+            scored.sort()
+            best_fk, best = scored[0][3], scored[0][4]
+            arr = [best["by_line"][L] for L in sorted(best["by_line"])]
+            # anota meta na 1ª linha (board pode ignorar campos extras)
+            if arr:
+                arr = [{**row,
+                        "market_type_id": best["meta"].get("market_type_id"),
+                        "market_type_name": best["meta"].get("market_type_name"),
+                        "scope": best["meta"].get("scope"),
+                        } for row in arr]
+            dropped = [{"family": s[3], "n_lines": -s[0],
+                        "name": (s[4]["meta"].get("market_type_name") or "")}
+                       for s in scored[1:]]
+            return arr, dropped
+
+        merc, merc_t = {}, {}
+        fam_log = []
+        for c, fams in families.items():
+            arr, dropped = _pick_family(fams)
+            if arr:
+                merc[c] = arr
+            if dropped:
+                fam_log.append({"canon": c, "kept": arr[0].get("market_type_name") if arr else None,
+                                "dropped": dropped})
+        for c2, by_team in families_t.items():
+            for team, fams in by_team.items():
+                arr, dropped = _pick_family(fams)
+                if arr:
+                    merc_t.setdefault(c2, {})[team] = arr
         if not merc and not merc_t: continue
         name = (e.get("EventName") or "").replace(" vs ", " - ")
         rec = {"casa": "7k", "event_id": eid, "name": name, "league": e.get("LeagueName"),
-               "start": e.get("StartEventDate"), "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"), "mercados": merc}
+               "start": e.get("StartEventDate"), "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+               "mercados": merc}
         if merc_t: rec["mercados_time"] = merc_t
+        if fam_log: rec["_family_choices"] = fam_log
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
         if n_out % 10 == 0: write_latest(n_out, promote=False)

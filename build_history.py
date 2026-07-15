@@ -208,8 +208,22 @@ def main():
     for k, v in settled:
         casa, gid, gk, mercado, linha, lado = row_ids(k, v)
         ots, kts = ts(v.get("open_ts")), ts(v.get("kickoff"))
-        clv_valido = bool(v.get("open_odd") and v.get("close_odd") and ots and kts and ots < kts)
-        q = v.get("capture_quality") or compute_capture_quality(v)
+        # CLV válido (brief P1): settled + open/close pré-KO + quality aceita + odds válidas
+        cts = ts(v.get("close_ts"))
+        q_raw = v.get("capture_quality") or compute_capture_quality(v)
+        # capture_quality é string (full_prematch|late_open|no_close|post_kickoff|…)
+        q_band = (q_raw.get("band") if isinstance(q_raw, dict) else q_raw) or ""
+        quality_ok = q_band in ("full_prematch", "late_open")  # open+close pré-KO
+        clv_valido = bool(
+            v.get("status") == "settled"
+            and v.get("open_odd") and v.get("close_odd")
+            and float(v.get("open_odd") or 0) > 1 and float(v.get("close_odd") or 0) > 1
+            and ots and cts and kts
+            and ots < kts and cts < kts
+            and v.get("won") is not None  # exclui push (won=None)
+            and quality_ok
+        )
+        q_out = q_raw
         home = v.get("home_raw") or v.get("home_norm") or ""
         away = v.get("away_raw") or v.get("away_norm") or ""
         liquidadas.append({
@@ -220,8 +234,9 @@ def main():
             "open": v.get("open_odd"), "close": v.get("close_odd"),
             "clv": v.get("clv_pct"), "beat": v.get("beat_close"),
             "result": v.get("result"), "won": v.get("won"),
-            "n_moves": v.get("n_moves", 0), "kickoff": v.get("kickoff"),
-            "clv_valido": clv_valido, "quality": q,
+            "n_moves": v.get("n_moves", 0), "n_obs": v.get("n_obs", 0),
+            "kickoff": v.get("kickoff"),
+            "clv_valido": clv_valido, "quality": q_out,
             "sofa_id": v.get("sofa_id"), "match_method": v.get("match_method"),
         })
     liquidadas.sort(key=lambda x: x["kickoff"] or "", reverse=True)

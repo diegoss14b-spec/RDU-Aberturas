@@ -306,9 +306,18 @@
     var staleSet = {};
     (j.stale_casas || []).forEach(function (c) { staleSet[c] = 1; });
     var frCard = freshness();
+    var gs = j.game_state || "unknown";
+    var gsLabel = { upcoming: "próximo", started: "iniciado", finished: "encerrado", unknown: "sem horário" }[gs] || gs;
+    // valor strip só acionável se upcoming e board fresco
+    var valActionable = gs === "upcoming" && !frCard.stale;
+    var valStripSafe = valActionable ? valStrip
+      : (gs === "started" || gs === "finished"
+        ? '<div class="val-strip muted">Jogo ' + esc(gsLabel) + ' — valor não acionável</div>'
+        : (frCard.stale ? '<div class="val-strip muted">Board desatualizado — valor desabilitado</div>' : valStrip));
     el.innerHTML =
       '<div class="g-top"><div><div class="g-name">' + esc(j.jogo) +
-      ' <span class="fresh-dot ' + frCard.band + '" title="Frescor da mesa: ' + esc(frCard.txt) + '"></span></div>' +
+      ' <span class="fresh-dot ' + frCard.band + '" title="Frescor da mesa: ' + esc(frCard.txt) + '"></span>' +
+      ' <span class="g-state ' + esc(gs) + '">' + esc(gsLabel) + '</span></div>' +
       '<div class="g-liga">' + esc(j.liga || "") + "</div>" +
       '<div class="houses">' + Object.keys(allHouses).map(function (c) {
         return '<span class="house' + (staleSet[c] ? " house-stale" : "") + '"' +
@@ -320,7 +329,7 @@
         : "") +
       "</div>" +
       '<div class="g-when">' + esc(j.inicio) + "</div></div>" +
-      valStrip +
+      valStripSafe +
       grid;
 
     // wire alt toggles per column

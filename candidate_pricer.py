@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 """candidate_pricer.py — precificadores dos MODELOS NOVOS (candidatos MAE 2026-07-13).
 
-Drop-in dos pricers antigos (value_pricers.py): mesma interface
-  price(lg, home_id, away_id, line) -> {"mu": float, "p_over": float, "p_under": float} | None
+TITULAR do BOARD.valor desde 15/07 (modelos novos promovidos pelo Diego em 14/07;
+rollback via FORCE_LEGACY_BOARD=1 no build_board). Mesma interface dos oficiais:
+  price(lg, home_id, away_id, line) ->
+    {mu, p_over_win, p_under_win, p_push, p_over, p_under} | None
 
 Carrega mu bruto pré-computado (bundle candidate_pricer_data.json, keyed por (comp, sofa_id))
 e recalcula a probabilidade de QUALQUER linha via a distribuição calibrada OOF:
   mu_cal = a + b*mu_raw   (calibração linear OOF, congelada)
-  Over X.5 = total >= floor(X)+1  ->  P(over) = 1 - CDF(floor(linha), mu_cal)
-  CDF = Binomial Negativa parametrizada por 'size' phi (var = mu + mu²/phi), idêntica à das
-        páginas dos modelos (scipy nbinom(n=phi, p=phi/(phi+mu))); phi None => Poisson.
+  CDF = Binomial Negativa size-φ (var = mu + mu²/phi); phi None => Poisson.
+  Linha inteira: push mass explícita (pricing_math.ou_probs_from_cdf).
 
-Isso garante que a Mesa e a página do modelo mostrem a MESMA probabilidade nas linhas padrão.
-Times fora do bundle (promovidos/rebaixados sem amostra) -> None (board não aposta)."""
+Times fora do bundle (promovidos/rebaixados sem amostra) -> None."""
 import json, math
 from pathlib import Path
+from pricing_math import ou_probs_from_cdf, price_dict
 
 ROOT = Path(__file__).resolve().parent
 BUNDLE_PATH = ROOT / "data" / "candidate_pricer_data.json"
@@ -81,9 +82,9 @@ class _Pricer:
         if mu_raw is None:
             return None
         mu_cal = max(0.1, self.a + self.b * float(mu_raw))
-        po = 1.0 - _nb_cdf_size(math.floor(line), mu_cal, self.phi)
-        po = min(1.0, max(0.0, po))
-        return {"mu": float(mu_raw), "p_over": po, "p_under": 1.0 - po}
+        po, pu, pp = ou_probs_from_cdf(_nb_cdf_size, mu_cal, line, self.phi)
+        # mu exposto = raw (compat com board/UI); probs usam mu_cal
+        return price_dict(float(mu_raw), po, pu, pp)
 
 
 class CardsPricer(_Pricer):
