@@ -57,6 +57,26 @@ jobs:
           if os.environ.get('EVENT') == 'schedule' and os.environ.get('SCHEDULE') == FULL_CRON:
               emit('full', f"cron horario ({os.environ.get('SCHEDULE')})")
 
+          # AUTOCURA contra cron engolido: o agendador do GitHub descarta boa parte dos
+          # disparos (medido 15/07: 4 crons/h configurados → ~0,6 rodada/h chegando; as
+          # rodadas de 03:00 e 04:00 UTC simplesmente não vieram). Reconhecer o cron certo
+          # não adianta se ele nunca chega. Então QUALQUER rodada agendada que encontre o
+          # board vencido faz o full que o horário deveria ter feito. Usa a idade do board
+          # AO VIVO (o que o usuário vê) — é exatamente o invariante que interessa.
+          BOARD_MAX_MIN = 75
+          try:
+              tb = urllib.request.urlopen(
+                  'https://valor-rdu.netlify.app/data/board.js', timeout=20).read().decode()
+              gb = json.loads(tb.split('=', 1)[1].rstrip().rstrip(';')).get('gerado')
+              bage = (now - dt.datetime.strptime(gb, '%Y-%m-%d %H:%M').replace(
+                  tzinfo=dt.timezone(dt.timedelta(hours=-3)))).total_seconds() / 60
+              print(f'board ao vivo: {gb} ({bage:.0f}min)')
+              if bage > BOARD_MAX_MIN:
+                  # emit() levanta SystemExit — não é pego pelo except Exception abaixo
+                  emit('full', f'board vencido ({bage:.0f}min) — recupera cron perdido')
+          except Exception as e:
+              print('board-age check falhou (segue):', e)
+
           def gh(path):
               req = urllib.request.Request(
                   f"https://api.github.com/repos/{os.environ['REPO']}/contents/{path}",
