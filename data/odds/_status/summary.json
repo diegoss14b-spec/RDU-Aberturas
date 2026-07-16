@@ -1,16 +1,23 @@
 {
- "ts_brt": "2026-07-16 08:51",
+ "ts_brt": "2026-07-16 09:10",
  "casas_ok": [
   "betano",
-  "superbet",
   "estrelabet",
-  "7k",
-  "pinnacle"
+  "7k"
  ],
- "casas_fail": [],
- "n_ok": 5,
- "n_fail": 0,
- "total_events": 329,
+ "casas_fail": [
+  {
+   "casa": "superbet",
+   "error": "exit=2"
+  },
+  {
+   "casa": "pinnacle",
+   "error": "exit=2"
+  }
+ ],
+ "n_ok": 3,
+ "n_fail": 2,
+ "total_events": 7,
  "deploy_allowed": true,
  "reason": "ok"
 }
