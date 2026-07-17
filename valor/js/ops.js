@@ -18,13 +18,26 @@
     var h = Math.floor(mins / 60), m = mins % 60;
     return "há " + h + "h" + (m ? " " + m + "min" : "");
   }
-  function liveAge(ts, fallback) {
-    if (!ts) return fallback;
+  function parseOpsTime(ts) {
+    if (!ts) return null;
     var s = String(ts).trim();
-    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) s = s.replace(" ", "T") + ":00-03:00";
-    var d = new Date(s), now = new Date();
-    if (isNaN(d.getTime())) return fallback;
-    return Math.max(0, Math.floor((now.getTime() - d.getTime()) / 60000));
+    var bare = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::(\d{2})(\.\d+)?)?$/;
+    var m = bare.exec(s);
+    if (m) {
+      s = m[1] + "T" + m[2] + ":" + (m[3] || "00") + (m[4] || "") + "-03:00";
+    } else {
+      s = s.replace(/^(\d{4}-\d{2}-\d{2})\s+/, "$1T");
+      s = s.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+    }
+    // Date.parse e inconsistente com fracoes acima de milissegundos em alguns browsers.
+    s = s.replace(/(\.\d{3})\d+(?=(?:Z|[+-]\d{2}:?\d{2})$)/, "$1");
+    var ms = Date.parse(s);
+    return isNaN(ms) ? null : ms;
+  }
+  function liveAge(ts, fallback) {
+    var ms = parseOpsTime(ts);
+    if (ms == null) return fallback;
+    return Math.max(0, Math.floor((Date.now() - ms) / 60000));
   }
   function clsRate(r) {
     if (r == null) return "";
@@ -273,4 +286,11 @@
     foot = settleHtml + foot;
     root.innerHTML = head + kpiHtml + avHtml + casaTbl + heatHtml + mercHtml + soonHtml + histHtml + foot;
   };
+
+  window.setInterval(function () {
+    var view = document.getElementById("view-ops");
+    if (!view || view.hidden) return;
+    window.renderOps();
+  }, 60000);
+
 })();

@@ -120,6 +120,28 @@ class FrontendFailClosedTests(unittest.TestCase):
         self.assertIn('stale: true, band: "unk"', board)
         self.assertIn("return j.sofa_id ? score : Math.min(score, 69)", valor)
 
+    def test_runtime_views_recompute_time_only_when_visible(self):
+        board = Path("valor/js/board.js").read_text(encoding="utf-8")
+        valor = Path("valor/js/valor.js").read_text(encoding="utf-8")
+        ops = Path("valor/js/ops.js").read_text(encoding="utf-8")
+        self.assertIn("function liveGameState(j, nowMs)", board)
+        self.assertIn('j.game_state === "finished"', board)
+        self.assertIn('return now >= kickoff ? "started" : "upcoming"', board)
+        self.assertIn('return "unknown"', board)
+        self.assertIn("var gs = liveGameState(j);", board)
+        self.assertIn("if (!valActionable)", board)
+        self.assertIn('document.getElementById("view-board")', board)
+        self.assertIn('document.getElementById("view-valor")', valor)
+        self.assertIn('document.getElementById("view-ops")', ops)
+        for source in (board, valor, ops):
+            self.assertIn("view.hidden", source)
+            self.assertIn("}, 60000);", source)
+        self.assertIn("function parseOpsTime(ts)", ops)
+        self.assertIn("bare.exec(s)", ops)
+        self.assertIn('"$1:$2"', ops)
+        self.assertIn("Date.now() - ms", ops)
+
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -49,6 +49,16 @@
     return Date.parse(year + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2) +
       "T" + ("0" + m[3]).slice(-2) + ":" + m[4] + ":00-03:00");
   }
+  function liveGameState(j, nowMs) {
+    if (j && j.game_state === "finished") return "finished";
+    var kickoff = gameEpoch(j);
+    if (!isFinite(kickoff) || kickoff === Number.MAX_SAFE_INTEGER) return "unknown";
+    var now = typeof nowMs === "number" ? nowMs : Date.now();
+    return now >= kickoff ? "started" : "upcoming";
+  }
+
+
+
 
   function freshness() {
     var ms = parseBrt(B.gerado_iso || B.gerado);
@@ -325,7 +335,7 @@
     var staleSet = {};
     (j.stale_casas || []).forEach(function (c) { staleSet[c] = 1; });
     var frCard = freshness();
-    var gs = j.game_state || "unknown";
+    var gs = liveGameState(j);
     var gsLabel = { upcoming: "próximo", started: "iniciado", finished: "encerrado", unknown: "sem horário" }[gs] || gs;
     // valor strip só acionável se upcoming e board fresco
     var valActionable = gs === "upcoming" && !frCard.stale;
@@ -333,6 +343,12 @@
       : (gs === "started" || gs === "finished"
         ? '<div class="val-strip muted">Jogo ' + esc(gsLabel) + ' — valor não acionável</div>'
         : (frCard.stale ? '<div class="val-strip muted">Board desatualizado — valor desabilitado</div>' : valStrip));
+    // Fail closed: estado desconhecido/iniciado ou board stale nunca herda a faixa acionavel.
+    if (!valActionable) {
+      valStripSafe = vals.length
+        ? '<div class="val-strip muted">' + (frCard.stale ? "Board desatualizado" : ("Jogo " + esc(gsLabel))) + ' &mdash; valor n&atilde;o acion&aacute;vel</div>'
+        : "";
+    }
     el.innerHTML =
       '<div class="g-top"><div><div class="g-name">' + esc(j.jogo) +
       ' <span class="fresh-dot ' + frCard.band + '" title="Frescor da mesa: ' + esc(frCard.txt) + '"></span>' +
@@ -454,6 +470,15 @@
     disc.innerHTML = "Odds capturadas num instante — <b>podem ter movido</b>. Main line = menor gap Mais/Menos (só cluster de partida). " +
       "Linhas de time só quando a casa publica (ex.: Superbet Fin / Betano Cartões).";
   }
+
+  window.setInterval(function () {
+    var view = document.getElementById("view-board");
+    if (!view || view.hidden) return;
+    var sx = window.scrollX || 0;
+    var sy = window.scrollY || 0;
+    render();
+    if (typeof window.scrollTo === "function") window.scrollTo(sx, sy);
+  }, 60000);
 
   render();
 })();

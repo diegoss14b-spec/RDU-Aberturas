@@ -1,10 +1,13 @@
 import os
+import tempfile
+from pathlib import Path
 import unittest
 from unittest.mock import patch
 
 from gate_board import (
     baseline_reasons,
     board_coverage,
+    clear_blocked_marker,
     sofa_reasons,
     status_reasons,
 )
@@ -20,6 +23,14 @@ def game(idx, houses=("A", "B"), market="Faltas", sofa=True, value=False):
 
 
 class GateHealthTest(unittest.TestCase):
+    def test_clear_blocked_marker_removes_stale_file_and_tolerates_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / "blocked_deploy.json"
+            marker.write_text("{}", encoding="utf-8")
+            clear_blocked_marker(marker)
+            self.assertFalse(marker.exists())
+            clear_blocked_marker(marker)
+
     def test_coverage_counts_per_house_market_and_value_fixture(self):
         cov = board_coverage({"jogos": [
             game(1, market="Faltas", sofa=True, value=True),

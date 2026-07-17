@@ -223,4 +223,11 @@
       };
     });
   }
+
+  window.setInterval(function () {
+    var view = document.getElementById("view-valor");
+    if (!view || view.hidden) return;
+    window.renderValor();
+  }, 60000);
+
 })();

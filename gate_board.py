@@ -125,6 +125,12 @@ def load_json(path):
     except Exception: return {}
 
 
+def clear_blocked_marker(path=None):
+    """Remove a stale deploy-block marker after a successful gate."""
+    marker = Path(path) if path is not None else STATUS / "blocked_deploy.json"
+    marker.unlink(missing_ok=True)
+
+
 def load_sofa_state(status):
     out = dict(status or {})
     ptr = ROOT / "data" / "fixtures" / "sofa_latest.json"
@@ -194,6 +200,7 @@ def main():
         print("[gate] ❌ DEPLOY BLOQUEADO — site antigo permanece no ar:")
         for reason in reasons: print(f"   - {reason}")
         sys.exit(3)
+    clear_blocked_marker()
     print("[gate] ✅ liberado pra deploy")
     sys.exit(0)
 
