@@ -175,8 +175,7 @@ def main():
     from capture_common import write_odds_latest
     def write_latest(n, promote=False):
         write_odds_latest("estrelabet", out_path.name, n,
-                          at=now.isoformat(timespec="seconds"), promote_full=promote)
-    write_latest(0, promote=False)
+                          at=now.isoformat(timespec="seconds"), promote_full=promote, min_events=MIN_EFF)
 
     # Detalhes em PARALELO. O proxy BR (nuvem) é ~3x mais lento por request mas NÃO rate-limita
     # (todos 200 mesmo sequencial) → 200 fetches em série estouravam o timeout e davam exit=2.
@@ -235,7 +234,6 @@ def main():
         if merc_t: rec["mercados_time"] = merc_t
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
-        if n_out % 15 == 0: write_latest(n_out, promote=False)
     f.close(); write_latest(n_out, promote=None)
     print(f"[estrelabet] {n_det} detalhes · {n_out} jogos com mercado de estatística salvos em {out_path.name}")
     return n_out

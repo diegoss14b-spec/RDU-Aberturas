@@ -1,94 +1,61 @@
 # -*- coding: utf-8 -*-
-"""fetch_fixtures_sofascore.py — calendário canônico de jogos (base da unificação de nomes).
-
-Puxa próximos jogos das ligas-alvo na API SofaScore e grava:
-  data/fixtures/sofa_{stamp}.json + sofa_latest.json
-
-Uso no build_board: cada odd de casa é encaixada num fixture sofa
-(horário ± janela + fuzzy de times, com atalho '1 lado forte no mesmo horário').
-"""
-import sys, os, json, time
+"""Calendário canônico SofaScore com promoção e fallback atômicos/observáveis."""
+import sys, os, json, time, math
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 if sys.stdout is None or not hasattr(sys.stdout, "write"):
     sys.stdout = open(os.devnull, "w")
-try:
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-except Exception:
-    pass
+try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except Exception: pass
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "data" / "fixtures"
 OUT.mkdir(parents=True, exist_ok=True)
 BRT = timezone(timedelta(hours=-3))
-H = {
-    "User-Agent": "Mozilla/5.0 Chrome/124.0.0.0",
-    "Accept": "*/*",
-    "Origin": "https://www.sofascore.com",
-    "Referer": "https://www.sofascore.com/",
-    "x-requested-with": "XMLHttpRequest",
-}
-# (uniqueTournamentId, label). Season = 1ª de /seasons. 404 soft-skip.
-TOURNAMENTS = [
-    (325, "BR-A"),
-    (390, "BR-B"),
-    (373, "BR-CdB"),
-    (16, "WC"),
-    (7, "UCL"),
-    (679, "UEL"),
-    (17, "EPL"),
-    (8, "LaLiga"),
-    (23, "SerieA"),
-    (35, "Bundesliga"),
-    (34, "Ligue1"),
-    (242, "MLS"),
-    (648, "Argentina"),
-    (136, "CSL"),
-    (40, "Allsvenskan"),
-    (278, "Uruguay"),
-    (240, "Ecuador"),
-    (203, "Russia"),
-    (20, "Eliteserien"),
-]
+from capture_common import (
+    _atomic_write_text, _cleanup_snapshot_versions, _immutable_text_snapshot,
+    pointer_age_hours, classify_error, STATUS_DIR,
+)
 
-DAYS_AHEAD = 7          # só grava jogos em [agora-6h, agora+N dias]
-MAX_PAGES = 6           # pages de /events/next/{page}
+H = {"User-Agent": "Mozilla/5.0 Chrome/124.0.0.0", "Accept": "*/*",
+     "Origin": "https://www.sofascore.com", "Referer": "https://www.sofascore.com/",
+     "x-requested-with": "XMLHttpRequest"}
+TOURNAMENTS = [
+    (325, "BR-A"), (390, "BR-B"), (373, "BR-CdB"), (16, "WC"),
+    (7, "UCL"), (679, "UEL"), (17, "EPL"), (8, "LaLiga"),
+    (23, "SerieA"), (35, "Bundesliga"), (34, "Ligue1"), (242, "MLS"),
+    (648, "Argentina"), (136, "CSL"), (40, "Allsvenskan"), (278, "Uruguay"),
+    (240, "Ecuador"), (203, "Russia"), (20, "Eliteserien"),
+]
+DAYS_AHEAD = 7
+MAX_PAGES = 6
+STABLE_FILE = "sofa_latest_data.json"
 
 
 def get(url, tries=3):
     try:
         from curl_cffi import requests as creq
-        for a in range(tries):
-            try:
-                r = creq.get(url, headers=H, impersonate="chrome124", timeout=25)
-                if r.status_code == 200 and r.text[:1] in "{[":
-                    return r.json()
-                if r.status_code == 404:
-                    return None
-            except Exception:
-                pass
-            time.sleep(0.8 * (a + 1))
+        getter = lambda u: creq.get(u, headers=H, impersonate="chrome124", timeout=25)
     except ImportError:
         import requests
-        for a in range(tries):
-            try:
-                r = requests.get(url, headers=H, timeout=25)
-                if r.status_code == 200 and r.text[:1] in "{[":
-                    return r.json()
-                if r.status_code == 404:
-                    return None
-            except Exception:
-                pass
-            time.sleep(0.8 * (a + 1))
+        getter = lambda u: requests.get(u, headers=H, timeout=25)
+    for a in range(tries):
+        try:
+            r = getter(url)
+            if r.status_code == 200 and r.text[:1] in "{[":
+                return r.json()
+            if r.status_code == 404:
+                return None
+        except Exception:
+            pass
+        time.sleep(0.8 * (a + 1))
     return None
 
 
 def season_id(utid):
     d = get(f"https://api.sofascore.com/api/v1/unique-tournament/{utid}/seasons")
     seas = (d or {}).get("seasons") or []
-    if not seas:
-        return None
-    return seas[0].get("id")
+    return seas[0].get("id") if seas else None
 
 
 def fetch_tournament(utid, label):
@@ -100,123 +67,137 @@ def fetch_tournament(utid, label):
     for page in range(MAX_PAGES):
         d = get(f"https://api.sofascore.com/api/v1/unique-tournament/{utid}/season/{sid}/events/next/{page}")
         evs = (d or {}).get("events") or []
-        if not evs:
-            break
+        if not evs: break
         out.extend(evs)
         time.sleep(0.25)
-        if len(evs) < 10:
-            break
+        if len(evs) < 10: break
     print(f"[sofa] {label} utid={utid} season={sid}: {len(out)} eventos")
     return out
 
 
 def normalize_event(e, label):
-    home = (e.get("homeTeam") or {})
-    away = (e.get("awayTeam") or {})
+    home, away = e.get("homeTeam") or {}, e.get("awayTeam") or {}
     ts = e.get("startTimestamp")
-    if not ts or not home.get("name") or not away.get("name"):
-        return None
+    if not ts or not home.get("name") or not away.get("name"): return None
     start_utc = datetime.fromtimestamp(int(ts), tz=timezone.utc)
     start_brt = start_utc.astimezone(BRT)
-    tour = e.get("tournament") or {}
-    ut = tour.get("uniqueTournament") or {}
+    tour = e.get("tournament") or {}; ut = tour.get("uniqueTournament") or {}
     return {
-        "sofa_id": e.get("id"),
-        "home": home.get("name"),
-        "away": away.get("name"),
-        "home_id": home.get("id"),
-        "away_id": away.get("id"),
+        "sofa_id": e.get("id"), "home": home.get("name"), "away": away.get("name"),
+        "home_id": home.get("id"), "away_id": away.get("id"),
         "home_code": home.get("nameCode") or home.get("shortName") or "",
         "away_code": away.get("nameCode") or away.get("shortName") or "",
-        "start_utc": start_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "start_ts": int(ts),
-        "day_brt": start_brt.strftime("%Y-%m-%d"),
-        "time_brt": start_brt.strftime("%H:%M"),
+        "start_utc": start_utc.strftime("%Y-%m-%dT%H:%M:%SZ"), "start_ts": int(ts),
+        "day_brt": start_brt.strftime("%Y-%m-%d"), "time_brt": start_brt.strftime("%H:%M"),
         "inicio": start_brt.strftime("%d/%m %H:%M"),
         "league": tour.get("name") or ut.get("name") or label,
-        "league_id": ut.get("id"),
-        "label": label,
+        "league_id": ut.get("id"), "label": label,
         "status": (e.get("status") or {}).get("type") or (e.get("status") or {}).get("description") or "",
     }
 
 
-def main():
+def pointer_info():
+    ptr = OUT / "sofa_latest.json"
+    try:
+        meta = json.loads(ptr.read_text(encoding="utf-8"))
+        src = OUT / meta["file"]
+        data = json.loads(src.read_text(encoding="utf-8"))
+        n = len(data.get("fixtures") or [])
+        valid = n > 0 and n == int(meta.get("n") or 0)
+        return meta, src, n, valid, pointer_age_hours(meta)
+    except Exception:
+        return {}, None, 0, False, None
+
+
+def write_status(ok, n, min_required, promoted, error=None, t0=None):
+    meta, src, pointer_n, valid, age_h = pointer_info()
     now = datetime.now(timezone.utc)
-    t0 = now - timedelta(hours=6)
-    t1 = now + timedelta(days=DAYS_AHEAD)
-    seen = set()
-    fixtures = []
+    st = {
+        "casa": "sofa", "kind": "fixture", "ok": bool(ok),
+        "ts_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "ts_brt": now.astimezone(BRT).strftime("%Y-%m-%d %H:%M"),
+        "n_events": int(n or 0), "n_fixtures": int(n or 0), "n_markets": 0,
+        "min_events": min_required, "promoted": bool(promoted),
+        "pointer_valid": bool(valid), "pointer_file": meta.get("file"),
+        "pointer_at": meta.get("at") or meta.get("ts"), "pointer_n": pointer_n,
+        "pointer_age_h": round(age_h, 3) if age_h is not None else None,
+        "duration_sec": round(time.time() - t0, 1) if t0 else None,
+        "error": str(error)[:300] if error else None,
+        "error_class": classify_error(error) if error else None,
+    }
+    _atomic_write_text(STATUS_DIR / "sofa.json", json.dumps(st, ensure_ascii=False, indent=1))
+    return st
+
+
+def promote_fixture_snapshot(payload):
+    """Promove fixture imutável e troca o pointer somente como último passo."""
+    previous_meta, previous_src, _, previous_valid, _ = pointer_info()
+    if not previous_valid:
+        previous_meta, previous_src = {}, None
+    text = json.dumps(payload, ensure_ascii=False, indent=1)
+    stable = _immutable_text_snapshot(OUT / "_snapshots", "sofa", ".json", text)
+    check = json.loads(stable.read_text(encoding="utf-8"))
+    n = len(check.get("fixtures") or [])
+    if n <= 0 or n != len(payload.get("fixtures") or []):
+        raise ValueError("snapshot Sofa imutável falhou na revalidação")
+    rel = stable.relative_to(OUT).as_posix()
+    pointer = {"file": rel, "n": n, "at": payload["at"], "ts_utc": payload["ts_utc"]}
+    # O pointer anterior e seu alvo permanecem válidos até este rename atômico.
+    _atomic_write_text(OUT / "sofa_latest.json", json.dumps(pointer, ensure_ascii=False))
+    # Mantém a geração anterior para leitores que já tenham lido o pointer antigo.
+    _cleanup_snapshot_versions(OUT / "_snapshots", "sofa_*.json", [stable, previous_src])
+    return rel
+
+def main():
+    t0_clock = time.time()
+    now = datetime.now(timezone.utc); t0 = now - timedelta(hours=6); t1 = now + timedelta(days=DAYS_AHEAD)
+    seen, fixtures = set(), []
     for utid, label in TOURNAMENTS:
-        try:
-            raw = fetch_tournament(utid, label)
+        try: raw = fetch_tournament(utid, label)
         except Exception as ex:
-            print(f"[sofa] {label} erro: {ex}")
-            continue
+            print(f"[sofa] {label} erro: {ex}"); continue
         for e in raw:
             eid = e.get("id")
-            if not eid or eid in seen:
-                continue
+            if not eid or eid in seen: continue
             rec = normalize_event(e, label)
-            if not rec:
-                continue
+            if not rec: continue
             st = datetime.fromtimestamp(rec["start_ts"], tz=timezone.utc)
-            if st < t0 or st > t1:
-                continue
-            seen.add(eid)
-            fixtures.append(rec)
+            if st < t0 or st > t1: continue
+            seen.add(eid); fixtures.append(rec)
         time.sleep(0.2)
-
     fixtures.sort(key=lambda x: x["start_ts"])
-    stamp = datetime.now(BRT).strftime("%Y-%m-%d_%H%M")
-    payload = {
-        "gerado": datetime.now(BRT).strftime("%Y-%m-%d %H:%M"),
-        "fonte": "sofascore",
-        "n": len(fixtures),
-        "janela_dias": DAYS_AHEAD,
-        "fixtures": fixtures,
-    }
-    outp = OUT / f"sofa_{stamp}.json"
-    # snapshot diagnóstico sempre grava (mesmo vazio)
-    outp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
 
-    # P1 brief: zero fixtures NÃO promove sofa_latest por cima do último saudável
-    MIN_PROMOTE = 1
-    prev_ptr = OUT / "sofa_latest.json"
-    prev_n = 0
-    if prev_ptr.exists():
-        try:
-            prev_n = int(json.loads(prev_ptr.read_text(encoding="utf-8")).get("n") or 0)
-        except Exception:
-            prev_n = 0
-
+    prev_meta, _, prev_n, prev_valid, _ = pointer_info()
+    base_min = max(1, int(os.environ.get("SOFA_MIN_FIXTURES", "10")))
+    ratio = float(os.environ.get("SOFA_MIN_PREV_RATIO", "0.25"))
+    min_required = max(base_min, math.ceil(prev_n * ratio) if prev_valid else 0)
     n = len(fixtures)
-    if n >= MIN_PROMOTE:
-        prev_ptr.write_text(
-            json.dumps({"file": outp.name, "n": n, "at": payload["gerado"]}, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        print(f"[sofa] {n} fixtures em janela {DAYS_AHEAD}d → {outp.name} (promovido latest)")
+    now_brt = datetime.now(BRT)
+    payload = {
+        "gerado": now_brt.strftime("%Y-%m-%d %H:%M"),
+        "at": now_brt.isoformat(timespec="seconds"),
+        "ts_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "fonte": "sofascore", "n": n, "janela_dias": DAYS_AHEAD, "fixtures": fixtures,
+    }
+    promoted = n >= min_required
+    if promoted:
+        stable_file = promote_fixture_snapshot(payload)
+        write_status(True, n, min_required, True, t0=t0_clock)
+        print(f"[sofa] {n} fixtures em {DAYS_AHEAD}d → {stable_file} (promovido atomicamente)")
     else:
-        # grava diagnóstico mas mantém pointer anterior
-        diag = OUT / f"sofa_{stamp}_EMPTY.json"
-        diag.write_text(json.dumps({
-            "gerado": payload["gerado"], "n": 0, "reason": "empty_window",
-            "snapshot": outp.name, "kept_prev_n": prev_n,
-        }, ensure_ascii=False, indent=1), encoding="utf-8")
-        print(f"[sofa] ⚠ 0 fixtures — NÃO promovi sofa_latest (prev n={prev_n}). diag={diag.name}")
-    for f in fixtures[:8]:
-        print(f"  {f['inicio']} · {f['home']} - {f['away']} · {f['league']}")
-    return n
+        err = f"snapshot não saudável: n={n}, mínimo={min_required}; fallback preservado n={prev_n}"
+        write_status(False, n, min_required, False, error=err, t0=t0_clock)
+        print(f"[sofa] ⚠ {err}")
+    for f in fixtures[:8]: print(f"  {f['inicio']} · {f['home']} - {f['away']} · {f['league']}")
+    return promoted
 
 
 if __name__ == "__main__":
-    try:
-        n = main() or 0
-        # exit ≠ 0 se vazio (hard fail configurável — brief P1 §7.2)
-        if n < 1:
-            print("[sofa] exit 2: janela sem fixtures (snapshot vazio não promoveu latest)")
-            sys.exit(2)
-        sys.exit(0)
-    except Exception as e:
-        print("[sofa] FAIL", e)
+    started = time.time()
+    try: sys.exit(0 if main() else 2)
+    except BaseException as exc:
+        if isinstance(exc, SystemExit): raise
+        print("[sofa] FAIL", exc)
+        write_status(False, 0, int(os.environ.get("SOFA_MIN_FIXTURES", "10")), False,
+                     error=exc, t0=started)
         sys.exit(1)

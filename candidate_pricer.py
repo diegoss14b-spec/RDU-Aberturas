@@ -4,7 +4,9 @@
 TITULAR do BOARD.valor desde 15/07 (modelos novos promovidos pelo Diego em 14/07;
 rollback via FORCE_LEGACY_BOARD=1 no build_board). Mesma interface dos oficiais:
   price(lg, home_id, away_id, line) ->
-    {mu, p_over_win, p_under_win, p_push, p_over, p_under} | None
+    {mu, mu_cal, mu_raw, p_over_win, p_under_win, p_push, p_over, p_under} | None
+
+``mu`` e ``mu_cal`` são a média calibrada realmente usada na CDF; ``mu_raw`` é apenas diagnóstico.
 
 Carrega mu bruto pré-computado (bundle candidate_pricer_data.json, keyed por (comp, sofa_id))
 e recalcula a probabilidade de QUALQUER linha via a distribuição calibrada OOF:
@@ -83,8 +85,10 @@ class _Pricer:
             return None
         mu_cal = max(0.1, self.a + self.b * float(mu_raw))
         po, pu, pp = ou_probs_from_cdf(_nb_cdf_size, mu_cal, line, self.phi)
-        # mu exposto = raw (compat com board/UI); probs usam mu_cal
-        return price_dict(float(mu_raw), po, pu, pp)
+        out = price_dict(mu_cal, po, pu, pp)
+        out["mu_raw"] = float(mu_raw)
+        out["mu_cal"] = float(mu_cal)
+        return out
 
 
 class CardsPricer(_Pricer):

@@ -242,8 +242,7 @@ def main():
     from capture_common import write_odds_latest
     def write_latest(n, promote=False):
         write_odds_latest("7k", out_path.name, n,
-                          at=now.isoformat(timespec="seconds"), promote_full=promote)
-    write_latest(0, promote=False)
+                          at=now.isoformat(timespec="seconds"), promote_full=promote, min_events=MIN_EFF)
     f = open(out_path, "w", encoding="utf-8")
     n_out = 0
     for e in cand:
@@ -327,7 +326,6 @@ def main():
         if fam_log: rec["_family_choices"] = fam_log
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
-        if n_out % 10 == 0: write_latest(n_out, promote=False)
     f.close(); write_latest(n_out, promote=None)
     print(f"[7k] {n_out} jogos com mercado de estatística salvos em {out_path.name}")
     return n_out

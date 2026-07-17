@@ -1,15 +1,12 @@
 name: Mesa de Aberturas (valor)
 
-# 14/07 — densificação close (P1):
-#   full  = :00 UTC captura cheia + board + deploy
-#   close = jogo em ≤90min e última captura ≥12min (janela 2.5h, sem deploy)
-#   skip  = captura <12min
-# Extra crons :15/:30/:45 só pra close denso perto do apito.
-
+# Rodada full em :07 UTC: captura completa, board, gate e deploy.
+# Rodadas :22/:37/:52: somente fechamento quando houver jogo iminente.
+# O watchdog independente em :17/:47 recupera um full perdido quando o board passa de 90 min.
 on:
   schedule:
-    - cron: "0 * * * *"           # full candidate
-    - cron: "15,30,45 * * * *"    # close densify
+    - cron: "7 * * * *"           # full candidate
+    - cron: "22,37,52 * * * *"    # close densify
   workflow_dispatch: {}           # manual = sempre full
 
 permissions:
@@ -49,11 +46,11 @@ jobs:
           if os.environ.get('EVENT') == 'workflow_dispatch':
               emit('full', 'manual')
 
-          # O cron HORÁRIO ("0 * * * *") = SEMPRE full — é o único momento em que o board é
+          # O cron HORÁRIO ("7 * * * *") = SEMPRE full — é o único momento em que o board é
           # montado e deployado. Identificado pela EXPRESSÃO do cron (github.event.schedule),
           # não pelo relógio: o GitHub atrasa o disparo e minute==0 quase nunca acontece.
-          # A densificação close fica só no cron ":15,30,45".
-          FULL_CRON = '0 * * * *'
+          # A densificação close fica só no cron ":22/:37/:52".
+          FULL_CRON = '7 * * * *'
           if os.environ.get('EVENT') == 'schedule' and os.environ.get('SCHEDULE') == FULL_CRON:
               emit('full', f"cron horario ({os.environ.get('SCHEDULE')})")
 
@@ -67,10 +64,19 @@ jobs:
           try:
               tb = urllib.request.urlopen(
                   'https://valor-rdu.netlify.app/data/board.js', timeout=20).read().decode()
-              gb = json.loads(tb.split('=', 1)[1].rstrip().rstrip(';')).get('gerado')
-              bage = (now - dt.datetime.strptime(gb, '%Y-%m-%d %H:%M').replace(
-                  tzinfo=dt.timezone(dt.timedelta(hours=-3)))).total_seconds() / 60
-              print(f'board ao vivo: {gb} ({bage:.0f}min)')
+              board = json.loads(tb.split('=', 1)[1].rstrip().rstrip(';'))
+              stamp = board.get('gerado_iso') or board.get('gerado')
+              if not stamp:
+                  raise ValueError('board sem timestamp')
+              if 'T' in stamp:
+                  parsed = dt.datetime.fromisoformat(stamp.replace('Z', '+00:00'))
+                  if parsed.tzinfo is None:
+                      parsed = parsed.replace(tzinfo=dt.timezone(dt.timedelta(hours=-3)))
+              else:
+                  parsed = dt.datetime.strptime(stamp, '%Y-%m-%d %H:%M').replace(
+                      tzinfo=dt.timezone(dt.timedelta(hours=-3)))
+              bage = (now - parsed).total_seconds() / 60
+              print(f'board ao vivo: {stamp} ({bage:.0f}min)')
               if bage > BOARD_MAX_MIN:
                   # emit() levanta SystemExit — não é pego pelo except Exception abaixo
                   emit('full', f'board vencido ({bage:.0f}min) — recupera cron perdido')
@@ -118,10 +124,10 @@ jobs:
               if soon and age_min >= 12:
                   emit('close', f'{soon} jogos em ≤90min (ultima captura ha {age_min:.0f}min)')
 
-              # Só chega aqui, vindo de cron, o de densificação (:15/:30/:45) — o horário já
+              # Só chega aqui, vindo de cron, o de densificação (:22/:37/:52) — o horário já
               # saiu como full lá em cima. Sem jogo iminente, ele não tem o que fazer.
               if os.environ.get('EVENT') == 'schedule':
-                  emit('skip', f"cron densificacao sem jogo iminente (ultima ha {age_min:.0f}min)")
+                  emit('skip', f"cron densificação sem jogo iminente (ultima ha {age_min:.0f}min)")
 
               if soon:
                   emit('close', f'{soon} jogos em ≤90min')
@@ -165,7 +171,7 @@ jobs:
         if: env.MODE == 'full'
         run: python -m playwright install --with-deps chromium
 
-      # Orquestrador: 4 casas em PARALELO com timeout próprio, grava _status/summary.json.
+      # Orquestrador: 5 casas em PARALELO com timeout próprio, grava _status/summary.json.
       # Betano/7k/EstrelaBet geo-bloqueiam ou rate-limitam IP estrangeiro → proxy BR (secrets).
       # No modo close, ODDS_WINDOW_H filtra pra só os jogos iminentes (captura ~2-4min).
       - name: Capturar odds (orquestrado, sem falha silenciosa)
@@ -179,9 +185,11 @@ jobs:
 
       # Histórico de odds SEMPRE (mesmo com captura parcial — o que entrou vira tick)
       - name: Banco de odds (ticks + open/close + CLV)
+        id: history
         if: always()
         continue-on-error: true
         run: |
+          python migrate_history_keys.py
           python history_ingest.py
           python history_close.py
           python history_settle.py
@@ -191,11 +199,13 @@ jobs:
       # Board + deploy SÓ no full (close é captura de fechamento pro banco; o board
       # filtrado da janela curta NÃO deve substituir o board cheio do site)
       - name: Montar o board
+        id: board
         if: env.MODE == 'full' && steps.capture.outcome == 'success'
         run: python build_board.py
 
       # Painel de Operação (sempre que houver status/histórico — útil mesmo em close)
       - name: Painel de operação
+        id: ops
         if: always()
         continue-on-error: true
         run: python build_ops.py
@@ -206,26 +216,103 @@ jobs:
         continue-on-error: true
         run: python gate_board.py
 
+
+      # Persistência versionada: status, snapshots estáveis, fixtures e histórico.
+      - name: Commit snapshots + histórico
+        id: persist
+        if: always()
+        env:
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
+        run: |
+          git config user.name "valor-bot"
+          git config user.email "actions@github.com"
+
+          git add -A -- data/odds/_status data/odds_history \
+            valor/data/history.js valor/data/moves.js valor/data/ops.js
+          if [ "$MODE" = "full" ] && [ "$GATE_OUTCOME" = "success" ]; then
+            git add -A -- valor/data/board.js
+            for p in data/odds/*_latest_full.json data/odds/_snapshots \
+                     data/fixtures/sofa_latest.json data/fixtures/sofa_latest_data.json \
+                     data/fixtures/_snapshots; do
+              [ -e "$p" ] && git add -A -- "$p"
+            done
+          else
+            echo "Board/snapshots não aprovados pelo gate: persistindo só diagnóstico/histórico."
+          fi
+
+          # Não faça rebase depois do gate: isso trocaria a árvore já testada por uma
+          # combinação que nunca foi reconstruída/validada (TOCTOU). Se main avançou,
+          # esta rodada falha fechada e a próxima reconstrói tudo sobre a base nova.
+          git fetch origin main
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+            echo "::error::main avançou durante a rodada; artefatos não serão publicados."
+            exit 1
+          fi
+
+          if git diff --cached --quiet; then
+            echo "Sem artefatos novos para commitar."
+            exit 0
+          fi
+
+          git commit -m "odds: snapshot $(date -u +%Y%m%d_%H%M) [$MODE] [skip ci]"
+          if ! git push origin HEAD:main; then
+            echo "::error::Push rejeitado; deploy bloqueado para evitar publicar estado não persistido."
+            exit 1
+          fi
+
+      # Só publica o estado que já foi versionado e enviado com sucesso ao repositório.
       - name: Publicar no Netlify
-        if: env.MODE == 'full' && steps.capture.outcome == 'success' && steps.gate.outcome == 'success'
+        id: deploy
+        if: >-
+          env.MODE == 'full' &&
+          steps.capture.outcome == 'success' &&
+          steps.history.outcome == 'success' &&
+          steps.board.outcome == 'success' &&
+          steps.ops.outcome == 'success' &&
+          steps.gate.outcome == 'success' &&
+          steps.persist.outcome == 'success'
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
         run: python deploy.py
 
-      # Persistência: snapshots leves + histórico no próprio repo (dataset nosso, versionado)
-      - name: Commit snapshots + histórico
-        if: always()
-        run: |
-          git config user.name "valor-bot"
-          git config user.email "actions@github.com"
-          git add -A data/odds/_status data/odds/*_latest.json data/odds/*_latest_full.json data/odds/*_latest_close.json data/odds_history valor/data/history.js valor/data/moves.js valor/data/ops.js || true
-          git diff --cached --quiet || git commit -m "odds: snapshot $(date -u +%Y%m%d_%H%M) [$MODE] [skip ci]"
-          git pull --rebase origin main || true
-          git push || echo "push falhou (sem mudanças ou conflito)"
-
-      # Job falha se a captura FULL foi insuficiente (visibilidade no Actions)
+      # Torna falhas de etapas best-effort visíveis sem impedir a persistência diagnóstica.
       - name: Veredito
-        if: env.MODE == 'full' && steps.capture.outcome != 'success'
+        if: always()
+        env:
+          CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+          PERSIST_OUTCOME: ${{ steps.persist.outcome }}
+          HISTORY_OUTCOME: ${{ steps.history.outcome }}
+          BOARD_OUTCOME: ${{ steps.board.outcome }}
+          OPS_OUTCOME: ${{ steps.ops.outcome }}
+          GATE_OUTCOME: ${{ steps.gate.outcome }}
+          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         run: |
-          echo "::error::Captura insuficiente — deploy bloqueado, site antigo permanece no ar (ver data/odds/_status/summary.json)"
-          exit 1
+          fail=0
+          if [ "$PERSIST_OUTCOME" != "success" ]; then
+            echo "::error::Persistência Git falhou; deploy bloqueado."
+            fail=1
+          fi
+          if [ "$HISTORY_OUTCOME" != "success" ]; then
+            echo "::error::Pipeline de histórico/liquidação falhou."
+            fail=1
+          fi
+          if [ "$OPS_OUTCOME" != "success" ]; then
+            echo "::error::Painel operacional não foi atualizado."
+            fail=1
+          fi
+          if [ "$MODE" = "full" ]; then
+            if [ "$CAPTURE_OUTCOME" != "success" ]; then
+              echo "::error::Captura insuficiente; deploy bloqueado e site anterior preservado."
+              fail=1
+            elif [ "$BOARD_OUTCOME" != "success" ]; then
+              echo "::error::Montagem do board falhou."
+              fail=1
+            elif [ "$GATE_OUTCOME" != "success" ]; then
+              echo "::error::Gate de qualidade bloqueou o deploy."
+              fail=1
+            elif [ "$DEPLOY_OUTCOME" != "success" ]; then
+              echo "::error::Netlify não confirmou a publicação."
+              fail=1
+            fi
+          fi
+          exit "$fail"

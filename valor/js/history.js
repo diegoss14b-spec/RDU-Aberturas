@@ -20,6 +20,7 @@
     post_kickoff: "pós-apito", open: "aberta", unknown: "?"
   };
   function qBadge(q) {
+    if (q && typeof q === "object") q = q.band || q.quality || "unknown";
     if (!q || q === "unknown") return "";
     var cls = q === "full_prematch" ? "q-ok" : (q === "late_open" ? "q-mid" : "q-bad");
     return '<span class="q-badge ' + cls + '" title="Qualidade da captura">' + esc(Q_LABEL[q] || q) + "</span>";
@@ -31,6 +32,24 @@
   function sign(x, d) { if (x == null) return "—"; return (x > 0 ? "+" : "") + br(x, d == null ? 1 : d) + "%"; }
   function cls(x) { return x == null ? "" : (x > 0 ? "pos" : (x < 0 ? "neg" : "")); }
   function pm(ci) { if (!ci || ci[0] == null) return ""; return ' <span class="pm">±' + Math.round((ci[1] - ci[0]) / 2) + '</span>'; }
+  function ciText(ci) {
+    return !ci || ci[0] == null ? "" : ("IC95 " + br(ci[0], 1) + "% a " + br(ci[1], 1) + "%");
+  }
+  function rowEpoch(r) {
+    if (r && r.kickoff_epoch != null) return Number(r.kickoff_epoch) || 0;
+    var ms = Date.parse((r && (r.kickoff || r.data)) || "");
+    return isNaN(ms) ? 0 : Math.floor(ms / 1000);
+  }
+  function fmtBrt(value, withTime) {
+    var d = typeof value === "number" ? new Date(value * 1000) : new Date(value || "");
+    if (isNaN(d.getTime())) return String(value || "").slice(0, withTime ? 16 : 10).replace("T", " ");
+    try {
+      var opt = { timeZone: "America/Fortaleza", day: "2-digit", month: "2-digit", year: "numeric" };
+      if (withTime) { opt.hour = "2-digit"; opt.minute = "2-digit"; opt.hour12 = false; }
+      return new Intl.DateTimeFormat("pt-BR", opt).format(d).replace(",", "");
+    } catch (e) { return d.toISOString().slice(0, withTime ? 16 : 10).replace("T", " "); }
+  }
+
 
   function chip(label, active, extra, onclick) {
     var c = document.createElement("span");
@@ -60,7 +79,7 @@
   function anyMv(gk) {
     var g = MV[gk];
     if (!g) return false;
-    return Object.keys(g).some(function (c) { return c !== "_ko" && g[c] && g[c].length >= 2; });
+    return Object.keys(g).some(function (c) { return c.charAt(0) !== "_" && g[c] && g[c].length >= 2; });
   }
 
   // --- índices jogo → mercados → linhas ---
@@ -172,10 +191,10 @@
     var gU = MV[base + "under"] || {};
     var set = {};
     Object.keys(gO).forEach(function (c) {
-      if (c !== "_ko" && gO[c] && gO[c].length >= 1) set[c] = 1;
+      if (c.charAt(0) !== "_" && gO[c] && gO[c].length >= 1) set[c] = 1;
     });
     Object.keys(gU).forEach(function (c) {
-      if (c !== "_ko" && gU[c] && gU[c].length >= 1) set[c] = 1;
+      if (c.charAt(0) !== "_" && gU[c] && gU[c].length >= 1) set[c] = 1;
     });
     return Object.keys(set);
   }
@@ -202,21 +221,22 @@
     var os = all.map(function (x) { return x[1]; });
     var t0 = Math.min.apply(null, ts), t1 = Math.max.apply(null, ts);
     var ko = gO._ko || gU._ko || null;
-    // estende eixo até o kickoff (fechamento natural)
+    var closeO = gO._close && gO._close[casa];
+    var closeU = gU._close && gU._close[casa];
+    var realClose = Math.max(closeO || 0, closeU || 0) || null;
+    // Mantém o KO no eixo, sem fingir que ele é um fechamento observado.
     if (ko && ko > t1) t1 = ko;
     // se só temos 2 pontos iguais, ainda desenha
     var o0 = Math.min.apply(null, os), o1 = Math.max.apply(null, os);
     if (o1 - o0 < 0.05) { o0 -= 0.15; o1 += 0.15; }
     else { var pad = (o1 - o0) * 0.15 + 0.04; o0 -= pad; o1 += pad; }
 
-    var W = 680, H = 280, L = 52, R = 56, T = 28, B = 36;
+    var W = 720, H = 300, L = 58, R = 118, T = 34, B = 42;
     var dt = (t1 - t0) || 1, dO = (o1 - o0) || 1;
     function X(t) { return L + (t - t0) / dt * (W - L - R); }
     function Y(o) { return T + (1 - (o - o0) / dO) * (H - T - B); }
     function fmtT(m) {
-      var d = new Date(m * 60000);
-      return ("0" + d.getDate()).slice(-2) + "/" + ("0" + (d.getMonth() + 1)).slice(-2) + " " +
-        ("0" + d.getHours()).slice(-2) + "h" + ("0" + d.getMinutes()).slice(-2);
+      return fmtBrt(m * 60, true);
     }
     function fmtDelta(m) {
       // minutos até o kickoff (negativo = antes)
@@ -260,12 +280,19 @@
     sv += '<text x="' + ((L + W - R) / 2) + '" y="' + (H - 2) +
       '" text-anchor="middle" font-size="10" fill="#525252">TEMPO (até o kickoff)</text>';
 
-    // kickoff
+    // Fechamento realmente observado, independente do horário de kickoff.
+    if (realClose && realClose >= t0 && realClose <= t1) {
+      sv += '<line x1="' + X(realClose).toFixed(1) + '" y1="' + T + '" x2="' + X(realClose).toFixed(1) +
+        '" y2="' + (H - B) + '" stroke="#d97706" stroke-width="1.5" stroke-dasharray="3,3"/>';
+      sv += '<text x="' + X(realClose).toFixed(1) + '" y="' + (T + 24) +
+        '" text-anchor="middle" font-size="10" fill="#b45309" font-weight="700">Close observado</text>';
+    }
+    // Kickoff agendado.
     if (ko && ko >= t0 && ko <= t1) {
       sv += '<line x1="' + X(ko).toFixed(1) + '" y1="' + T + '" x2="' + X(ko).toFixed(1) +
         '" y2="' + (H - B) + '" stroke="#a3a3a3" stroke-width="1.5" stroke-dasharray="5,4"/>';
       sv += '<text x="' + X(ko).toFixed(1) + '" y="' + (T + 12) +
-        '" text-anchor="middle" font-size="10" fill="#525252" font-weight="700">Fechamento / KO</text>';
+        '" text-anchor="middle" font-size="10" fill="#525252" font-weight="700">Kickoff</text>';
     }
 
     var lnLab = br(linha, 1); // "20,5"
@@ -329,7 +356,7 @@
       '<div class="mv-legend">' +
       '<span><span class="sw" style="background:' + COR_MAIS + ';height:3px"></span>' + labMais + "</span>" +
       '<span><span class="sw" style="background:' + COR_MENOS + ';height:3px"></span>' + labMenos + "</span>" +
-      '<span class="ex-leg-note">abertura → fechamento (pré-jogo)</span></div></div>';
+      '<span class="ex-leg-note">capturas pré-jogo · close observado ≠ kickoff</span></div></div>';
 
     return leg + sum + '<div class="mv-chart ex-chart ex-chart-ref">' + sv + "</div>";
   }
@@ -360,14 +387,18 @@
       return (Q_LABEL[k] || k) + " <b>" + q[k] + "</b>";
     }).join(" · ");
     el.innerHTML = "Banco de odds: <b>" + (b.monitoradas || 0) + "</b> linhas · <b>" +
-      (b.liquidadas || 0) + "</b> liquidadas · <b>" + (b.clv_validas || 0) + "</b> CLV pré-jogo · " +
+      (b.liquidadas || 0) + "</b> linhas liquidadas · <b>" + (b.clv_validas || 0) +
+      "</b> linhas CLV estritas · <b>" + (b.sinais_clv || nv) + "</b> sinais independentes · " +
       br(b.moveu_pct, 1) + "% moveram" +
       (formacao
         ? '<div class="cap-note"><b>CLV em formação</b> — precisa ≥' + (head.limiar_clv || LIM.head) +
-          " linhas com abertura <b>antes</b> do apito (agora " + nv + "). Não use taxa/ROI agregado ainda.</div>"
+          " sinais jogo+mercado com open e close pré-KO (agora " + nv + "). Não use taxa/ROI agregado ainda.</div>"
         : "") +
       (qBits ? '<div class="cap-note">Qualidade: ' + qBits + "</div>" : "") +
-      '<div class="cap-note">Explore um <b>jogo → mercado → main line</b> pra ver a curva até o fechamento e se a linha bateu.</div>';
+      '<div class="cap-note">Métricas e IC usam <b>1 sinal por jogo+mercado</b>: linha mais equilibrada e preço de abertura perto de 2,00. ' +
+      'Alternativas, casas e os dois lados continuam no explorador, mas não multiplicam a amostra. ' +
+      'O ROI é diagnóstico dessa regra fixa, <b>não</b> um backtest dos sinais do modelo.</div>' +
+      '<div class="cap-note">Explore um <b>jogo → mercado → main line</b> para ver close observado e kickoff separadamente.</div>';
     return el;
   }
 
@@ -388,12 +419,16 @@
     }
     var tiles = "";
     tiles += statTile("Bateu o fechamento", pct(h.beat_close_rate, 0),
-      h.beat_close_rate == null ? "wait" : (h.beat_close_rate >= 50 ? "pos" : "neg"), "N=" + (h.n_valid || 0));
-    tiles += statTile("CLV médio", sign(h.clv_medio, 1), cls(h.clv_medio), "mediana " + sign(h.clv_mediana, 1));
-    tiles += statTile("Placar (green)", pct(h.green_geral, 1), "", "N=" + (h.n_settled || 0));
+      h.beat_close_rate == null ? "wait" : (h.beat_close_rate >= 50 ? "pos" : "neg"),
+      "N=" + (h.n_valid || 0) + " sinais / " + (h.n_valid_rows || h.n_valid || 0) + " linhas · " + ciText(h.beat_ci));
+    tiles += statTile("CLV médio", sign(h.clv_medio, 1), cls(h.clv_medio),
+      "mediana " + sign(h.clv_mediana, 1) + " · " + ciText(h.clv_ci));
+    tiles += statTile("Placar (green)", pct(h.green_geral, 1), "",
+      "N=" + (h.n_settled_dec || 0) + " sinais decididos · " + ciText(h.green_geral_ci));
     if (h.roi_abertura != null) {
       tiles += statTile("ROI abertura", sign(h.roi_abertura, 1), cls(h.roi_abertura),
-        "vs fecha " + sign(h.roi_fechamento, 1));
+        "N=" + (h.roi_n || 0) + " sinais · " + (h.roi_pushes || 0) + " pushes · " + ciText(h.roi_abertura_ci) +
+        " · vs fecha " + sign(h.roi_fechamento, 1));
     }
     var row = document.createElement("div"); row.className = "stat-row"; row.innerHTML = tiles;
     wrap.appendChild(row);
@@ -405,7 +440,7 @@
     var idx = buildGameIndex();
     var games = Object.keys(idx).map(function (k) { return idx[k]; });
     games.sort(function (a, b) {
-      return (b.kickoff || b.data || "").localeCompare(a.kickoff || a.data || "");
+      return rowEpoch(b) - rowEpoch(a);
     });
 
     // se game selecionado sumiu, limpa
@@ -456,7 +491,7 @@
         });
         card.innerHTML =
           '<div class="ex-g-top"><div class="ex-g-name">' + esc(g.jogo) + '</div>' +
-          '<div class="ex-g-when">' + esc((g.kickoff || g.data || "").slice(0, 16).replace("T", " ")) + "</div></div>" +
+          '<div class="ex-g-when">' + esc(fmtBrt(g.kickoff_epoch || g.kickoff || g.data, true)) + "</div></div>" +
           '<div class="ex-g-meta">' +
           (g.settled ? '<span class="ex-badge done">liquidado</span>' : '<span class="ex-badge live">aberto</span>') +
           (bestQ ? qBadge(bestQ) : "") +
@@ -495,7 +530,7 @@
     head.appendChild(back);
     var title = document.createElement("div");
     title.innerHTML = '<div class="ex-d-name">' + esc(g.jogo) + '</div>' +
-      '<div class="ex-d-sub">' + esc(g.data || "") +
+      '<div class="ex-d-sub">' + esc(fmtBrt(g.kickoff || g.data, true)) +
       (g.settled ? ' · liquidado' : ' · em aberto') +
       " · " + Object.keys(g.casas).join(", ") + "</div>";
     head.appendChild(title);
@@ -647,6 +682,9 @@
     if (state.aba === "liquidadas") {
       box.appendChild(chip("🟢 green", state.res === "green", "val", function () { state.res = state.res === "green" ? "todos" : "green"; render(); }));
       box.appendChild(chip("🔴 red", state.res === "red", "ord", function () { state.res = state.res === "red" ? "todos" : "red"; render(); }));
+      if (dataset.some(function (r) { return r.push; })) {
+        box.appendChild(chip("⚪ push", state.res === "push", "", function () { state.res = state.res === "push" ? "todos" : "push"; render(); }));
+      }
     }
     // filtro qualidade (liquidadas + abertas)
     if (state.aba === "liquidadas" || state.aba === "abertas") {
@@ -664,8 +702,9 @@
     return rows.filter(function (r) {
       if (state.merc !== "todos" && r.mercado !== state.merc) return false;
       if (state.aba === "liquidadas" && state.res !== "todos") {
-        if (state.res === "green" && !r.won) return false;
-        if (state.res === "red" && r.won) return false;
+        if (state.res === "green" && r.won !== true) return false;
+        if (state.res === "red" && r.won !== false) return false;
+        if (state.res === "push" && !r.push) return false;
       }
       if (state.quality !== "todos" && (r.quality || "") !== state.quality) return false;
       return true;
@@ -678,14 +717,17 @@
       '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Fecha</th><th>CLV</th><th>Qual.</th><th>Res.</th><th>Mov.</th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var invalid = !r.clv_valido;
-      t += '<tr class="' + (invalid ? "sm" : "") + (anyMv(r.gk) ? " has-mv" : "") + '" data-gk="' + esc(r.gk || "") + '">' +
+      var resultTxt = r.push ? "push" : (r.won === true ? "green" : (r.won === false ? "red" : "—"));
+      var resultCls = r.push ? "hist-mv flat" : (r.won === true ? "hist-mv up" : (r.won === false ? "hist-mv dn" : ""));
+      t += '<tr class="' + (invalid ? "sm" : "") + (anyMv(r.gk) ? " has-mv" : "") + '" data-gk="' + esc(r.gk || "") +
+        '" data-gid="' + esc(r.gid || "") + '" data-merc="' + esc(r.mercado || "") + '" data-line="' + esc(r.linha) + '">' +
         '<td class="jg">' + esc(r.jogo) + "</td>" +
         "<td>" + (ABBR[r.mercado] || esc(r.mercado)) + "</td>" +
         '<td class="ln">' + br(r.linha, 1) + "</td><td>" + esc(r.lado) + "</td>" +
         '<td class="o">' + br(r.open, 2) + '</td><td class="u">' + br(r.close, 2) + "</td>" +
         '<td class="' + (invalid ? "" : cls(r.clv)) + '">' + (invalid ? "—" : sign(r.clv, 1)) + "</td>" +
         "<td>" + qBadge(r.quality) + "</td>" +
-        '<td class="' + (r.won ? "hist-mv up" : "hist-mv dn") + '">' + (r.won ? "green" : "red") + "</td>" +
+        '<td class="' + resultCls + '">' + resultTxt + "</td>" +
         "<td>" + sparkline(r.gk, r.casa) + "</td></tr>";
     });
     return t + "</tbody></table></div>";
@@ -698,7 +740,8 @@
     rows.forEach(function (r) {
       var d = r.drift_pct;
       var mv = d == null ? "flat" : (d < 0 ? "up" : (d > 0 ? "dn" : "flat"));
-      t += '<tr class="' + (anyMv(r.gk) ? "has-mv" : "") + '" data-gk="' + esc(r.gk || "") + '">' +
+      t += '<tr class="' + (anyMv(r.gk) ? "has-mv" : "") + '" data-gk="' + esc(r.gk || "") +
+        '" data-gid="' + esc(r.gid || "") + '" data-merc="' + esc(r.mercado || "") + '" data-line="' + esc(r.linha) + '">' +
         '<td class="jg">' + esc(r.jogo) + "</td><td>" + (ABBR[r.mercado] || esc(r.mercado)) + "</td>" +
         '<td class="ln">' + br(r.linha, 1) + "</td><td>" + esc(r.lado) + "</td>" +
         '<td class="o">' + br(r.open, 2) + '</td><td class="u">' + br(r.last, 2) + "</td>" +
@@ -722,7 +765,10 @@
     nav.appendChild(chip("🔎 Explorar jogo", state.aba === "explorar", "", function () {
       state.aba = "explorar"; render();
     }));
-    nav.appendChild(chip("Liquidadas <span class='ct2'>" + (H.liquidadas || []).length + "</span>",
+    var shownSettled = (H.liquidadas || []).length;
+    var totalSettled = H.liquidadas_total != null ? H.liquidadas_total : shownSettled;
+    var settledChip = shownSettled + (totalSettled > shownSettled ? ("/" + totalSettled + " · limite " + (H.liquidadas_limit || shownSettled)) : "");
+    nav.appendChild(chip("Liquidadas <span class='ct2'>" + settledChip + "</span>",
       state.aba === "liquidadas", "", function () {
         state.aba = "liquidadas"; state.merc = "todos"; state.res = "todos"; render();
       }));
@@ -743,8 +789,11 @@
     root.appendChild(filtros(base));
     var vis = applyFilters(base);
     var meta = document.createElement("div"); meta.className = "meta";
-    meta.innerHTML = vis.length + " linha" + (vis.length === 1 ? "" : "s") +
-      " · atualizado " + esc(H.gerado || "?");
+    var limitNote = state.aba === "liquidadas" && totalSettled > shownSettled
+      ? " · exibindo no máximo " + (H.liquidadas_limit || shownSettled) + " de " + totalSettled
+      : "";
+    meta.innerHTML = vis.length + " linha" + (vis.length === 1 ? "" : "s") + limitNote +
+      " · atualizado " + esc(H.gerado_iso || H.gerado || "?");
     root.appendChild(meta);
     var tbl = document.createElement("div");
     tbl.innerHTML = state.aba === "liquidadas" ? tblLiquidadas(vis) : tblAbertas(vis);
@@ -754,13 +803,14 @@
     tbl.querySelectorAll("tr.has-mv, tr[data-gk]").forEach(function (tr) {
       tr.style.cursor = "pointer";
       tr.onclick = function () {
-        var gk = tr.getAttribute("data-gk") || "";
-        var p = gk.split("|");
-        if (p.length < 6) return;
+        var gid = tr.getAttribute("data-gid") || "";
+        var mercado = tr.getAttribute("data-merc") || "";
+        var linha = parseFloat(tr.getAttribute("data-line"));
+        if (!gid || !mercado || isNaN(linha)) return;
         state.aba = "explorar";
-        state.game = p[0] + "|" + p[1] + "|" + p[2];
-        state.mercado = p[3];
-        state.linha = parseFloat(p[4]);
+        state.game = gid;
+        state.mercado = mercado;
+        state.linha = linha;
         render();
       };
     });

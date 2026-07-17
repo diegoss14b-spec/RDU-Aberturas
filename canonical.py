@@ -145,7 +145,12 @@ def load_sofa_fixtures(root: Path | None = None):
     try:
         meta = json.loads(ptr.read_text(encoding="utf-8"))
         src = root / "data" / "fixtures" / meta["file"]
+        if not src.is_file():
+            return []
         data = json.loads(src.read_text(encoding="utf-8"))
+        fixtures = data.get("fixtures") or []
+        if int(meta.get("n") or 0) != len(fixtures) or not fixtures:
+            return []
     except Exception:
         return []
     out = []

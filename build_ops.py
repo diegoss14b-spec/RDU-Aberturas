@@ -67,11 +67,16 @@ def load_js_window(path: Path, prefix: str):
 def parse_ts_brt(s):
     if not s:
         return None
+    raw = str(s).strip()
     try:
-        return datetime.strptime(s[:16], "%Y-%m-%d %H:%M").replace(tzinfo=BRT)
+        if "T" in raw or raw.endswith("Z") or re.search(r"[+-]\d\d:\d\d$", raw):
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=BRT)
+            return dt.astimezone(BRT)
+        return datetime.strptime(raw[:16], "%Y-%m-%d %H:%M").replace(tzinfo=BRT)
     except Exception:
         return None
-
 
 def age_mins(ts_brt_str, now=None):
     dt = parse_ts_brt(ts_brt_str)
@@ -91,6 +96,8 @@ def load_casa_status():
             "ok": bool(st.get("ok")),
             "n_events": st.get("n_events"),
             "n_markets": st.get("n_markets"),
+            "market_counts": st.get("market_counts") or {},
+            "pointer_valid": st.get("pointer_valid"),
             "min_events": st.get("min_events"),
             "duration_sec": st.get("duration_sec"),
             "ts_brt": st.get("ts_brt"),
@@ -116,6 +123,8 @@ def load_casa_status():
             "proxy_br": sofa.get("proxy_br"),
             "age_min": age_mins(sofa.get("ts_brt")),
             "kind": "fixture",
+            "pointer_valid": sofa.get("pointer_valid"),
+            "pointer_age_h": sofa.get("pointer_age_h"),
         })
     return rows
 
@@ -326,21 +335,53 @@ def history_health():
     }
 
 
-def fixtures_info():
-    ptr = ROOT / "data" / "fixtures" / "sofa_latest.json"
-    meta = load_json(ptr) or {}
-    n = 0
-    file_name = meta.get("file")
-    if file_name:
-        data = load_json(ROOT / "data" / "fixtures" / file_name) or {}
-        n = len(data.get("fixtures") or [])
+def settlement_health():
+    raw = load_json(
+        ROOT / "data" / "odds_history" / "results" / "settlement_status.json"
+    )
+    if not raw:
+        return None
+    markets = {}
+    for market, row in (raw.get("by_market") or {}).items():
+        statuses = row.get("status") or {}
+        pending = statuses.get("pending_result") or 0
+        unavailable = statuses.get("unavailable") or 0
+        if pending or unavailable:
+            markets[market] = {
+                "total": row.get("total") or 0,
+                "pending": pending,
+                "unavailable": unavailable,
+                "age": row.get("pending_age") or {},
+                "reasons": row.get("pending_reasons") or {},
+            }
     return {
-        "file": file_name,
-        "n_fixtures": n,
-        "ts": meta.get("ts") or meta.get("ts_brt") or meta.get("updated"),
+        "generated_at": raw.get("generated_at"),
+        "results_rows": raw.get("results_rows"),
+        "totals_by_status": raw.get("totals_by_status") or {},
+        "backlog": raw.get("backlog") or {},
+        "by_market": markets,
+        "result_field_coverage": raw.get("result_field_coverage") or {},
     }
 
 
+def fixtures_info():
+    ptr = ROOT / "data" / "fixtures" / "sofa_latest.json"
+    meta = load_json(ptr) or {}
+    file_name = meta.get("file")
+    target_valid = False
+    n = 0
+    if file_name:
+        data = load_json(ROOT / "data" / "fixtures" / file_name) or {}
+        n = len(data.get("fixtures") or [])
+        target_valid = n > 0 and n == int(meta.get("n") or 0)
+    ts = meta.get("at") or meta.get("ts") or meta.get("ts_brt") or meta.get("updated")
+    return {
+        "file": file_name,
+        "n_fixtures": n,
+        "ts": ts,
+        "target_valid": target_valid,
+        "age_min": age_mins(ts),
+    }
 def build_avisos(summary, casas, board_cov, hist_h, runs):
     avisos = []
     fails = [c for c in casas if c["id"] in CASAS and not c["ok"]]
@@ -359,12 +400,12 @@ def build_avisos(summary, casas, board_cov, hist_h, runs):
         })
     if board_cov:
         age = board_cov.get("age_min")
-        if age is not None and age > 300:
+        if age is not None and age > 120:
             avisos.append({
                 "level": "bad",
-                "txt": f"Mesa defasada: atualizada há {age} min (>{5}h)",
+                "txt": f"Mesa defasada: atualizada há {age} min (>2h)",
             })
-        elif age is not None and age > 120:
+        elif age is not None and age > 90:
             avisos.append({
                 "level": "warn",
                 "txt": f"Mesa com {age} min — pode estar desatualizada",
@@ -405,9 +446,18 @@ def main():
     board = load_js_window(ROOT / "valor" / "data" / "board.js", "window.BOARD=")
     board_cov = board_coverage(board)
     hist_h = history_health()
+    settle_h = settlement_health()
     fx = fixtures_info()
 
     avisos = build_avisos(summary, casas, board_cov, hist_h, runs)
+    if settle_h:
+        age = (settle_h.get("backlog") or {}).get("age") or {}
+        stale = (age.get("7-30d") or 0) + (age.get("30d+") or 0)
+        if stale:
+            avisos.append({
+                "level": "warn",
+                "txt": f"Liquidação atrasada: {stale} keys aguardam resultado há 7+ dias",
+            })
     for nome, h in (hist7 or {}).items():
         if h.get("total", 0) >= 3 and (h.get("rate") or 100) < 70:
             avisos.append({
@@ -454,6 +504,7 @@ def main():
         "heat": heat,
         "board": board_cov,
         "historico": hist_h,
+        "liquidacao": settle_h,
         "fixtures": fx,
         "avisos": avisos,
     }

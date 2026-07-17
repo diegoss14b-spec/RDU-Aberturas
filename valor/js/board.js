@@ -30,18 +30,37 @@
     });
   }
 
+  function parseBrt(value) {
+    if (!value) return null;
+    var text = String(value);
+    var ms = Date.parse(text);
+    if (!isNaN(ms) && /(?:Z|[+-]\d{2}:?\d{2})$/.test(text)) return ms;
+    var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+    if (!m) return isNaN(ms) ? null : ms;
+    return Date.parse(m[1] + "-" + m[2] + "-" + m[3] + "T" + m[4] + ":" + m[5] + ":" + (m[6] || "00") + "-03:00");
+  }
+
+  function gameEpoch(j) {
+    var ms = parseBrt(j && j.inicio_iso);
+    if (ms != null) return ms;
+    var m = /(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/.exec((j && j.inicio) || "");
+    if (!m) return Number.MAX_SAFE_INTEGER;
+    var year = new Date().getFullYear();
+    return Date.parse(year + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2) +
+      "T" + ("0" + m[3]).slice(-2) + ":" + m[4] + ":00-03:00");
+  }
+
   function freshness() {
-    var m = /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(B.gerado || "");
-    if (!m) return { txt: "?", mins: null, stale: false, band: "unk" };
-    var d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
-    var mins = Math.round((Date.now() - d.getTime()) / 60000);
+    var ms = parseBrt(B.gerado_iso || B.gerado);
+    if (ms == null) return { txt: "?", mins: null, stale: true, band: "unk" };
+    var mins = Math.round((Date.now() - ms) / 60000);
     if (mins < 0) mins = 0;
     var txt = mins < 1 ? "agora mesmo" : mins < 60 ? ("há " + mins + " min")
       : ("há " + Math.floor(mins / 60) + "h" + (mins % 60 ? " " + (mins % 60) + "min" : ""));
-    // OddsPortal-style: green ≤10min · yellow 10–60 · red >60 · stale board >5h
     var band = mins <= 10 ? "fresh" : mins <= 60 ? "mid" : "old";
-    return { txt: txt, mins: mins, stale: mins > 300, band: band };
+    return { txt: txt, mins: mins, stale: mins > 120, band: band };
   }
+
 
   function chip(label, active, cls, onclick) {
     var c = document.createElement("span");
@@ -97,17 +116,17 @@
   }
 
   function sortFn(a, b) {
-    if (state.ordem === "horario") return (a.inicio || "").localeCompare(b.inicio || "");
+    if (state.ordem === "horario") return gameEpoch(a) - gameEpoch(b);
     if (state.ordem === "casas") {
       var na = Object.keys((a.mercados && a.mercados[state.mercado]) || {}).length;
       var nb = Object.keys((b.mercados && b.mercados[state.mercado]) || {}).length;
-      return nb - na || (a.inicio || "").localeCompare(b.inicio || "");
+      return nb - na || gameEpoch(a) - gameEpoch(b);
     }
     var ea = topEvMkt(a), eb = topEvMkt(b);
     var va = ea > -999, vb = eb > -999;
     if (va !== vb) return va ? -1 : 1;
     if (va && vb && eb !== ea) return eb - ea;
-    return (a.inicio || "").localeCompare(b.inicio || "");
+    return gameEpoch(a) - gameEpoch(b);
   }
 
   function valMap(j) {

@@ -119,10 +119,7 @@ def load_betano():
     """-> lista de eventos normalizados {casa, name, league, start, captured, mercados, mercados_time?}"""
     from capture_common import resolve_odds_pointer
     meta, src = resolve_odds_pointer("betano", prefer_full=True, max_age_h=BOARD_MAX_AGE_H)
-    if not src:
-        cs = sorted((ROOT / "data/odds").glob("betano_*.jsonl"))
-        src = cs[-1] if cs else None
-        meta = {}
+
     if not src:
         return [], None
     out = []
@@ -427,8 +424,9 @@ def main():
                 dt_brt = dt.astimezone(BRT)
             day = dt_brt.strftime("%Y-%m-%d")
             ini = dt_brt.strftime("%d/%m %H:%M")
+            ini_iso = dt_brt.isoformat(timespec="seconds")
         else:
-            day, ini = "?", "?"
+            day, ini, ini_iso = "?", "?", None
         hn = norm_team(parts[0]) if len(parts) == 2 else norm_team(e["name"])
         an = norm_team(parts[1]) if len(parts) == 2 else ""
 
@@ -443,6 +441,9 @@ def main():
                         "jogo": f"{fx['home']} - {fx['away']}",
                         "liga": fx.get("league") or e.get("league") or "",
                         "inicio": fx.get("inicio") or ini,
+                        "inicio_iso": (datetime.fromtimestamp(int(fx["start_ts"]), tz=timezone.utc)
+                                       .astimezone(BRT).isoformat(timespec="seconds")
+                                       if fx.get("start_ts") else ini_iso),
                         "home": fx["home"],
                         "away": fx["away"],
                         "sofa_id": fx["sofa_id"],
@@ -478,6 +479,7 @@ def main():
 
         if j is None:
             j = {"jogo": e["name"], "liga": e["league"], "inicio": ini,
+                 "inicio_iso": ini_iso,
                  "home": parts[0].strip() if len(parts) == 2 else "",
                  "away": parts[1].strip() if len(parts) == 2 else "",
                  "casas": set(), "mercados": {}, "times": {}, "valor": [],
@@ -583,7 +585,9 @@ def main():
                                         "edge_pp": round(edge * 100, 1),
                                         "ev_pct": round(ev * 100, 1),
                                         "fair_odd": round(fo, 2) if fo else None,
-                                        "mu": round(pr["mu"], 1),
+                                        "mu": round(pr.get("mu_cal", pr["mu"]), 1),
+                                        "mu_cal": round(pr.get("mu_cal", pr["mu"]), 1),
+                                        "mu_raw": round(pr.get("mu_raw", pr["mu"]), 1),
                                         "actionable": True,
                                         "model_status": model_status,
                                         "model_source": model_source,
@@ -616,7 +620,9 @@ def main():
                                     "odd": ln_[oddk], "ev_pct": round(sev * 100, 1),
                                     "nossa_prob": round(sp_ * 100, 1),
                                     "p_push": round(spp * 100, 1),
-                                    "mu": round(spr["mu"], 1),
+                                    "mu": round(spr.get("mu_cal", spr["mu"]), 1),
+                                    "mu_cal": round(spr.get("mu_cal", spr["mu"]), 1),
+                                    "mu_raw": round(spr.get("mu_raw", spr["mu"]), 1),
                                     "model_status": baseline_status,
                                     "model_source": baseline_source,
                                 })
@@ -641,9 +647,11 @@ def main():
         j["times"] = times_clean
 
     lista = sorted([j for j in jogos if j["mercados"] or j.get("times")],
-                   key=lambda j: (not j["tem_valor"], j["inicio"]))
+                   key=lambda j: (not j["tem_valor"], j.get("inicio_iso") or "9999"))
+    generated = datetime.now(BRT)
     out = {
-        "gerado": datetime.now(BRT).strftime("%Y-%m-%d %H:%M"),
+        "gerado": generated.strftime("%Y-%m-%d %H:%M"),
+        "gerado_iso": generated.isoformat(timespec="seconds"),
         "casas": casas_ativas,
         "mercados": MERCADOS,
         "fonte": src,

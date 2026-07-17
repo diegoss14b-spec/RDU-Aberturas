@@ -9,7 +9,7 @@ Salva: data/odds/betano_{YYYY-MM-DD_HHMM}.jsonl (1 evento/linha) + betano_latest
 Uso futuro: comparador odds × modelos calibrados → apostas de valor. Só leitura/GET, ritmo educado.
 """
 import json, sys, os, time, re
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 if sys.stdout is None or not hasattr(sys.stdout, "write"): sys.stdout = open(os.devnull, "w")
 if sys.stderr is None or not hasattr(sys.stderr, "write"): sys.stderr = open(os.devnull, "w")
@@ -19,6 +19,7 @@ from curl_cffi import requests as creq
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "data/odds"; OUT.mkdir(parents=True, exist_ok=True)
+BRT = timezone(timedelta(hours=-3))
 LOG = ROOT / "data/_odds_betano.log"
 H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125 Safari/537.36",
      "Accept": "application/json", "Accept-Language": "pt-BR"}
@@ -31,7 +32,7 @@ MIN_EFF = MIN_EVENTS                # modo close (ODDS_WINDOW_H) reduz — ver m
 PROX = br_proxies()                 # nuvem: proxy BR (geo-block); local: None/direto
 
 def log(m):
-    line = f"[{datetime.now().strftime('%Y-%m-%d %H:%M')}] {m}"
+    line = f"[{datetime.now(BRT).strftime('%Y-%m-%d %H:%M')}] {m}"
     try: print(line, flush=True)
     except Exception: pass
     try: LOG.open("a", encoding="utf-8").write(line + "\n")
@@ -93,13 +94,14 @@ def main():
         events = [e for e in events if in_window(e.get("start"), _wh)]
         MIN_EFF = (min(MIN_EVENTS, 1) if events else 0)   # janela curta: 1+ ok; lista vazia não é falha
         log(f"[betano] modo close: janela {_wh:g}h -> {len(events)} de {_tot} eventos")
-    stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    now = datetime.now(BRT)
+    stamp = now.strftime("%Y-%m-%d_%H%M")
     fp = OUT / f"betano_{stamp}.jsonl"
     n_ok = 0
     with fp.open("w", encoding="utf-8") as f:
         for ev in events[:MAX_EVENTS]:
             if not ev.get("url"): continue
-            rec = {"captured_at": datetime.now().isoformat(timespec="seconds"),
+            rec = {"captured_at": datetime.now(BRT).isoformat(timespec="seconds"),
                    "event_id": ev["id"], "name": ev["name"], "league": ev["league"],
                    "region": ev["region"], "start": ev["start"], "markets": {}}
             base_ev = get(f"{BASE}/api{ev['url']}")
@@ -118,7 +120,7 @@ def main():
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             n_ok += 1
     from capture_common import write_odds_latest
-    write_odds_latest("betano", fp.name, n_ok, at=stamp)  # full pointer só se n>0 e não-close
+    write_odds_latest("betano", fp.name, n_ok, at=now.isoformat(timespec="seconds"), min_events=MIN_EFF)  # full pointer só se n>0 e não-close
     log(f"✅ {n_ok} eventos capturados → {fp.name}")
     return n_ok
 

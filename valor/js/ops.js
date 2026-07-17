@@ -18,6 +18,14 @@
     var h = Math.floor(mins / 60), m = mins % 60;
     return "há " + h + "h" + (m ? " " + m + "min" : "");
   }
+  function liveAge(ts, fallback) {
+    if (!ts) return fallback;
+    var s = String(ts).trim();
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s)) s = s.replace(" ", "T") + ":00-03:00";
+    var d = new Date(s), now = new Date();
+    if (isNaN(d.getTime())) return fallback;
+    return Math.max(0, Math.floor((now.getTime() - d.getTime()) / 60000));
+  }
   function clsRate(r) {
     if (r == null) return "";
     if (r >= 90) return "op-good";
@@ -41,12 +49,15 @@
     var S = O.summary || {};
     var B = O.board || {};
     var H = O.historico || {};
+    var L = O.liquidacao || {};
     var casas = O.casas || [];
     var avisos = O.avisos || [];
     var hist7 = O.hist7 || {};
     var heat = O.heat || { casas: [], cols: [] };
     var runs = O.runs || [];
     var fx = O.fixtures || {};
+    var summaryAge = liveAge(S.ts_brt, S.age_min);
+    var boardAge = liveAge(B.gerado, B.age_min);
 
     var head =
       '<div class="sub">Saúde das <b>capturas</b>, cobertura da <b>mesa</b> e qualidade do <b>histórico</b>. '
@@ -56,9 +67,9 @@
     var kpis = [
       {
         lab: "Última captura",
-        val: ageTxt(S.age_min),
+        val: ageTxt(summaryAge),
         sub: (S.ts_brt || "—") + (S.deploy_allowed === false ? " · deploy bloqueado" : ""),
-        tone: S.age_min != null && S.age_min > 180 ? "bad" : S.age_min != null && S.age_min > 90 ? "mid" : "good",
+        tone: summaryAge != null && summaryAge > 180 ? "bad" : summaryAge != null && summaryAge > 90 ? "mid" : "good",
       },
       {
         lab: "Casas ok",
@@ -69,8 +80,8 @@
       {
         lab: "Mesa",
         val: B.n_jogos != null ? String(B.n_jogos) : "—",
-        sub: ageTxt(B.age_min) + (B.casas && B.casas.length ? " · " + B.casas.join(", ") : ""),
-        tone: B.age_min != null && B.age_min > 300 ? "bad" : "good",
+        sub: ageTxt(boardAge) + (B.casas && B.casas.length ? " · " + B.casas.join(", ") : ""),
+        tone: boardAge != null && boardAge > 120 ? "bad" : "good",
       },
       {
         lab: "Sofa match",
@@ -108,6 +119,7 @@
       var dur = c.duration_sec != null ? br(c.duration_sec, 0) + "s" : "—";
       var n = c.n_events != null ? String(c.n_events) : "—";
       var proxy = c.proxy_br === true ? "BR" : c.proxy_br === false ? "direct" : "—";
+      var cAge = liveAge(c.ts_brt, c.age_min);
       var rateHtml = rate != null
         ? '<span class="' + clsRate(rate) + '">' + br(rate, 0) + "% <span class=\"op-muted\">(" + h7.ok + "/" + h7.total + ")</span></span>"
         : "—";
@@ -116,7 +128,7 @@
         + "<td>" + st + "</td>"
         + '<td class="op-num">' + esc(n) + "</td>"
         + '<td class="op-num">' + esc(dur) + "</td>"
-        + "<td>" + esc(ageTxt(c.age_min)) + "</td>"
+        + "<td>" + esc(ageTxt(cAge)) + "</td>"
         + "<td>" + esc(proxy) + "</td>"
         + "<td>" + rateHtml + "</td>"
         + '<td class="op-err">' + esc(c.ok ? "" : (c.error || "—")) + "</td>"
@@ -200,6 +212,7 @@
     var histHtml = H
       ? '<div class="op-sec"><div class="op-sec-h">Banco de odds (histórico)</div>'
         + '<div class="op-kpis op-kpis-sm">'
+        + kpiMini("Em retry", (L.backlog || {}).total)
         + kpiMini("Monitoradas", H.monitoradas)
         + kpiMini("Liquidadas", H.liquidadas)
         + kpiMini("CLV válidas", H.clv_validas)
@@ -215,6 +228,37 @@
         + "Gerado " + esc(H.gerado || "—") + ".</div></div>"
       : "";
 
+    var settleMarkets = Object.keys(L.by_market || {}).sort(function (a, b) {
+      return (L.by_market[b].pending || 0) - (L.by_market[a].pending || 0);
+    });
+    var settleHtml = "";
+    if (L.generated_at) {
+      var settleRows = settleMarkets.map(function (market) {
+        var row = L.by_market[market] || {};
+        var age = row.age || {};
+        var reasons = row.reasons || {};
+        var topReason = Object.keys(reasons).sort(function (a, b) {
+          return reasons[b] - reasons[a];
+        })[0] || "n/a";
+        return "<tr>"
+          + "<td><b>" + esc(market) + "</b></td>"
+          + '<td class="op-num">' + esc(row.pending || 0) + "</td>"
+          + '<td class="op-num">' + esc(age["0-24h"] || 0) + "</td>"
+          + '<td class="op-num">' + esc(age["1-3d"] || 0) + "</td>"
+          + '<td class="op-num">' + esc(age["3-7d"] || 0) + "</td>"
+          + '<td class="op-num">' + esc((age["7-30d"] || 0) + (age["30d+"] || 0)) + "</td>"
+          + "<td>" + esc(topReason) + "</td></tr>";
+      }).join("");
+      settleHtml = '<div class="op-sec"><div class="op-sec-h">Liquida&ccedil;&atilde;o &mdash; backlog retryable por mercado e idade</div>'
+        + '<div class="op-table-wrap"><table class="op-table"><thead><tr>'
+        + "<th>Mercado</th><th>Retry</th><th>0-24h</th><th>1-3d</th><th>3-7d</th><th>7d+</th><th>Motivo principal</th>"
+        + "</tr></thead><tbody>"
+        + (settleRows || '<tr><td colspan="7">Sem backlog &mdash; liquida&ccedil;&atilde;o em dia.</td></tr>')
+        + "</tbody></table></div>"
+        + '<div class="op-muted op-note">Resultado dispon&iacute;vel em ' + esc(L.results_rows || 0)
+        + " jogos &middot; atualizado " + esc(L.generated_at) + ".</div></div>";
+    }
+
     function kpiMini(lab, val) {
       return '<div class="op-kpi"><div class="op-kpi-lab">' + esc(lab) + '</div>'
         + '<div class="op-kpi-val op-kpi-val-sm">' + esc(val == null ? "—" : String(val)) + "</div></div>";
@@ -226,6 +270,7 @@
       + (fx.file ? " · fixtures " + esc(fx.file) : "")
       + "</div>";
 
+    foot = settleHtml + foot;
     root.innerHTML = head + kpiHtml + avHtml + casaTbl + heatHtml + mercHtml + soonHtml + histHtml + foot;
   };
 })();

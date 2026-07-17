@@ -234,10 +234,8 @@ def main():
     def write_latest(n, promote=False):
         write_odds_latest(
             "pinnacle", out_path.name, n,
-            at=now.isoformat(timespec="seconds"), promote_full=promote,
+            at=now.isoformat(timespec="seconds"), promote_full=promote, min_events=MIN_EFF,
         )
-
-    write_latest(0, promote=False)
 
     # parent_id → rec acumulado (Corners + Bookings no mesmo jogo)
     by_parent = {}

@@ -6,71 +6,69 @@
 
   var MODELO_MKT = { "Cartões": 1, "Faltas": 1, "Finalizações": 1, "Escanteios": 1 };
 
-  /** Score 0–100: qualidade dos dados, NÃO previsão extra. */
+  /** Score 0–100 de qualidade operacional; EV não participa do score. */
   function confScore(b, j, B) {
     var s = 0;
-    // EV na zona útil (15–40 pts)
-    var ev = +b.ev_pct || 0;
-    if (ev >= 12) s += 20;
-    else if (ev >= 8) s += 15;
-    else if (ev >= 5) s += 10;
-    else s += 5;
-    // probabilidade na região calibrada (15–85%)
-    var p = +b.nossa_prob || 0;
-    if (p >= 20 && p <= 80) s += 20;
-    else if (p >= 15 && p <= 85) s += 12;
-    else s += 4;
-    // cobertura: nº de casas no jogo/mercado
     var nCasas = 1;
     try {
       var m = (j.mercados || {})[b.mercado];
       if (m && typeof m === "object") nCasas = Object.keys(m).length || 1;
       else if (j.casas) nCasas = (j.casas.length || Object.keys(j.casas || {}).length) || 1;
     } catch (e) { /* ignore */ }
-    if (nCasas >= 4) s += 20;
-    else if (nCasas >= 3) s += 15;
-    else if (nCasas >= 2) s += 10;
-    else s += 4;
-    // fixture sofa confirmado
-    if (j.sofa_id) s += 15;
+    if (nCasas >= 4) s += 35;
+    else if (nCasas >= 3) s += 28;
+    else if (nCasas >= 2) s += 18;
+    else s += 6;
+
+    if (j.sofa_id) s += 30;
     else s += 5;
-    // frescor da mesa
-    var mins = ageMins(B.gerado);
+
+    var mins = ageMins(B.gerado_iso || B.gerado);
     if (mins != null) {
-      if (mins <= 90) s += 15;
-      else if (mins <= 180) s += 10;
-      else if (mins <= 360) s += 5;
-    } else s += 8;
-    // hard gates: iniciado / desconhecido / board stale → nunca alta confiança
-    var toKo = minsToKick(b.inicio || j.inicio);
-    var boardAge = ageMins(B.gerado);
-    if (toKo == null || toKo <= 0 || (boardAge != null && boardAge > 300) || b.actionable === false) {
-      return Math.min(s, 49); // hard cap: no máximo "média/baixa"
+      if (mins <= 90) s += 20;
+      else if (mins <= 180) s += 12;
+      else if (mins <= 300) s += 5;
     }
-    // kickoff razoável (não jogo já começado, nem >48h)
-    if (toKo >= 15 && toKo <= 24 * 60) s += 10;
-    else if (toKo > 0 && toKo < 15) s += 4; // late
-    else if (toKo > 24 * 60 && toKo <= 48 * 60) s += 6;
-    return Math.max(0, Math.min(100, Math.round(s)));
+
+    var toKo = minsToKick(b.inicio_iso || b.inicio || j.inicio_iso || j.inicio);
+    var boardAge = ageMins(B.gerado_iso || B.gerado);
+    if (toKo == null || toKo <= 0 || boardAge == null || boardAge > 120 || b.actionable === false) {
+      return Math.min(s, 49);
+    }
+    if (toKo >= 15 && toKo <= 24 * 60) s += 15;
+    else if (toKo > 0 && toKo < 15) s += 6;
+    else if (toKo <= 48 * 60) s += 10;
+    var score = Math.max(0, Math.min(100, Math.round(s)));
+    return j.sofa_id ? score : Math.min(score, 69);
+  }
+
+  function parseBrt(value) {
+    if (!value) return null;
+    var text = String(value);
+    var ms = Date.parse(text);
+    if (!isNaN(ms) && /(?:Z|[+-]\d{2}:?\d{2})$/.test(text)) return ms;
+    var m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+    if (m) return Date.parse(m[1] + "-" + m[2] + "-" + m[3] + "T" + m[4] + ":" + m[5] + ":" + (m[6] || "00") + "-03:00");
+    return isNaN(ms) ? null : ms;
   }
 
   function ageMins(gerado) {
-    var m = /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(gerado || "");
-    if (!m) return null;
-    var d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
-    return Math.round((Date.now() - d.getTime()) / 60000);
+    var ms = parseBrt(gerado);
+    return ms == null ? null : Math.round((Date.now() - ms) / 60000);
   }
 
   function minsToKick(inicio) {
-    // "dd/mm HH:MM" (BRT implícito)
+    var iso = parseBrt(inicio);
+    if (iso != null && /^\d{4}-/.test(String(inicio))) return Math.round((iso - Date.now()) / 60000);
     var m = /(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/.exec(inicio || "");
     if (!m) return null;
     var now = new Date();
     var y = now.getFullYear();
-    var d = new Date(y, +m[2] - 1, +m[1], +m[3], +m[4]);
-    // se já passou >12h no calendário, assume ano seguinte (virada)
-    if (d.getTime() - now.getTime() < -12 * 3600 * 1000) d.setFullYear(y + 1);
-    return Math.round((d.getTime() - now.getTime()) / 60000);
+    var isoBrt = y + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2) +
+      "T" + ("0" + m[3]).slice(-2) + ":" + m[4] + ":00-03:00";
+    var target = Date.parse(isoBrt);
+    if (target - Date.now() < -12 * 3600 * 1000) target = Date.parse((y + 1) + isoBrt.slice(4));
+    return Math.round((target - Date.now()) / 60000);
   }
 
   function confLabel(sc) {
@@ -95,9 +93,11 @@
           if (m && typeof m === "object") nCasas = Object.keys(m).length || 1;
         } catch (e) { /* ignore */ }
         bets.push({
-          jogo: j.jogo, liga: j.liga, inicio: j.inicio, mercado: v.mercado, linha: v.linha,
+          jogo: j.jogo, liga: j.liga, inicio: j.inicio, inicio_iso: j.inicio_iso,
+          mercado: v.mercado, linha: v.linha,
           lado: v.lado, casa: v.casa, odd: v.odd, nossa_prob: v.nossa_prob, edge_pp: v.edge_pp,
-          ev_pct: v.ev_pct, mu: v.mu, conf: conf, nCasas: nCasas, sofa_id: j.sofa_id || null,
+          ev_pct: v.ev_pct, mu: v.mu, mu_cal: v.mu_cal, mu_raw: v.mu_raw,
+          conf: conf, nCasas: nCasas, sofa_id: j.sofa_id || null,
           p_push: v.p_push || 0, push_line: !!v.push_line, fair_odd: v.fair_odd,
           actionable: v.actionable !== false, game_state: j.game_state || null,
           model_status: v.model_status || (B.model && B.model.status) || "production"
@@ -111,8 +111,8 @@
     });
 
     var mod = B.model || {};
-    var head = '<div class="sub">Linhas com <b style="color:var(--green)">valor (+EV)</b> pelos modelos oficiais, ranqueadas por <b>confiança</b> (qualidade dos dados) e EV%. ' +
-      'Confiança ≠ previsão: mede cobertura, frescor, fixture e região calibrada. A stake é sua.</div>'
+    var head = '<div class="sub">Linhas com <b style="color:var(--green)">valor (+EV)</b> pelos modelos oficiais, ranqueadas por <b>qualidade operacional</b> e, depois, EV%. ' +
+      'Qualidade ≠ EV: o score mede somente cobertura, frescor, fixture e tempo até o jogo. A stake é sua.</div>'
       + '<div class="disc"><b>EV%</b> = p_win × odd + p_push − 1 (linha inteira devolve stake no empate exato). ' +
       '<b>Odd justa</b> = (1 − p_push) / p_win. ' +
       'Modelo: <b>' + esc(mod.source || "value_pricers") + '</b> · status <b>' + esc(mod.status || "production") + '</b>. ' +
@@ -126,11 +126,11 @@
       + '<span class="chip' + (filt.near ? ' on' : '') + '" data-f="near">Próx. 90 min</span>'
       + '</div>';
 
-    var boardAge = ageMins(B.gerado);
-    var boardStale = boardAge != null && boardAge > 300;
+    var boardAge = ageMins(B.gerado_iso || B.gerado);
+    var boardStale = boardAge == null || boardAge > 120;
     var filtered = bets.filter(function (b) {
       // hard: nunca mostrar started/unknown/stale como acionável
-      var mk = minsToKick(b.inicio);
+      var mk = minsToKick(b.inicio_iso || b.inicio);
       if (mk == null || mk <= 0) return false;
       if (boardStale) return false;
       if (b.actionable === false) return false;
@@ -187,7 +187,8 @@
         + '<span class="vb-pick">' + esc(b.mercado) + ' <b>' + esc(b.lado) + ' ' + b.linha + '</b>' + pushTag + '</span></div>'
         + '<div class="vb-game">' + esc(b.jogo) + '</div>'
         + '<div class="vb-meta">' + esc(b.inicio) + (b.liga ? ' · ' + esc(b.liga) : '')
-        + ' · μ ' + b.mu
+        + ' · μ cal ' + (b.mu_cal != null ? b.mu_cal : b.mu)
+        + (b.mu_raw != null && Math.abs(b.mu_raw - (b.mu_cal != null ? b.mu_cal : b.mu)) >= 0.05 ? (' · raw ' + b.mu_raw) : '')
         + (b.sofa_id ? ' · sofa' : ' · sem fixture')
         + ' · ' + b.nCasas + ' casa' + (b.nCasas > 1 ? 's' : '')
         + pushMeta
@@ -200,10 +201,10 @@
         + '</div>';
     }).join("");
 
-    var meta = '<div class="meta">' + filtered.length + ' acionável' + (filtered.length > 1 ? 'is' : '')
+    var meta = '<div class="meta">' + filtered.length + (filtered.length === 1 ? ' acionável' : ' acionáveis')
       + ' de ' + bets.length + ' flag' + (bets.length > 1 ? 's' : '')
       + (dist ? ' · ' + dist : '')
-      + ' · atualizado ' + esc(B.gerado || "") + '</div>';
+      + ' · atualizado ' + esc(B.gerado_iso || B.gerado || "") + '</div>';
     root.innerHTML = head + staleBanner + filtHtml + meta + '<div class="vbets">' + rows + '</div>';
     bindFilt(root);
   };
