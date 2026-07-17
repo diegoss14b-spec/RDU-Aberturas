@@ -1,134 +1,127 @@
 {
- "ts_utc": "2026-07-17T20:23:50Z",
- "ts_brt": "2026-07-17 17:23",
+ "ts_utc": "2026-07-17T21:29:42Z",
+ "ts_brt": "2026-07-17 18:29",
  "casas_ok": [
   "betano",
   "superbet",
+  "estrelabet",
   "7k",
   "pinnacle"
  ],
- "casas_fail": [
-  {
-   "casa": "estrelabet",
-   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 17 → 5 eventos"
-  }
- ],
- "n_ok": 4,
- "n_fail": 1,
- "total_events": 301,
+ "casas_fail": [],
+ "n_ok": 5,
+ "n_fail": 0,
+ "total_events": 69,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 60,
+   "n_events": 23,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 16,
-    "Chutes no gol": 13,
+    "Cartões": 7,
+    "Chutes no gol": 6,
     "Desarmes": 3,
-    "Escanteios": 36,
-    "Faltas": 11,
-    "Finalizações": 13,
-    "Impedimentos": 11,
+    "Escanteios": 17,
+    "Faltas": 6,
+    "Finalizações": 6,
+    "Impedimentos": 6,
     "Laterais": 3,
     "Tiros de meta": 3
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-07-17_1713.jsonl",
+   "pointer_file": "betano_2026-07-17_1825.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 79,
+   "n_events": 12,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 30,
-    "Chutes no gol": 25,
-    "Desarmes": 13,
-    "Escanteios": 79,
-    "Faltas": 20,
-    "Finalizações": 25,
-    "Impedimentos": 15,
-    "Laterais": 15,
-    "Tiros de meta": 15
+    "Cartões": 8,
+    "Chutes no gol": 6,
+    "Desarmes": 6,
+    "Escanteios": 12,
+    "Faltas": 6,
+    "Finalizações": 6,
+    "Impedimentos": 6,
+    "Laterais": 6,
+    "Tiros de meta": 6
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-07-17_1713.jsonl",
+   "pointer_file": "superbet_2026-07-17_1825.jsonl",
    "error": null
   },
   "estrelabet": {
-   "ok": false,
-   "n_events": 36,
-   "n_markets": 9,
+   "ok": true,
+   "n_events": 14,
+   "n_markets": 6,
    "market_counts": {
-    "Cartões": 5,
-    "Chutes no gol": 2,
-    "Desarmes": 2,
-    "Escanteios": 36,
-    "Faltas": 2,
-    "Finalizações": 2,
-    "Impedimentos": 2,
-    "Laterais": 2,
-    "Tiros de meta": 2
+    "Cartões": 8,
+    "Chutes no gol": 3,
+    "Escanteios": 14,
+    "Faltas": 3,
+    "Finalizações": 3,
+    "Impedimentos": 3
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-07-17_1723.jsonl",
-   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 17 → 5 eventos"
+   "pointer_file": "estrelabet_2026-07-17_1825.jsonl",
+   "error": null
   },
   "7k": {
    "ok": true,
-   "n_events": 67,
+   "n_events": 9,
    "n_markets": 4,
    "market_counts": {
-    "Cartões": 17,
-    "Desarmes": 5,
-    "Escanteios": 67,
-    "Faltas": 14
+    "Cartões": 6,
+    "Desarmes": 3,
+    "Escanteios": 9,
+    "Faltas": 6
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-07-17_1713.jsonl",
+   "pointer_file": "7k_2026-07-17_1825.jsonl",
    "error": null
   },
   "pinnacle": {
    "ok": true,
-   "n_events": 95,
+   "n_events": 11,
    "n_markets": 2,
    "market_counts": {
-    "Cartões": 7,
-    "Escanteios": 93
+    "Cartões": 3,
+    "Escanteios": 11
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-07-17_1713.jsonl",
+   "pointer_file": "pinnacle_2026-07-17_1825.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 70,
-  "Chutes no gol": 38,
-  "Desarmes": 21,
-  "Escanteios": 275,
-  "Faltas": 45,
-  "Finalizações": 38,
-  "Impedimentos": 26,
-  "Laterais": 18,
-  "Tiros de meta": 18
+  "Cartões": 32,
+  "Chutes no gol": 15,
+  "Desarmes": 12,
+  "Escanteios": 63,
+  "Faltas": 21,
+  "Finalizações": 15,
+  "Impedimentos": 15,
+  "Laterais": 9,
+  "Tiros de meta": 9
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-07-17T20:14:06Z",
-  "ts_brt": "2026-07-17 17:14",
+  "ts_utc": "2026-07-17T21:26:37Z",
+  "ts_brt": "2026-07-17 18:26",
   "n_events": 119,
   "n_fixtures": 119,
   "n_markets": 0,
   "min_events": 30,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_9585caf48edb22558bfd.json",
-  "pointer_at": "2026-07-17T17:14:06-03:00",
+  "pointer_file": "_snapshots/sofa_8886d77adcd2a90183bc.json",
+  "pointer_at": "2026-07-17T18:26:37-03:00",
   "pointer_n": 119,
   "pointer_age_h": 0.0,
-  "duration_sec": 50.2,
+  "duration_sec": 49.6,
   "error": null,
   "error_class": null,
   "transport": {
@@ -146,5 +139,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "full"
+ "mode": "close"
 }
