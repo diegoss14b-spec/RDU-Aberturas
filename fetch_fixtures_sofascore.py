@@ -14,7 +14,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 BRT = timezone(timedelta(hours=-3))
 from capture_common import (
     _atomic_write_text, _cleanup_snapshot_versions, _immutable_text_snapshot,
-    pointer_age_hours, classify_error, STATUS_DIR,
+    pointer_age_hours, classify_error, STATUS_DIR, br_proxies,
 )
 
 H = {"User-Agent": "Mozilla/5.0 Chrome/124.0.0.0", "Accept": "*/*",
@@ -24,31 +24,105 @@ TOURNAMENTS = [
     (325, "BR-A"), (390, "BR-B"), (373, "BR-CdB"), (16, "WC"),
     (7, "UCL"), (679, "UEL"), (17, "EPL"), (8, "LaLiga"),
     (23, "SerieA"), (35, "Bundesliga"), (34, "Ligue1"), (242, "MLS"),
-    (648, "Argentina"), (136, "CSL"), (40, "Allsvenskan"), (278, "Uruguay"),
+    (155, "Argentina"), (649, "CSL"), (40, "Allsvenskan"), (278, "Uruguay"),
     (240, "Ecuador"), (203, "Russia"), (20, "Eliteserien"),
 ]
 DAYS_AHEAD = 7
-MAX_PAGES = 6
+MAX_PAGES = 3
+REQUEST_TIMEOUT = 20
 STABLE_FILE = "sofa_latest_data.json"
+PROX = br_proxies()
+
+try:
+    from curl_cffi import requests as _HTTP_CLIENT
+    _HTTP_IMPERSONATE = True
+except ImportError:
+    import requests as _HTTP_CLIENT
+    _HTTP_IMPERSONATE = False
+
+_GET_DIAG = {}
 
 
-def get(url, tries=3):
-    try:
-        from curl_cffi import requests as creq
-        getter = lambda u: creq.get(u, headers=H, impersonate="chrome124", timeout=25)
-    except ImportError:
-        import requests
-        getter = lambda u: requests.get(u, headers=H, timeout=25)
-    for a in range(tries):
-        try:
-            r = getter(url)
-            if r.status_code == 200 and r.text[:1] in "{[":
-                return r.json()
-            if r.status_code == 404:
-                return None
-        except Exception:
-            pass
-        time.sleep(0.8 * (a + 1))
+def _reset_get_diag():
+    _GET_DIAG.clear()
+    _GET_DIAG.update({
+        "requests": 0, "proxy_attempts": 0, "direct_attempts": 0,
+        "statuses": {}, "last_error": None, "consecutive_failures": 0,
+        "circuit_open": False, "failed_tournaments": [],
+    })
+
+
+def _diag_snapshot():
+    return {
+        "requests": int(_GET_DIAG.get("requests") or 0),
+        "proxy_attempts": int(_GET_DIAG.get("proxy_attempts") or 0),
+        "direct_attempts": int(_GET_DIAG.get("direct_attempts") or 0),
+        "statuses": dict(_GET_DIAG.get("statuses") or {}),
+        "last_error": _GET_DIAG.get("last_error"),
+        "consecutive_failures": int(_GET_DIAG.get("consecutive_failures") or 0),
+        "circuit_open": bool(_GET_DIAG.get("circuit_open")),
+        "failed_tournaments": list(_GET_DIAG.get("failed_tournaments") or []),
+    }
+
+
+def _diag_text():
+    d = _diag_snapshot()
+    statuses = ",".join(f"{k}:{v}" for k, v in sorted(d["statuses"].items())) or "nenhum"
+    return (
+        f"req={d['requests']} proxy={d['proxy_attempts']} direto={d['direct_attempts']} "
+        f"http={statuses} ultimo={d['last_error'] or '-'} "
+        f"circuito={int(d['circuit_open'])} falhas={','.join(d['failed_tournaments']) or '-'}"
+    )
+
+
+def _transport_get(url, proxies):
+    kwargs = {"headers": H, "timeout": REQUEST_TIMEOUT}
+    if proxies:
+        kwargs["proxies"] = proxies
+    if _HTTP_IMPERSONATE:
+        kwargs["impersonate"] = "chrome124"
+    return _HTTP_CLIENT.get(url, **kwargs)
+
+
+_reset_get_diag()
+
+
+def get(url, tries=2):
+    """Usa proxy residencial primeiro na nuvem e conexao direta localmente."""
+    if _GET_DIAG.get("circuit_open"):
+        return None
+    routes = [("proxy", PROX)] if PROX else [("direct", None)]
+    for mode, proxies in routes:
+        for attempt in range(tries):
+            _GET_DIAG["requests"] += 1
+            _GET_DIAG[f"{mode}_attempts"] += 1
+            try:
+                r = _transport_get(url, proxies)
+                status = int(getattr(r, "status_code", 0) or 0)
+                statuses = _GET_DIAG["statuses"]
+                statuses[str(status)] = int(statuses.get(str(status)) or 0) + 1
+                body = (getattr(r, "text", "") or "").lstrip()
+                if status == 200 and body[:1] in "{[":
+                    data = r.json()
+                    _GET_DIAG["last_error"] = None
+                    _GET_DIAG["consecutive_failures"] = 0
+                    return data
+                if status in (401, 403, 407):
+                    _GET_DIAG["last_error"] = f"HTTP {status} via {mode}"
+                    _GET_DIAG["circuit_open"] = True
+                    return None
+                if status == 404:
+                    _GET_DIAG["last_error"] = f"HTTP 404 via {mode}"
+                    return None
+                _GET_DIAG["last_error"] = f"HTTP {status or '?'} via {mode}"
+            except Exception as exc:
+                _GET_DIAG["last_error"] = f"{type(exc).__name__} via {mode}"
+            if attempt + 1 < tries:
+                time.sleep(0.8 * (attempt + 1))
+    _GET_DIAG["consecutive_failures"] += 1
+    if _GET_DIAG["consecutive_failures"] >= 2:
+        _GET_DIAG["circuit_open"] = True
+        _GET_DIAG["last_error"] = f"{_GET_DIAG.get('last_error') or 'transport failure'}; circuit open"
     return None
 
 
@@ -58,19 +132,27 @@ def season_id(utid):
     return seas[0].get("id") if seas else None
 
 
-def fetch_tournament(utid, label):
+def fetch_tournament(utid, label, max_ts=None):
     sid = season_id(utid)
     if not sid:
-        print(f"[sofa] {label} utid={utid}: sem season")
+        if label not in _GET_DIAG["failed_tournaments"]:
+            _GET_DIAG["failed_tournaments"].append(label)
+        print(f"[sofa] {label} utid={utid}: sem season ({_diag_text()})")
         return []
     out = []
     for page in range(MAX_PAGES):
         d = get(f"https://api.sofascore.com/api/v1/unique-tournament/{utid}/season/{sid}/events/next/{page}")
-        evs = (d or {}).get("events") or []
+        if not isinstance(d, dict):
+            if label not in _GET_DIAG["failed_tournaments"]:
+                _GET_DIAG["failed_tournaments"].append(label)
+            break
+        evs = d.get("events") or []
         if not evs: break
         out.extend(evs)
+        stamps = [int(e["startTimestamp"]) for e in evs if e.get("startTimestamp")]
         time.sleep(0.25)
-        if len(evs) < 10: break
+        if d.get("hasNextPage") is False or len(evs) < 10: break
+        if max_ts and stamps and max(stamps) >= max_ts: break
     print(f"[sofa] {label} utid={utid} season={sid}: {len(out)} eventos")
     return out
 
@@ -124,6 +206,7 @@ def write_status(ok, n, min_required, promoted, error=None, t0=None):
         "duration_sec": round(time.time() - t0, 1) if t0 else None,
         "error": str(error)[:300] if error else None,
         "error_class": classify_error(error) if error else None,
+        "transport": _diag_snapshot(),
     }
     _atomic_write_text(STATUS_DIR / "sofa.json", json.dumps(st, ensure_ascii=False, indent=1))
     return st
@@ -150,10 +233,11 @@ def promote_fixture_snapshot(payload):
 
 def main():
     t0_clock = time.time()
+    _reset_get_diag()
     now = datetime.now(timezone.utc); t0 = now - timedelta(hours=6); t1 = now + timedelta(days=DAYS_AHEAD)
     seen, fixtures = set(), []
     for utid, label in TOURNAMENTS:
-        try: raw = fetch_tournament(utid, label)
+        try: raw = fetch_tournament(utid, label, int(t1.timestamp()))
         except Exception as ex:
             print(f"[sofa] {label} erro: {ex}"); continue
         for e in raw:
@@ -179,13 +263,15 @@ def main():
         "ts_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "fonte": "sofascore", "n": n, "janela_dias": DAYS_AHEAD, "fixtures": fixtures,
     }
-    promoted = n >= min_required
+    source_healthy = not _GET_DIAG["circuit_open"] and not _GET_DIAG["failed_tournaments"]
+    promoted = n >= min_required and source_healthy
     if promoted:
         stable_file = promote_fixture_snapshot(payload)
         write_status(True, n, min_required, True, t0=t0_clock)
         print(f"[sofa] {n} fixtures em {DAYS_AHEAD}d → {stable_file} (promovido atomicamente)")
     else:
         err = f"snapshot não saudável: n={n}, mínimo={min_required}; fallback preservado n={prev_n}"
+        err += f"; transporte {_diag_text()}"
         write_status(False, n, min_required, False, error=err, t0=t0_clock)
         print(f"[sofa] ⚠ {err}")
     for f in fixtures[:8]: print(f"  {f['inicio']} · {f['home']} - {f['away']} · {f['league']}")
