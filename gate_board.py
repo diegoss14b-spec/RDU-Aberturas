@@ -164,6 +164,18 @@ def load_sofa_state(status):
         out.setdefault("pointer_valid", False)
     return out
 
+def _board_age_min(board):
+    """Idade (min) do board AO VIVO a partir do 'gerado' (BRT). None se não der pra ler."""
+    g = (board or {}).get("gerado")
+    if not g:
+        return None
+    try:
+        d = datetime.strptime(g, "%Y-%m-%d %H:%M").replace(tzinfo=BRT)
+        return (datetime.now(BRT) - d).total_seconds() / 60
+    except Exception:
+        return None
+
+
 def main():
     new = parse_board((ROOT / "valor" / "data" / "board.js").read_text(encoding="utf-8"))
     summary = load_json(STATUS / "summary.json")
@@ -178,7 +190,16 @@ def main():
 
     now_cov = board_coverage(new); prev_cov = board_coverage(prev or {})
     reasons = status_reasons(summary) + sofa_reasons(now_cov, sofa)
-    if prev is not None:
+    # Baseline defasado (18/07): comparar contra um board AO VIVO velho (ex.: durante um freeze)
+    # é sem sentido — o cardápio de jogos/mercados mudou naturalmente e as "quedas" viram
+    # fantasmas que travavam a Mesa em loop (não publica porque o baseline é velho... porque
+    # não publica). Acima de GATE_STALE_BASELINE_MIN, ignora a comparação de queda e libera
+    # pela qualidade ABSOLUTA (status/sofa/model/margem já cobrem o board novo).
+    stale_min = int(os.environ.get("GATE_STALE_BASELINE_MIN", "90"))
+    prev_age = _board_age_min(prev) if prev is not None else None
+    if prev is not None and prev_age is not None and prev_age > stale_min:
+        print(f"[gate] baseline ao vivo defasado ({prev_age:.0f}min > {stale_min}min) — ignorando comparação de queda")
+    elif prev is not None:
         if now_cov["n_games"] < 0.5 * prev_cov["n_games"] and prev_cov["n_games"] >= 10:
             reasons.append(f"jogos caíram >50%: {prev_cov['n_games']} → {now_cov['n_games']}")
         reasons += baseline_reasons(now_cov, prev_cov)
