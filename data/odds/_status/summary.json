@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-07-18T15:37:20Z",
- "ts_brt": "2026-07-18 12:37",
+ "ts_utc": "2026-07-18T16:17:51Z",
+ "ts_brt": "2026-07-18 13:17",
  "casas_ok": [
   "betano",
   "superbet",
@@ -11,7 +11,7 @@
  "casas_fail": [],
  "n_ok": 5,
  "n_fail": 0,
- "total_events": 355,
+ "total_events": 327,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -21,7 +21,7 @@
     "Cartões": 9,
     "Chutes no gol": 9,
     "Desarmes": 1,
-    "Escanteios": 52,
+    "Escanteios": 50,
     "Faltas": 5,
     "Finalizações": 9,
     "Impedimentos": 5,
@@ -29,37 +29,37 @@
     "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-07-18_1221.jsonl",
+   "pointer_file": "betano_2026-07-18_1307.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 111,
+   "n_events": 92,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 32,
-    "Chutes no gol": 17,
+    "Cartões": 27,
+    "Chutes no gol": 16,
     "Desarmes": 6,
-    "Escanteios": 111,
+    "Escanteios": 92,
     "Faltas": 10,
-    "Finalizações": 17,
+    "Finalizações": 16,
     "Impedimentos": 6,
     "Laterais": 6,
     "Tiros de meta": 6
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-07-18_1218.jsonl",
+   "pointer_file": "superbet_2026-07-18_1307.jsonl",
    "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 29,
+   "n_events": 24,
    "n_markets": 9,
    "market_counts": {
     "Cartões": 7,
     "Chutes no gol": 2,
     "Desarmes": 2,
-    "Escanteios": 29,
+    "Escanteios": 24,
     "Faltas": 2,
     "Finalizações": 2,
     "Impedimentos": 2,
@@ -67,7 +67,7 @@
     "Tiros de meta": 2
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-07-18_1231.jsonl",
+   "pointer_file": "estrelabet_2026-07-18_1307.jsonl",
    "error": null
   },
   "7k": {
@@ -81,29 +81,29 @@
     "Faltas": 6
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-07-18_1231.jsonl",
+   "pointer_file": "7k_2026-07-18_1307.jsonl",
    "error": null
   },
   "pinnacle": {
    "ok": true,
-   "n_events": 87,
+   "n_events": 83,
    "n_markets": 2,
    "market_counts": {
     "Cartões": 2,
-    "Escanteios": 87
+    "Escanteios": 83
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-07-18_1235.jsonl",
+   "pointer_file": "pinnacle_2026-07-18_1307.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 56,
-  "Chutes no gol": 28,
+  "Cartões": 51,
+  "Chutes no gol": 27,
   "Desarmes": 11,
-  "Escanteios": 347,
+  "Escanteios": 317,
   "Faltas": 23,
-  "Finalizações": 28,
+  "Finalizações": 27,
   "Impedimentos": 13,
   "Laterais": 9,
   "Tiros de meta": 9
@@ -111,51 +111,33 @@
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
-  "ok": false,
-  "ts_utc": "2026-07-18T15:18:43Z",
-  "ts_brt": "2026-07-18 12:18",
-  "n_events": 0,
-  "n_fixtures": 0,
+  "ok": true,
+  "ts_utc": "2026-07-18T16:08:41Z",
+  "ts_brt": "2026-07-18 13:08",
+  "n_events": 111,
+  "n_fixtures": 111,
   "n_markets": 0,
   "min_events": 30,
-  "promoted": false,
+  "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_7222c1f4ff9d732006ca.json",
-  "pointer_at": "2026-07-17T20:00:53-03:00",
-  "pointer_n": 117,
-  "pointer_age_h": 16.297,
-  "duration_sec": 17.9,
-  "error": "snapshot não saudável: n=0, mínimo=30; fallback preservado n=117; transporte req=4 proxy=4 direto=0 http=nenhum ultimo=ProxyError via proxy; circuit open circuito=1 falhas=BR-A,BR-B,BR-CdB,WC,UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Eliteserien",
-  "error_class": "Other",
+  "pointer_file": "_snapshots/sofa_0be2e1566f6a4a9022ec.json",
+  "pointer_at": "2026-07-18T13:08:41-03:00",
+  "pointer_n": 111,
+  "pointer_age_h": 0.0,
+  "duration_sec": 56.0,
+  "error": null,
+  "error_class": null,
   "transport": {
-   "requests": 4,
-   "proxy_attempts": 4,
+   "requests": 38,
+   "proxy_attempts": 38,
    "direct_attempts": 0,
-   "statuses": {},
-   "last_error": "ProxyError via proxy; circuit open",
-   "consecutive_failures": 2,
-   "circuit_open": true,
-   "failed_tournaments": [
-    "BR-A",
-    "BR-B",
-    "BR-CdB",
-    "WC",
-    "UCL",
-    "UEL",
-    "EPL",
-    "LaLiga",
-    "SerieA",
-    "Bundesliga",
-    "Ligue1",
-    "MLS",
-    "Argentina",
-    "CSL",
-    "Allsvenskan",
-    "Uruguay",
-    "Ecuador",
-    "Russia",
-    "Eliteserien"
-   ]
+   "statuses": {
+    "200": 38
+   },
+   "last_error": null,
+   "consecutive_failures": 0,
+   "circuit_open": false,
+   "failed_tournaments": []
   }
  },
  "deploy_allowed": true,
