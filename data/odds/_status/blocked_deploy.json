@@ -1,37 +1,29 @@
 {
- "ts_brt": "2026-07-18 12:12",
+ "ts_brt": "2026-07-18 12:37",
  "reasons": [
-  "SofaScore defasado: 16.2h > 12h",
-  "casa 7k caiu >65%: 51 → 0 jogos",
-  "casa Betano caiu >65%: 40 → 0 jogos",
-  "casa/mercado 7k/Escanteios caiu >65%: 115 → 0 instrumentos",
-  "casa/mercado 7k/Faltas caiu >65%: 8 → 0 instrumentos",
-  "casa/mercado 7k/Cartões caiu >65%: 22 → 0 instrumentos",
-  "casa/mercado Betano/Cartões caiu >65%: 33 → 0 instrumentos",
-  "casa/mercado Betano/Finalizações caiu >65%: 13 → 0 instrumentos",
-  "casa/mercado Betano/Chutes no gol caiu >65%: 11 → 0 instrumentos",
-  "casa/mercado Betano/Faltas caiu >65%: 26 → 0 instrumentos",
-  "casa/mercado Betano/Impedimentos caiu >65%: 27 → 0 instrumentos",
-  "casa/mercado Betano/Escanteios caiu >65%: 40 → 0 instrumentos",
-  "casa/mercado Betano/Tiros de meta caiu >65%: 9 → 0 instrumentos",
-  "casa/mercado Betano/Laterais caiu >65%: 9 → 0 instrumentos"
+  "SofaScore defasado: 16.6h > 12h",
+  "casa/mercado Betano/Tiros de meta caiu >65%: 9 → 3 instrumentos",
+  "casa/mercado Betano/Laterais caiu >65%: 9 → 3 instrumentos"
  ],
  "now": {
-  "n_games": 152,
-  "sofa_games": 28,
-  "sofa_pct": 18.42105263157895,
-  "value_games": 8,
-  "value_sofa": 8,
+  "n_games": 205,
+  "sofa_games": 44,
+  "sofa_pct": 21.463414634146343,
+  "value_games": 11,
+  "value_sofa": 11,
   "value_sofa_pct": 100.0,
   "houses": {
+   "Betano": 51,
    "Superbet": 110,
-   "Pinnacle": 85
+   "Pinnacle": 86,
+   "7k": 56,
+   "EstrelaBet": 29
   },
   "markets": {
-   "Escanteios": 150,
+   "Escanteios": 184,
    "Cartões": 32,
-   "Chutes no gol": 17,
    "Finalizações": 11,
+   "Chutes no gol": 17,
    "Faltas": 10,
    "Impedimentos": 6,
    "Desarmes": 6,
@@ -39,11 +31,21 @@
    "Tiros de meta": 6
   },
   "house_markets": {
+   "Betano": {
+    "Escanteios": 51,
+    "Cartões": 27,
+    "Finalizações": 11,
+    "Chutes no gol": 9,
+    "Faltas": 15,
+    "Impedimentos": 15,
+    "Tiros de meta": 3,
+    "Laterais": 3
+   },
    "Superbet": {
     "Escanteios": 202,
     "Cartões": 78,
-    "Chutes no gol": 51,
     "Finalizações": 33,
+    "Chutes no gol": 51,
     "Faltas": 30,
     "Impedimentos": 18,
     "Desarmes": 18,
@@ -51,8 +53,25 @@
     "Tiros de meta": 18
    },
    "Pinnacle": {
-    "Escanteios": 251,
+    "Escanteios": 257,
     "Cartões": 6
+   },
+   "7k": {
+    "Escanteios": 110,
+    "Faltas": 6,
+    "Cartões": 10,
+    "Desarmes": 4
+   },
+   "EstrelaBet": {
+    "Cartões": 19,
+    "Escanteios": 51,
+    "Finalizações": 6,
+    "Chutes no gol": 6,
+    "Faltas": 6,
+    "Impedimentos": 6,
+    "Tiros de meta": 6,
+    "Laterais": 6,
+    "Desarmes": 6
    }
   }
  },
@@ -118,8 +137,8 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-07-18T15:07:36Z",
-  "ts_brt": "2026-07-18 12:07",
+  "ts_utc": "2026-07-18T15:18:43Z",
+  "ts_brt": "2026-07-18 12:18",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -129,8 +148,8 @@
   "pointer_file": "_snapshots/sofa_7222c1f4ff9d732006ca.json",
   "pointer_at": "2026-07-17T20:00:53-03:00",
   "pointer_n": 117,
-  "pointer_age_h": 16.187957431666668,
-  "duration_sec": 18.1,
+  "pointer_age_h": 16.610888904444444,
+  "duration_sec": 17.9,
   "error": "snapshot não saudável: n=0, mínimo=30; fallback preservado n=117; transporte req=4 proxy=4 direto=0 http=nenhum ultimo=ProxyError via proxy; circuit open circuito=1 falhas=BR-A,BR-B,BR-CdB,WC,UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Eliteserien",
   "error_class": "Other",
   "transport": {
