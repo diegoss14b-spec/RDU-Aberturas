@@ -147,7 +147,12 @@ jobs:
     env:
       MODE: ${{ needs.gate.outputs.mode }}
     steps:
+      # ref: main → pega o TIP ATUAL do main ao INICIAR o job, não o github.sha congelado
+      # no agendamento. Sem isso, uma rodada enfileirada nasce com base velha e vê o commit
+      # da rodada anterior como "main avançou" — a auto-colisão que congelava a Mesa (18/07).
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-python@v5
         with:
@@ -217,48 +222,16 @@ jobs:
         run: python gate_board.py
 
 
-      # Persistência versionada: status, snapshots estáveis, fixtures e histórico.
-      - name: Commit snapshots + histórico
+      # Persistência versionada RESILIENTE: se main avançou durante a rodada, em vez de
+      # abortar (o que congelava a Mesa), o script reconcilia o histórico sobre a base nova
+      # (re-ingest idempotente por chave = merge sem perder tick) e re-pusha com retry.
+      # Garante: (1) a variação das odds NUNCA é perdida; (2) o board sempre chega ao deploy.
+      - name: Commit snapshots + histórico (resiliente)
         id: persist
         if: always()
         env:
           GATE_OUTCOME: ${{ steps.gate.outcome }}
-        run: |
-          git config user.name "valor-bot"
-          git config user.email "actions@github.com"
-
-          git add -A -- data/odds/_status data/odds_history \
-            valor/data/history.js valor/data/moves.js valor/data/ops.js
-          if [ "$MODE" = "full" ] && [ "$GATE_OUTCOME" = "success" ]; then
-            git add -A -- valor/data/board.js
-            for p in data/odds/*_latest_full.json data/odds/_snapshots \
-                     data/fixtures/sofa_latest.json data/fixtures/sofa_latest_data.json \
-                     data/fixtures/_snapshots; do
-              [ -e "$p" ] && git add -A -- "$p"
-            done
-          else
-            echo "Board/snapshots não aprovados pelo gate: persistindo só diagnóstico/histórico."
-          fi
-
-          # Não faça rebase depois do gate: isso trocaria a árvore já testada por uma
-          # combinação que nunca foi reconstruída/validada (TOCTOU). Se main avançou,
-          # esta rodada falha fechada e a próxima reconstrói tudo sobre a base nova.
-          git fetch origin main
-          if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
-            echo "::error::main avançou durante a rodada; artefatos não serão publicados."
-            exit 1
-          fi
-
-          if git diff --cached --quiet; then
-            echo "Sem artefatos novos para commitar."
-            exit 0
-          fi
-
-          git commit -m "odds: snapshot $(date -u +%Y%m%d_%H%M) [$MODE] [skip ci]"
-          if ! git push origin HEAD:main; then
-            echo "::error::Push rejeitado; deploy bloqueado para evitar publicar estado não persistido."
-            exit 1
-          fi
+        run: bash persist_snapshot.sh
 
       # Só publica o estado que já foi versionado e enviado com sucesso ao repositório.
       - name: Publicar no Netlify
