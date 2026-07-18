@@ -62,10 +62,25 @@ def baseline_reasons(now_cov, prev_cov):
     market_ratio = float(os.environ.get("GATE_MARKET_MIN_RATIO", "0.35"))
     min_house = int(os.environ.get("GATE_HOUSE_BASE_MIN", "8"))
     min_market = int(os.environ.get("GATE_MARKET_BASE_MIN", "8"))
+    # Incidente 18/07: 1 casa morta (ex.: EstrelaBet 45→0) NÃO deve congelar a Mesa inteira —
+    # a Mesa ficou 8h parada por causa disso. Coletamos as casas que colapsaram (>65% de queda)
+    # e só bloqueamos POR CASA se mais de GATE_MAX_HOUSE_COLLAPSE (default 1) colapsarem.
+    # 1 casa = tolerado: publica com as demais frescas; a casa morta é dropada/marcada stale no
+    # board. As outras proteções seguem firmes: queda geral >50% (main), mercado-wide, pares de
+    # casas VIVAS, margem negativa, model shadow, sofa defasado.
+    max_collapse = int(os.environ.get("GATE_MAX_HOUSE_COLLAPSE", "1"))
+    collapsed = set()
+    house_reasons = []
     for house, before in (prev_cov.get("houses") or {}).items():
         after = (now_cov.get("houses") or {}).get(house, 0)
         if before >= min_house and after < before * house_ratio:
-            reasons.append(f"casa {house} caiu >{(1-house_ratio)*100:.0f}%: {before} → {after} jogos")
+            collapsed.add(house)
+            house_reasons.append(f"casa {house} caiu >{(1-house_ratio)*100:.0f}%: {before} → {after} jogos")
+    tolerated = collapsed if len(collapsed) <= max_collapse else set()
+    if tolerated:
+        print(f"[gate] tolerado (não bloqueia — casa única morta): {sorted(tolerated)} — publica sem ela")
+    if len(collapsed) > max_collapse:
+        reasons.extend(house_reasons)
     for market, before in (prev_cov.get("markets") or {}).items():
         after = (now_cov.get("markets") or {}).get(market, 0)
         if before >= min_market and after < before * market_ratio:
@@ -73,6 +88,8 @@ def baseline_reasons(now_cov, prev_cov):
     pair_ratio = float(os.environ.get("GATE_HOUSE_MARKET_MIN_RATIO", str(market_ratio)))
     pair_min = int(os.environ.get("GATE_HOUSE_MARKET_BASE_MIN", "5"))
     for house, markets in (prev_cov.get("house_markets") or {}).items():
+        if house in tolerated:
+            continue  # casa morta tolerada: não bloqueia pelos pares dela também
         current = (now_cov.get("house_markets") or {}).get(house) or {}
         for market, before in (markets or {}).items():
             after = int(current.get(market) or 0)
