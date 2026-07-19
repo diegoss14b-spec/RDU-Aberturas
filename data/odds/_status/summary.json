@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-07-19T01:07:14Z",
- "ts_brt": "2026-07-18 22:07",
+ "ts_utc": "2026-07-19T03:53:01Z",
+ "ts_brt": "2026-07-19 00:53",
  "casas_ok": [
   "betano",
   "superbet",
@@ -11,101 +11,119 @@
  "casas_fail": [],
  "n_ok": 5,
  "n_fail": 0,
- "total_events": 23,
+ "total_events": 316,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 10,
-   "n_markets": 4,
+   "n_events": 60,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 2,
-    "Chutes no gol": 2,
-    "Escanteios": 5,
-    "Finalizações": 2
+    "Cartões": 1,
+    "Chutes no gol": 1,
+    "Desarmes": 1,
+    "Escanteios": 42,
+    "Faltas": 1,
+    "Finalizações": 1,
+    "Impedimentos": 1,
+    "Laterais": 1,
+    "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-07-18_2205.jsonl",
+   "pointer_file": "betano_2026-07-19_0043.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 4,
-   "n_markets": 5,
+   "n_events": 81,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 2,
-    "Chutes no gol": 2,
-    "Escanteios": 4,
-    "Faltas": 2,
-    "Finalizações": 2
+    "Cartões": 14,
+    "Chutes no gol": 10,
+    "Desarmes": 1,
+    "Escanteios": 77,
+    "Faltas": 1,
+    "Finalizações": 13,
+    "Impedimentos": 1,
+    "Laterais": 1,
+    "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-07-18_2205.jsonl",
+   "pointer_file": "superbet_2026-07-19_0043.jsonl",
    "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 4,
-   "n_markets": 6,
+   "n_events": 39,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 2,
-    "Chutes no gol": 2,
-    "Escanteios": 4,
-    "Faltas": 2,
-    "Finalizações": 2,
-    "Impedimentos": 2
+    "Cartões": 1,
+    "Chutes no gol": 1,
+    "Desarmes": 1,
+    "Escanteios": 39,
+    "Faltas": 1,
+    "Finalizações": 1,
+    "Impedimentos": 1,
+    "Laterais": 1,
+    "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-07-18_2205.jsonl",
+   "pointer_file": "estrelabet_2026-07-19_0043.jsonl",
    "error": null
   },
   "7k": {
    "ok": true,
-   "n_events": 2,
-   "n_markets": 1,
+   "n_events": 69,
+   "n_markets": 4,
    "market_counts": {
-    "Escanteios": 2
+    "Cartões": 1,
+    "Desarmes": 1,
+    "Escanteios": 69,
+    "Faltas": 1
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-07-18_2205.jsonl",
+   "pointer_file": "7k_2026-07-19_0043.jsonl",
    "error": null
   },
   "pinnacle": {
    "ok": true,
-   "n_events": 3,
+   "n_events": 67,
    "n_markets": 1,
    "market_counts": {
-    "Escanteios": 3
+    "Escanteios": 67
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-07-18_2205.jsonl",
+   "pointer_file": "pinnacle_2026-07-19_0043.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 6,
-  "Chutes no gol": 6,
-  "Escanteios": 18,
+  "Cartões": 17,
+  "Chutes no gol": 12,
+  "Desarmes": 4,
+  "Escanteios": 294,
   "Faltas": 4,
-  "Finalizações": 6,
-  "Impedimentos": 2
+  "Finalizações": 15,
+  "Impedimentos": 3,
+  "Laterais": 3,
+  "Tiros de meta": 3
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-07-19T01:06:55Z",
-  "ts_brt": "2026-07-18 22:06",
-  "n_events": 125,
-  "n_fixtures": 125,
+  "ts_utc": "2026-07-19T03:43:56Z",
+  "ts_brt": "2026-07-19 00:43",
+  "n_events": 129,
+  "n_fixtures": 129,
   "n_markets": 0,
   "min_events": 31,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_e66b83656e04a19beb6f.json",
-  "pointer_at": "2026-07-18T22:06:55-03:00",
-  "pointer_n": 125,
+  "pointer_file": "_snapshots/sofa_275c71685309cc101594.json",
+  "pointer_at": "2026-07-19T00:43:56-03:00",
+  "pointer_n": 129,
   "pointer_age_h": 0.0,
-  "duration_sec": 76.5,
+  "duration_sec": 53.7,
   "error": null,
   "error_class": null,
   "transport": {
@@ -113,7 +131,7 @@
    "proxy_attempts": 39,
    "direct_attempts": 0,
    "statuses": {
-    "200": 38
+    "200": 39
    },
    "last_error": null,
    "consecutive_failures": 0,
@@ -123,5 +141,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "close"
+ "mode": "full"
 }
