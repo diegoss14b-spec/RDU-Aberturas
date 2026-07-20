@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-07-20T22:19:48Z",
- "ts_brt": "2026-07-20 19:19",
+ "ts_utc": "2026-07-20T22:44:04Z",
+ "ts_brt": "2026-07-20 19:44",
  "casas_ok": [
   "betano",
   "superbet",
@@ -11,123 +11,107 @@
  "casas_fail": [],
  "n_ok": 5,
  "n_fail": 0,
- "total_events": 375,
+ "total_events": 7,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 60,
-   "n_markets": 4,
+   "n_events": 2,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 5,
-    "Chutes no gol": 1,
-    "Escanteios": 37,
-    "Finalizações": 1
+    "Escanteios": 2
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-07-20_1909.jsonl",
+   "pointer_file": "betano_2026-07-20_1943.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 102,
-   "n_markets": 9,
+   "n_events": 2,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 35,
-    "Chutes no gol": 29,
-    "Desarmes": 4,
-    "Escanteios": 101,
-    "Faltas": 21,
-    "Finalizações": 39,
-    "Impedimentos": 23,
-    "Laterais": 5,
-    "Tiros de meta": 5
+    "Escanteios": 2
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-07-20_1909.jsonl",
+   "pointer_file": "superbet_2026-07-20_1943.jsonl",
    "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 106,
-   "n_markets": 4,
+   "n_events": 2,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 24,
-    "Chutes no gol": 4,
-    "Escanteios": 106,
-    "Finalizações": 4
+    "Escanteios": 2
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-07-20_1909.jsonl",
+   "pointer_file": "estrelabet_2026-07-20_1943.jsonl",
    "error": null
   },
   "7k": {
    "ok": true,
-   "n_events": 84,
-   "n_markets": 4,
-   "market_counts": {
-    "Cartões": 9,
-    "Desarmes": 7,
-    "Escanteios": 84,
-    "Faltas": 11
-   },
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "7k_2026-07-20_1909.jsonl",
+   "pointer_file": null,
    "error": null
   },
   "pinnacle": {
    "ok": true,
-   "n_events": 23,
+   "n_events": 1,
    "n_markets": 1,
    "market_counts": {
-    "Escanteios": 23
+    "Escanteios": 1
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-07-20_1909.jsonl",
+   "pointer_file": "pinnacle_2026-07-20_1943.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 73,
-  "Chutes no gol": 34,
-  "Desarmes": 11,
-  "Escanteios": 351,
-  "Faltas": 32,
-  "Finalizações": 44,
-  "Impedimentos": 23,
-  "Laterais": 5,
-  "Tiros de meta": 5
+  "Escanteios": 7
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
-  "ok": true,
-  "ts_utc": "2026-07-20T22:10:28Z",
-  "ts_brt": "2026-07-20 19:10",
-  "n_events": 158,
-  "n_fixtures": 158,
+  "ok": false,
+  "ts_utc": "2026-07-20T22:44:04Z",
+  "ts_brt": "2026-07-20 19:44",
+  "n_events": 58,
+  "n_fixtures": 58,
   "n_markets": 0,
   "min_events": 40,
-  "promoted": true,
+  "promoted": false,
   "pointer_valid": true,
   "pointer_file": "_snapshots/sofa_d52e78ecccd8081bc202.json",
   "pointer_at": "2026-07-20T19:10:28-03:00",
   "pointer_n": 158,
-  "pointer_age_h": 0.0,
-  "duration_sec": 52.7,
-  "error": null,
-  "error_class": null,
+  "pointer_age_h": 0.56,
+  "duration_sec": 32.0,
+  "error": "snapshot não saudável: n=58, mínimo=40; fallback preservado n=158; transporte req=21 proxy=21 direto=0 http=200:19,403:1,404:1 ultimo=HTTP 403 via proxy circuito=1 falhas=Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Eliteserien inativos=WC",
+  "error_class": "Geo",
   "transport": {
-   "requests": 39,
-   "proxy_attempts": 39,
+   "requests": 21,
+   "proxy_attempts": 21,
    "direct_attempts": 0,
    "statuses": {
-    "200": 38,
-    "404": 1
+    "200": 19,
+    "404": 1,
+    "403": 1
    },
-   "last_error": null,
+   "last_error": "HTTP 403 via proxy",
    "consecutive_failures": 0,
-   "circuit_open": false,
-   "failed_tournaments": [],
+   "circuit_open": true,
+   "failed_tournaments": [
+    "Ligue1",
+    "MLS",
+    "Argentina",
+    "CSL",
+    "Allsvenskan",
+    "Uruguay",
+    "Ecuador",
+    "Russia",
+    "Eliteserien"
+   ],
    "inactive_tournaments": [
     "WC"
    ]
@@ -135,5 +119,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "full"
+ "mode": "close"
 }
