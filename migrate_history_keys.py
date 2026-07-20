@@ -25,6 +25,7 @@ from canonical import (  # noqa: E402
     norm_team,
     parse_history_key,
     resolve_fixture,
+    unify_gids,
 )
 from history_merge import atomic_write_text, merge_latest_state, merge_records  # noqa: E402
 
@@ -166,10 +167,110 @@ def migrate_keys_dict(keys, fixtures):
     return new, stats
 
 
+def _gid_of(key_meta, rec):
+    """Identidade de jogo (gid) de uma key + registro."""
+    if key_meta.get("format") == "sofa":
+        sid = rec.get("sofa_id") or key_meta.get("sofa_id")
+        return f"sofa:{sid}", (rec.get("kickoff") or "")[:10], \
+            rec.get("home_norm") or "", rec.get("away_norm") or ""
+    day = key_meta.get("day") or (rec.get("kickoff") or "")[:10]
+    hn = key_meta.get("hn") or rec.get("home_norm") or ""
+    an = key_meta.get("an") or rec.get("away_norm") or ""
+    return f"{day}|{hn}|{an}", day, hn, an
+
+
+def unify_keys_dict(keys):
+    """Dedup de CONFRONTOS: junta keys do mesmo jogo gravado com nomes/dia
+    diferentes por casas diferentes (fuzzy ±1 dia, ver canonical.unify_gids).
+
+    Retorna (keys_novo, alias {gid_antigo: gid_canônico}, stats). Idempotente.
+    """
+    games = {}
+    for k, v in (keys or {}).items():
+        if k.startswith("__") or not isinstance(v, dict):
+            continue
+        meta = parse_history_key(k)
+        if meta.get("format") not in ("sofa", "legacy"):
+            continue
+        gid, day, hn, an = _gid_of(meta, v)
+        g = games.setdefault(gid, {"day": day, "hn": hn, "an": an, "n": 0,
+                                   "sofa": gid.startswith("sofa:")})
+        g["n"] += 1
+        if not g["day"] and day:
+            g["day"] = day
+        if not g["hn"] and hn:
+            g["hn"], g["an"] = hn, an
+
+    alias = unify_gids(games)
+    stats = {"gid_merges": len(alias), "key_merges": 0, "main_line_merges": 0}
+    if not alias:
+        return keys, alias, stats
+
+    new = {}
+    main_store = keys.get("__main_lines__") if isinstance(keys, dict) else None
+    for k, v in keys.items():
+        if k == "__main_lines__":
+            continue
+        if k.startswith("__") or not isinstance(v, dict):
+            new[k] = v
+            continue
+        meta = parse_history_key(k)
+        if meta.get("format") not in ("sofa", "legacy"):
+            new[k] = v
+            continue
+        gid, _, _, _ = _gid_of(meta, v)
+        canon = alias.get(gid)
+        if not canon:
+            if k in new:
+                new[k] = merge_records(new[k], v)
+                stats["key_merges"] += 1
+            else:
+                new[k] = v
+            continue
+        casa = meta.get("casa") or k.split("|")[0]
+        mercado, linha, lado = meta["mercado"], meta["linha"], meta["lado"]
+        rec = dict(v)
+        rec["merged_from_keys"] = sorted(set((rec.get("merged_from_keys") or []) + [k]))
+        if canon.startswith("sofa:"):
+            rec["sofa_id"] = canon.split(":", 1)[1]
+            new_key = f"{casa}|{canon}|{mercado}|{linha}|{lado}"
+        else:
+            cday, chn, can_ = canon.split("|")
+            rec["home_norm"], rec["away_norm"] = chn, can_
+            new_key = f"{casa}|{cday}|{chn}|{can_}|{mercado}|{linha}|{lado}"
+        if new_key in new:
+            new[new_key] = merge_records(new[new_key], rec)
+            stats["key_merges"] += 1
+        else:
+            new[new_key] = rec
+
+    # __main_lines__: casa|<gid>|mercado — segue o mesmo alias
+    if main_store is not None:
+        migrated_main = {}
+        for old_key, state in (main_store or {}).items():
+            parts = str(old_key).split("|")
+            new_key = old_key
+            if len(parts) >= 3 and isinstance(state, dict):
+                casa, mercado = parts[0], parts[-1]
+                gid = "|".join(parts[1:-1])
+                canon = alias.get(gid)
+                if canon:
+                    new_key = f"{casa}|{canon}|{mercado}"
+            if new_key in migrated_main and isinstance(state, dict):
+                migrated_main[new_key] = merge_latest_state(migrated_main[new_key], state)
+                stats["main_line_merges"] += 1
+            else:
+                migrated_main[new_key] = state
+        new["__main_lines__"] = migrated_main
+    return new, alias, stats
+
+
 def migrate_file(path: Path, fixtures):
     original = path.read_text(encoding="utf-8")
     keys = json.loads(original)
     new, stats = migrate_keys_dict(keys, fixtures)
+    # dedup de confrontos (mesmo jogo com grafias/dia diferentes entre casas)
+    new, _alias, ustats = unify_keys_dict(new)
     backup = path.with_suffix(path.suffix + ".bak_pre_migrate")
     if backup.exists():
         backup.unlink()
@@ -179,7 +280,8 @@ def migrate_file(path: Path, fixtures):
     print(
         f"[migrate] {path.name}: {len(keys)} -> {len(new)} keys · "
         f"sofa={stats['sofa']} · leg={stats['legacy']} · "
-        f"merges={stats['merges']} · main_merges={stats['main_line_merges']}"
+        f"merges={stats['merges']} · main_merges={stats['main_line_merges']} · "
+        f"dedup jogos={ustats['gid_merges']} (keys unidas={ustats['key_merges']})"
     )
     return len(new)
 

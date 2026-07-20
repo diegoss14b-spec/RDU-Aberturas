@@ -27,7 +27,10 @@ except Exception:
 ROOT = Path(__file__).resolve().parent
 BRT = timezone(timedelta(hours=-3))
 
-STOP = {"fc", "cf", "ec", "sc", "ca", "ac", "afc", "club", "clube", "futebol", "if", "bk", "sc"}
+STOP = {"fc", "cf", "ec", "sc", "ca", "ac", "afc", "club", "clube", "futebol", "if", "bk",
+        # prefixos/sufixos societários que as casas usam de forma inconsistente
+        # (SL Benfica vs Benfica, SK Brann vs Brann, IK Start vs Start, ...)
+        "sl", "sk", "ik", "fk", "cs", "cd", "ud", "umf"}
 # exige separador (espaço/hífen) antes do UF — evita "france"→"fran", "peace"→"pea"
 STATE = re.compile(r"[- ](pr|sp|rj|mg|rs|go|ce|pe|ba|mt|ms|pa|to|al|se|rn|pb|pi|ap|ac|ro|rr|df)$")
 
@@ -294,6 +297,114 @@ def resolve_fixture(home_raw, away_raw, start, league="", fixtures=None):
         "match_confidence": 40 if hn and an else 0,
         "league": league,
     }
+
+
+# ---------------------------------------------------------------------------
+# Unificação fuzzy de identidades de jogo (dedup do histórico, 20/07/2026).
+# O mesmo jogo aparecia 2x+ no banco porque cada casa grafa os times de um jeito
+# ("SL Benfica" vs "Benfica", "Náutico" vs "Náutico Capibaribe") e/ou grava a
+# data local vs UTC (±1 dia). Aqui juntamos gids do MESMO confronto.
+# ---------------------------------------------------------------------------
+UNIFY_MIN = 90          # semelhança mínima do par (gscore) pra considerar mesmo jogo
+# marcadores de time B/feminino/reserva: se um lado tem e o outro não, NÃO junta
+FLAG_TOKENS = {"f", "fem", "w", "b", "ii", "r", "res", "sub", "jr",
+               "u17", "u19", "u20", "u21", "u23"}
+
+
+def _flags(name):
+    return {t for t in (name or "").split() if t in FLAG_TOKENS}
+
+
+def _day_delta(a, b):
+    try:
+        da = datetime.strptime(a, "%Y-%m-%d")
+        db = datetime.strptime(b, "%Y-%m-%d")
+        return abs((da - db).days)
+    except Exception:
+        return 99
+
+
+def unify_gids(games):
+    """games: {gid: {day, hn, an, n, sofa}} → {gid_antigo: gid_canônico}.
+
+    Junta gids do mesmo confronto (dia ±1 + nomes fuzzy ≥ UNIFY_MIN, com guarda
+    de marcadores F/B/II/U20). Canônico = sofa > mais registros > gid menor.
+    Nunca junta dois gids sofa distintos (Sofa é autoridade).
+    """
+    by_day = {}
+    for gid, g in games.items():
+        if g.get("day"):
+            by_day.setdefault(g["day"], []).append(gid)
+
+    parent = {}
+
+    def find(x):
+        while parent.get(x, x) != x:
+            parent[x] = parent.get(parent[x], parent[x])
+            x = parent[x]
+        return x
+
+    roots_sofa = {gid: (gid if g.get("sofa") else None) for gid, g in games.items()}
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra == rb:
+            return
+        sa, sb = roots_sofa.get(ra), roots_sofa.get(rb)
+        if sa and sb and sa != sb:
+            return  # dois jogos Sofa diferentes — não junta
+        parent[rb] = ra
+        roots_sofa[ra] = sa or sb
+
+    days = sorted(by_day)
+    for i, day in enumerate(days):
+        pool = list(by_day[day])
+        # ±1 dia (fuso local vs UTC)
+        for j in (i + 1, i + 2):
+            if j < len(days) and _day_delta(day, days[j]) <= 1:
+                pool += by_day[days[j]]
+        pool = sorted(set(pool))
+        for x in range(len(pool)):
+            ga = games[pool[x]]
+            if not ga.get("hn") or not ga.get("an"):
+                continue
+            for y in range(x + 1, len(pool)):
+                gb = games[pool[y]]
+                if not gb.get("hn") or not gb.get("an"):
+                    continue
+                if ga.get("sofa") and gb.get("sofa"):
+                    continue
+                if _day_delta(ga.get("day") or "", gb.get("day") or "") > 1:
+                    continue
+                straight = min(ratio(ga["hn"], gb["hn"]), ratio(ga["an"], gb["an"]))
+                crossed = min(ratio(ga["hn"], gb["an"]), ratio(ga["an"], gb["hn"]))
+                s = max(straight, crossed)
+                if s < UNIFY_MIN:
+                    continue
+                if straight >= crossed:
+                    sides = ((ga["hn"], gb["hn"]), (ga["an"], gb["an"]))
+                else:
+                    sides = ((ga["hn"], gb["an"]), (ga["an"], gb["hn"]))
+                if any(_flags(p) != _flags(q) for p, q in sides):
+                    continue  # feminino/B/sub-XX de um lado só — jogos diferentes
+                union(pool[x], pool[y])
+
+    clusters = {}
+    for gid in games:
+        clusters.setdefault(find(gid), []).append(gid)
+
+    alias = {}
+    for members in clusters.values():
+        if len(members) < 2:
+            continue
+        def rank(gid):
+            g = games[gid]
+            return (0 if g.get("sofa") else 1, -int(g.get("n") or 0), gid)
+        canonical = sorted(members, key=rank)[0]
+        for gid in members:
+            if gid != canonical:
+                alias[gid] = canonical
+    return alias
 
 
 def history_key(casa, day, hn, an, mercado, linha, lado, sofa_id=None):

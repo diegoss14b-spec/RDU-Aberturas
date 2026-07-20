@@ -19,7 +19,9 @@ except Exception:
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from canonical import norm_team, parse_history_key
+from history_merge import merge_records
 from history_quality import CLOSE_EPS, ensure_aware, parse_ts
+from migrate_history_keys import unify_keys_dict
 
 OUT = ROOT / "valor" / "data" / "moves.js"
 BOARD_M = {"Cart\u00f5es", "Faltas", "Finaliza\u00e7\u00f5es", "Impedimentos", "Laterais", "Tiros de meta",
@@ -74,6 +76,18 @@ def identity(meta, rec, aliases):
 
 def main():
     key_docs = load_key_docs()
+    # dedup de confrontos: mesmo alias do build_history, pra série e linha da
+    # tabela caírem no MESMO gid (senão o gráfico não acha a série da casa)
+    merged_keys = {}
+    for keys in key_docs:
+        for key, rec in keys.items():
+            if key.startswith("__") or not isinstance(rec, dict):
+                continue
+            merged_keys[key] = merge_records(merged_keys[key], rec) if key in merged_keys else rec
+    _, gid_alias, ustats = unify_keys_dict(merged_keys)
+    if ustats.get("gid_merges"):
+        print(f"[moves] dedup: {ustats['gid_merges']} identidades unificadas")
+
     aliases = {}
     for keys in key_docs:
         for key, rec in keys.items():
@@ -116,6 +130,7 @@ def main():
                 an = norm_team(tick.get("away") or "")
                 sid = tick.get("sofa_id") or aliases.get((day, hn, an))
                 gid = f"sofa:{sid}" if sid else f"{day}|{hn}|{an}"
+                gid = gid_alias.get(gid, gid)
                 gk = f"{gid}|{tick.get('mercado')}|{line_key(tick.get('linha'))}|{tick.get('lado')}"
                 tm = epoch_min(dt)
                 if tm is None:
@@ -144,6 +159,7 @@ def main():
             if not is_valid_odd(rec.get("open_odd")) or not is_prematch(ot, ko):
                 continue
             gid, _, _, _ = identity(meta, rec, aliases)
+            gid = gid_alias.get(gid, gid)
             gk = f"{gid}|{market}|{line_key(line)}|{side}"
             bucket = series.setdefault(gk, {}).setdefault(house, [])
             bucket.append([epoch_min(ot), float(rec["open_odd"])])

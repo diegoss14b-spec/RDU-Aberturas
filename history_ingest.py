@@ -24,7 +24,7 @@ from canonical import resolve_fixture, history_key, load_sofa_fixtures, parse_st
 from history_quality import (
     compute_capture_quality, is_pre_kickoff, pick_main_line, parse_ts, ensure_aware, BRT,
 )
-from migrate_history_keys import migrate_keys_dict, migrate_tick_file
+from migrate_history_keys import migrate_keys_dict, migrate_tick_file, unify_keys_dict
 
 ODDS = ROOT / "data" / "odds"
 HIST = ROOT / "data" / "odds_history"
@@ -96,6 +96,8 @@ def main():
     fixtures = load_sofa_fixtures()
     keys = json.loads(kf.read_text(encoding="utf-8")) if kf.exists() else {}
     keys, merge_stats = migrate_keys_dict(keys, fixtures)
+    # dedup de confrontos (mesmo jogo grafado diferente por casas / dia ±1)
+    keys, _gid_alias, _ustats = unify_keys_dict(keys)
     tick_path = HIST / "ticks" / f"{now.strftime('%Y-%m-%d')}.jsonl"
     if tick_path.exists():
         migrate_tick_file(tick_path, fixtures)

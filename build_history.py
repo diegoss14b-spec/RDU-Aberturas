@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from canonical import parse_history_key
 from history_merge import merge_records
+from migrate_history_keys import unify_keys_dict
 from history_quality import (
     compute_capture_quality, ensure_aware, is_strict_clv, parse_ts, strict_clv_reason,
     valid_decimal_odd,
@@ -178,6 +179,14 @@ def main():
                 keys[kk] = merge_records(keys[kk], vv) if kk in keys else vv
         except Exception as e:
             print(f"[history] pulei {f}: {type(e).__name__}")
+
+    # dedup de confrontos em memória (mesmo jogo com grafias/dia diferentes entre
+    # casas). O migrate também persiste isso nos keys/*.json; aqui é cinto e
+    # suspensório pra view nunca mostrar o jogo em dobro.
+    keys, _alias, ustats = unify_keys_dict(keys)
+    if ustats.get("gid_merges"):
+        print(f"[history] dedup: {ustats['gid_merges']} identidades de jogo unificadas "
+              f"({ustats['key_merges']} keys unidas)")
 
     def merc_of(key):
         return parse_history_key(key).get("mercado")
