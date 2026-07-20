@@ -3,6 +3,7 @@
   "use strict";
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function evCls(ev) { return ev >= 10 ? "ev-hi" : ev >= 7 ? "ev-md" : "ev-lo"; }
+  var LOGO = window.casaLogo || function (c) { return esc(c); };
 
   var MODELO_MKT = { "Cartões": 1, "Faltas": 1, "Finalizações": 1, "Escanteios": 1 };
 
@@ -209,7 +210,7 @@
         + '</div>'
         + '</div>'
         + '<div class="vb-num">'
-        + '<div class="vb-odd"><span class="vb-house">' + esc(b.casa) + '</span> @ <b>' + b.odd.toFixed(2) + '</b></div>'
+        + '<div class="vb-odd">' + LOGO(b.casa, "house-logo-sm") + ' @ <b>' + b.odd.toFixed(2) + '</b></div>'
         + '<div class="vb-prob">nossa <b>' + b.nossa_prob.toFixed(0) + '%</b> · justa ' + Number(fair).toFixed(2) + '</div>'
         + '</div>'
         + '</div>';

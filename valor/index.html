@@ -2,21 +2,21 @@
 <html lang="pt-BR"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mesa de Aberturas · RDU</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
+/* Visual padronizado com o RDU Stats (20/07/2026): fonte do sistema, fundo
+   #fafafa, cards brancos com borda #e5e7eb e radius 12px, roxo #6d28d9. */
 :root{
-  --bg:#f4f1ea;--panel:#fbf9f4;--card:#ffffff;--ink:#1a1626;--dim:#6b6577;--faint:#9a94a6;--line:#e7e2d8;--line2:#efeae0;
-  --purple:#6d28d9;--purple-soft:#f1ecfd;--gold:#c88a04;--gold-soft:#fdf6e3;--green:#15803d;--green-soft:#eafaf0;
+  --bg:#fafafa;--panel:#f9fafb;--card:#ffffff;--ink:#1f2937;--dim:#6b7280;--faint:#9ca3af;--line:#e5e7eb;--line2:#f3f4f6;
+  --purple:#6d28d9;--purple-soft:#f5f3ff;--gold:#b45309;--gold-soft:#fffbeb;--green:#15803d;--green-soft:#f0fdf4;
   --red:#c2410c;--blue:#1d4ed8;
-  --sans:'Inter',-apple-system,sans-serif;--disp:'Space Grotesk',sans-serif;--mono:'Space Mono',monospace}
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --disp:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;padding:14px;-webkit-text-size-adjust:100%;
-  background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:22px 22px}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:14px;padding:14px;-webkit-text-size-adjust:100%}
 .wrap{max-width:1180px;margin:0 auto}
 .hdr{display:flex;align-items:center;gap:11px;margin-bottom:2px}
-.mark{width:40px;height:40px;border-radius:11px;background:var(--ink);color:var(--gold);display:grid;place-items:center;font:700 20px var(--disp);flex-shrink:0;box-shadow:0 3px 0 rgba(26,22,38,.18)}
+.mark{width:40px;height:40px;border-radius:11px;background:var(--ink);color:var(--gold);display:grid;place-items:center;font:700 20px var(--disp);flex-shrink:0;box-shadow:0 3px 0 rgba(17,24,39,.18)}
 h1{font:700 22px var(--disp);letter-spacing:-.4px;line-height:1}
 h1 .rd{color:var(--purple)}
 .tag{font:600 10px var(--disp);letter-spacing:.5px;text-transform:uppercase;color:var(--gold);margin-top:2px}
@@ -25,11 +25,11 @@ h1 .rd{color:var(--purple)}
 .disc{background:var(--gold-soft);border:1px solid #f0e2bd;border-radius:11px;padding:9px 12px;font-size:11.5px;color:#7a5a12;line-height:1.5;margin-bottom:13px}
 .bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .chip{padding:6px 12px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--dim);cursor:pointer;font:600 11.5px var(--sans);user-select:none;white-space:nowrap;transition:all .12s}
-.chip:hover{border-color:#d8d0c2}
+.chip:hover{border-color:#d1d5db}
 .chip.on{border-color:var(--purple);color:var(--purple);background:var(--purple-soft)}
 .chip.val.on{border-color:var(--green);color:var(--green);background:var(--green-soft)}
 .meta{font:500 11.5px var(--sans);color:var(--faint);margin-bottom:11px}
-.game{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;margin-bottom:11px;box-shadow:0 1px 2px rgba(26,22,38,.04)}
+.game{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:11px;box-shadow:0 1px 2px rgba(17,24,39,.04)}
 .g-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .g-name{font:600 15.5px var(--disp);line-height:1.2;letter-spacing:-.2px}
 .g-liga{font-size:11px;color:var(--faint);margin-top:3px}
@@ -47,7 +47,7 @@ h1 .rd{color:var(--purple)}
 .mkts{margin-top:10px;display:flex;flex-direction:column;gap:6px}
 .mkt{border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .mkt-h{display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;user-select:none;background:var(--panel)}
-.mkt-h:hover{background:#f6f2ea}
+.mkt-h:hover{background:#f3f4f6}
 .mkt-h .nm{font:600 12.5px var(--sans);flex:1}
 .mkt-h .ct{font:500 10.5px var(--sans);color:var(--faint)}
 .mkt-h .rng{font:700 10.5px var(--mono);color:var(--purple);background:var(--purple-soft);border-radius:6px;padding:2px 7px}
@@ -70,7 +70,7 @@ h1 .rd{color:var(--purple)}
 .ml-mkt{font:600 11.5px var(--sans);color:var(--dim);margin-left:auto}
 .main-line .lad{background:var(--card)}
 .main-line .lad th{padding-top:8px}
-.alt-btn{display:flex;align-items:center;gap:7px;width:100%;margin-top:8px;padding:9px 12px;border:1px dashed #d8d0c2;border-radius:10px;background:var(--card);color:var(--purple);font:600 12px var(--sans);cursor:pointer;text-align:left}
+.alt-btn{display:flex;align-items:center;gap:7px;width:100%;margin-top:8px;padding:9px 12px;border:1px dashed #d1d5db;border-radius:10px;background:var(--card);color:var(--purple);font:600 12px var(--sans);cursor:pointer;text-align:left}
 .alt-btn:hover{border-color:var(--purple);background:var(--purple-soft)}
 .alt-btn.open{border-style:solid;border-color:var(--purple);background:var(--purple-soft)}
 .alt-arw{font-size:11px;color:var(--faint);width:12px}
@@ -164,7 +164,7 @@ tr.mv-open td{background:var(--purple-soft)!important}
 .hist-mv.up{color:var(--green);font-weight:700} .hist-mv.dn{color:var(--red);font-weight:700} .hist-mv.flat{color:var(--faint)}
 /* --- explorador jogo → mercado → main line --- */
 .ex-games{display:flex;flex-direction:column;gap:8px;margin-top:4px}
-.ex-game-card{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 14px;cursor:pointer;font:inherit;color:inherit;box-shadow:0 1px 2px rgba(26,22,38,.04);transition:border-color .12s,background .12s}
+.ex-game-card{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;font:inherit;color:inherit;box-shadow:0 1px 2px rgba(17,24,39,.04);transition:border-color .12s,background .12s}
 .ex-game-card:hover{border-color:var(--purple);background:var(--purple-soft)}
 .ex-g-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
 .ex-g-name{font:600 15px var(--disp);letter-spacing:-.2px;line-height:1.2}
@@ -208,7 +208,7 @@ tr.mv-open td{background:var(--purple-soft)!important}
 .ex-drift{font:700 12px var(--mono);color:var(--dim)}
 /* --- Valor (+EV) --- */
 .vbets{display:flex;flex-direction:column;gap:9px}
-.vbet{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:11px 13px;box-shadow:0 1px 2px rgba(26,22,38,.04)}
+.vbet{display:flex;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;box-shadow:0 1px 2px rgba(17,24,39,.04)}
 .vb-rank{font:700 13px var(--mono);color:var(--faint);width:20px;text-align:center;flex-shrink:0}
 .vb-main{flex:1;min-width:0}
 .vb-top{display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap}
@@ -238,7 +238,7 @@ tr.mv-open td{background:var(--purple-soft)!important}
 .op-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:10px 0 12px}
 .op-kpis-sm{grid-template-columns:repeat(4,1fr)}
 @media (max-width:800px){.op-kpis,.op-kpis-sm{grid-template-columns:1fr 1fr}}
-.op-kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;box-shadow:0 1px 2px rgba(26,22,38,.04)}
+.op-kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;box-shadow:0 1px 2px rgba(17,24,39,.04)}
 .op-kpi-good{border-color:#cdeede;background:linear-gradient(180deg,#fff 60%,#f3fbf6)}
 .op-kpi-mid{border-color:#f0e2bd;background:linear-gradient(180deg,#fff 60%,#fdf8ec)}
 .op-kpi-bad{border-color:#f2c9c9;background:linear-gradient(180deg,#fff 60%,#fdf4f4)}
@@ -275,7 +275,7 @@ tr.mv-open td{background:var(--purple-soft)!important}
 .op-heat td{width:16px;height:16px;border-radius:4px;background:var(--line2)}
 .op-heat td.ht-ok{background:#22c55e}
 .op-heat td.ht-fail{background:#ef4444}
-.op-heat td.ht-na{background:#e7e2d8}
+.op-heat td.ht-na{background:#e5e7eb}
 .op-mercs{display:flex;flex-direction:column;gap:8px}
 .op-merc{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 11px}
 .op-merc-top{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px;margin-bottom:5px}
@@ -289,6 +289,36 @@ tr.mv-open td{background:var(--purple-soft)!important}
 .op-soon-j{font:600 12.5px var(--disp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:600px){.op-soon-row{grid-template-columns:1fr;gap:2px}.op-table .op-err{display:none}}
 [hidden]{display:none!important}
+/* --- logos das casas (frente A, 20/07) --- */
+.house-logo{height:16px;width:auto;display:inline-block;vertical-align:middle;border-radius:4px}
+.house-logo-sm{height:13px}
+.house-logo-lg{height:20px}
+.house-badge{font:700 9.5px var(--disp);letter-spacing:.4px;background:var(--ink);color:#fff;padding:2px 8px;border-radius:6px;text-transform:uppercase;display:inline-block;vertical-align:middle}
+.chip .house-logo{height:14px;vertical-align:-3px}
+.lad th .house-logo{height:12px;vertical-align:-2px;text-transform:none}
+/* --- mesa: linha de jogo colapsada + expansão (frente B, 20/07) --- */
+.gr{background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;box-shadow:0 1px 2px rgba(17,24,39,.04);overflow:hidden}
+.gr-head{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;user-select:none;flex-wrap:wrap}
+.gr-head:hover{background:var(--panel)}
+.gr-head:focus-visible{outline:2px solid var(--purple);outline-offset:-2px}
+.gr-when{font:600 11px var(--mono);color:var(--dim);background:var(--line2);padding:3px 8px;border-radius:6px;white-space:nowrap;flex-shrink:0}
+.gr-names{flex:1;min-width:180px}
+.gr-title{font:600 14px var(--disp);letter-spacing:-.2px;line-height:1.2}
+.gr-liga{font:500 10.5px var(--sans);color:var(--faint);margin-top:1px}
+.gr-sum{display:flex;gap:5px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.gr-pill{font:700 10px var(--mono);color:var(--purple);background:var(--purple-soft);border:1px solid #ddd6fe;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.gr-pill b{font-weight:800}
+.gr-val{font:700 10px var(--mono);color:#fff;background:var(--green);border-radius:6px;padding:2px 7px;white-space:nowrap}
+.gr-houses{display:flex;gap:4px;align-items:center;flex-shrink:0}
+.gr-houses .house-logo{height:14px}
+.gr-arw{color:var(--faint);font-size:10px;transition:transform .15s;flex-shrink:0}
+.gr.open .gr-arw{transform:rotate(90deg)}
+.gr-body{display:none;padding:2px 12px 12px;border-top:1px solid var(--line2)}
+.gr.open .gr-body{display:block}
+.gr-mkt-block{margin-top:12px}
+.gr-mkt-title{font:700 12.5px var(--disp);letter-spacing:-.2px;margin-bottom:2px;display:flex;align-items:center;gap:8px}
+.gr-mkt-title .ct{font:500 10.5px var(--sans);color:var(--faint);font-weight:500}
+.gr-none{font:500 12px var(--sans);color:var(--faint);padding:10px 2px}
 /* --- P0.2 badge honesto do modelo (candidate vs produção) --- */
 .mdl-badge{display:inline-block;font:700 9px var(--disp);letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:6px;vertical-align:middle;border:1px solid transparent;cursor:help}
 .mdl-badge.mdl-prod{background:var(--green-soft);color:var(--green);border-color:#cdeede}
@@ -332,6 +362,7 @@ h1 .mdl-badge{font-size:9.5px}
 </div>
 <script src="data/board.js"></script>
 <script src="data/ops.js"></script>
+<script src="js/casas.js"></script>
 <script src="js/board.js"></script>
 <script src="js/valor.js"></script>
 <script src="js/ops.js"></script>

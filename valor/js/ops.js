@@ -7,6 +7,7 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
   }
+  var LOGO = window.casaLogo || function (c) { return esc(c); };
   function br(x, d) {
     if (x == null || x !== x) return "—";
     return Number(x).toFixed(d == null ? 0 : d).replace(".", ",");
@@ -140,7 +141,8 @@
         ? '<span class="' + clsRate(rate) + '">' + br(rate, 0) + "% <span class=\"op-muted\">(" + h7.ok + "/" + h7.total + ")</span></span>"
         : "—";
       return "<tr>"
-        + "<td><b>" + esc(c.nome) + "</b>" + (c.kind === "fixture" ? ' <span class="op-muted">fixture</span>' : "") + "</td>"
+        + "<td>" + (c.kind === "fixture" ? "<b>" + esc(c.nome) + '</b> <span class="op-muted">fixture</span>'
+          : LOGO(c.nome)) + "</td>"
         + "<td>" + st + "</td>"
         + '<td class="op-num">' + esc(n) + "</td>"
         + '<td class="op-num">' + esc(dur) + "</td>"
@@ -171,7 +173,7 @@
           var title = nome + " " + (col.ts || "") + (cell.n != null ? " · n=" + cell.n : "");
           return '<td class="' + cls + '" title="' + esc(title) + '"></td>';
         }).join("");
-        return "<tr><th>" + esc(nome) + "</th>" + cells + "</tr>";
+        return "<tr><th>" + LOGO(nome, "house-logo-sm") + "</th>" + cells + "</tr>";
       }).join("");
       heatHtml =
         '<div class="op-sec"><div class="op-sec-h">Rodadas recentes <span class="op-muted">(verde = ok · vermelho = fail)</span></div>'
