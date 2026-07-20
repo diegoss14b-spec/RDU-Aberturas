@@ -1,37 +1,34 @@
 {
  "casa": "sofa",
  "kind": "fixture",
- "ok": false,
- "ts_utc": "2026-07-20T14:39:16Z",
- "ts_brt": "2026-07-20 11:39",
- "n_events": 149,
- "n_fixtures": 149,
+ "ok": true,
+ "ts_utc": "2026-07-20T15:25:06Z",
+ "ts_brt": "2026-07-20 12:25",
+ "n_events": 157,
+ "n_fixtures": 157,
  "n_markets": 0,
  "min_events": 40,
- "promoted": false,
+ "promoted": true,
  "pointer_valid": true,
- "pointer_file": "_snapshots/sofa_f219beb71c1ccf64bb60.json",
- "pointer_at": "2026-07-20T11:28:10-03:00",
+ "pointer_file": "_snapshots/sofa_6399bf2696750625a24b.json",
+ "pointer_at": "2026-07-20T12:25:06-03:00",
  "pointer_n": 157,
- "pointer_age_h": 0.185,
- "duration_sec": 50.5,
- "error": "snapshot não saudável: n=149, mínimo=40; fallback preservado n=157; transporte req=38 proxy=38 direto=0 http=200:36,403:1,404:1 ultimo=HTTP 403 via proxy circuito=1 falhas=Eliteserien inativos=WC",
- "error_class": "Geo",
+ "pointer_age_h": 0.0,
+ "duration_sec": 52.8,
+ "error": null,
+ "error_class": null,
  "transport": {
-  "requests": 38,
-  "proxy_attempts": 38,
+  "requests": 39,
+  "proxy_attempts": 39,
   "direct_attempts": 0,
   "statuses": {
-   "200": 36,
-   "404": 1,
-   "403": 1
+   "200": 38,
+   "404": 1
   },
-  "last_error": "HTTP 403 via proxy",
+  "last_error": null,
   "consecutive_failures": 0,
-  "circuit_open": true,
-  "failed_tournaments": [
-   "Eliteserien"
-  ],
+  "circuit_open": false,
+  "failed_tournaments": [],
   "inactive_tournaments": [
    "WC"
   ]
