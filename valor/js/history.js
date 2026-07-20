@@ -8,7 +8,11 @@
   var ABBR = { "Cartões": "CAR", "Faltas": "FAL", "Finalizações": "FIN", "Impedimentos": "IMP",
     "Laterais": "LAT", "Tiros de meta": "TM", "Escanteios": "ESC", "Chutes no gol": "CG", "Desarmes": "DES" };
   var MV = window.MOVES || {};
-  var CASA_COR = { betano: "#6d28d9", superbet: "#2f6f57", estrelabet: "#c2410c", "7k": "#1d4ed8", pinnacle: "#0f766e" };
+  // cores distintas por casa NO GRÁFICO (a cor de marca real repete vermelho
+  // em superbet/estrelabet — aqui legibilidade ganha da identidade)
+  var CASA_COR = { betano: "#f97316", superbet: "#dc2626", estrelabet: "#6d28d9", "7k": "#059669", pinnacle: "#1d4ed8" };
+  function casaCor(c) { return CASA_COR[String(c || "").toLowerCase()] || "#6b7280"; }
+  var LOGO = window.casaLogo || function (c) { return esc(c); };
   var LADO_EN = { "Mais": "over", "Menos": "under", over: "over", under: "under" };
 
   // explorar | liquidadas | abertas
@@ -200,47 +204,121 @@
   }
 
   /**
-   * Gráfico Odds vs Tempo — UMA casa (estilo referência).
-   * Pré-jogo: eixo X = tempo até o kickoff (abertura → fechamento).
-   * Séries: Mais (azul) e Menos (vermelho).
+   * TOTAL IMPLÍCITO (μ) — a "linha projetada pela casa" ao longo do tempo.
+   *
+   * Pra cada snapshot (linha L, odd_over, odd_under) de uma casa:
+   *   p_over_fair = (1/over) / (1/over + 1/under)          [remove o juice]
+   *   μ resolve P(X > L) = p_over_fair sob Poisson          [bisseção em μ]
+   *   com P(X > L) = 1 − CDF(floor(L))  (L meio-inteiro).
+   * Assim "over 24.5 @ 1.90/1.90" vira μ≈24.7 — e uma linha nova (24.5→26.5)
+   * não quebra a série: o μ continua comparável. Odd do over SUBINDO = μ CAINDO.
+   * Em cada minuto usamos a linha mais equilibrada (menor |over−under|) da casa.
    */
-  function houseChart(gid, mercado, linha, casa) {
-    var base = gid + "|" + mercado + "|" + linha + "|";
-    var gO = MV[base + "over"] || {};
-    var gU = MV[base + "under"] || {};
-    var sO = (gO[casa] || []).slice().sort(function (a, b) { return a[0] - b[0]; });
-    var sU = (gU[casa] || []).slice().sort(function (a, b) { return a[0] - b[0]; });
-    if (sO.length < 2 && sU.length < 2) {
-      return '<div class="ex-empty">Sem série suficiente em <b>' + esc(casa) +
-        "</b> pra essa linha.<br><span style=\"font-size:12px\">Precisa de ≥2 capturas (abertura → fechamento). " +
+  function poissonCdf(k, mu) {
+    if (k < 0) return 0;
+    var t = Math.exp(-mu), s = t;
+    for (var i = 1; i <= k; i++) { t *= mu / i; s += t; }
+    return Math.min(1, s);
+  }
+  function pOverFromMu(L, mu) { return 1 - poissonCdf(Math.floor(L), mu); }
+  function solveMu(L, pOver) {
+    if (!(pOver > 0 && pOver < 1) || L == null || L < 0) return null;
+    var lo = 1e-6, hi = Math.max(2 * L + 10, 20), i;
+    for (i = 0; i < 40 && pOverFromMu(L, hi) < pOver; i++) hi *= 1.5;
+    for (i = 0; i < 80; i++) {
+      var mid = (lo + hi) / 2;
+      if (pOverFromMu(L, mid) < pOver) lo = mid; else hi = mid;
+      if (hi - lo < 5e-4) break;
+    }
+    return (lo + hi) / 2;
+  }
+
+  /** Junta as séries over/under de TODAS as linhas do jogo+mercado.
+      → { casas: {casa: [{t, mu, L, o, u}...]}, ko } */
+  function impliedSeries(gid, mercado) {
+    var prefix = gid + "|" + mercado + "|";
+    var perCasa = {};   // casa -> minuto -> L -> {o, u}
+    var ko = null;
+    var linhasVistas = {};
+    Object.keys(MV).forEach(function (gk) {
+      if (gk.indexOf(prefix) !== 0) return;
+      var rest = gk.slice(prefix.length).split("|");
+      if (rest.length !== 2) return;
+      var L = parseFloat(rest[0]), lado = rest[1];
+      if (isNaN(L) || (lado !== "over" && lado !== "under")) return;
+      linhasVistas[L] = 1;
+      var g = MV[gk];
+      if (g._ko && !ko) ko = g._ko;
+      Object.keys(g).forEach(function (casa) {
+        if (casa.charAt(0) === "_") return;
+        (g[casa] || []).forEach(function (p) {
+          var slot = ((perCasa[casa] = perCasa[casa] || {})[p[0]] =
+            perCasa[casa][p[0]] || {});
+          var cell = (slot[L] = slot[L] || {});
+          cell[lado === "over" ? "o" : "u"] = p[1];
+        });
+      });
+    });
+    // só linhas de PARTIDA (descarta totais de time misturados na captura antiga)
+    var okSet = {};
+    matchLineSet(linhasVistas, mercado).forEach(function (L) { okSet[L] = 1; });
+    var out = {};
+    Object.keys(perCasa).forEach(function (casa) {
+      var serie = [];
+      Object.keys(perCasa[casa]).map(Number).sort(function (a, b) { return a - b; })
+        .forEach(function (t) {
+          var porLinha = perCasa[casa][t];
+          var bestL = null, bestGap = Infinity;
+          Object.keys(porLinha).forEach(function (Lk) {
+            var c = porLinha[Lk];
+            if (!(c.o > 1 && c.u > 1) || !okSet[+Lk]) return;
+            var gap = Math.abs(c.o - c.u);
+            if (gap < bestGap) { bestGap = gap; bestL = +Lk; }
+          });
+          if (bestL == null) return;
+          var c = porLinha[bestL];
+          var pFair = (1 / c.o) / (1 / c.o + 1 / c.u);
+          var mu = solveMu(bestL, pFair);
+          if (mu == null) return;
+          serie.push({ t: t, mu: mu, L: bestL, o: c.o, u: c.u });
+        });
+      if (serie.length) out[casa] = serie;
+    });
+    return { casas: out, ko: ko };
+  }
+
+  /** Gráfico do total implícito: UMA linha por casa (ou uma casa só). */
+  function impliedChart(gid, mercado, casaSel) {
+    var data = impliedSeries(gid, mercado);
+    var casas = Object.keys(data.casas).sort();
+    if (casaSel && casaSel !== "__all__") {
+      casas = casas.filter(function (c) { return c === casaSel; });
+    }
+    var series = casas.map(function (c) { return { casa: c, pts: data.casas[c] }; })
+      .filter(function (s) { return s.pts.length >= 1; });
+    if (!series.length || !series.some(function (s) { return s.pts.length >= 2; })) {
+      return '<div class="ex-empty">Sem série suficiente pra desenhar o total implícito.' +
+        "<br><span style=\"font-size:12px\">Precisa de ≥2 capturas com o par Mais/Menos da mesma casa. " +
         "Com o cron de 1h o banco enche rápido.</span></div>";
     }
 
-    var all = sO.concat(sU);
-    var ts = all.map(function (x) { return x[0]; });
-    var os = all.map(function (x) { return x[1]; });
-    var t0 = Math.min.apply(null, ts), t1 = Math.max.apply(null, ts);
-    var ko = gO._ko || gU._ko || null;
-    var closeO = gO._close && gO._close[casa];
-    var closeU = gU._close && gU._close[casa];
-    var realClose = Math.max(closeO || 0, closeU || 0) || null;
-    // Mantém o KO no eixo, sem fingir que ele é um fechamento observado.
+    var allT = [], allMu = [];
+    series.forEach(function (s) {
+      s.pts.forEach(function (p) { allT.push(p.t); allMu.push(p.mu); });
+    });
+    var t0 = Math.min.apply(null, allT), t1 = Math.max.apply(null, allT);
+    var ko = data.ko;
     if (ko && ko > t1) t1 = ko;
-    // se só temos 2 pontos iguais, ainda desenha
-    var o0 = Math.min.apply(null, os), o1 = Math.max.apply(null, os);
-    if (o1 - o0 < 0.05) { o0 -= 0.15; o1 += 0.15; }
-    else { var pad = (o1 - o0) * 0.15 + 0.04; o0 -= pad; o1 += pad; }
+    var m0 = Math.min.apply(null, allMu), m1 = Math.max.apply(null, allMu);
+    if (m1 - m0 < 0.6) { m0 -= 0.4; m1 += 0.4; }
+    else { var padY = (m1 - m0) * 0.15 + 0.1; m0 -= padY; m1 += padY; }
 
-    var W = 720, H = 300, L = 58, R = 118, T = 34, B = 42;
-    var dt = (t1 - t0) || 1, dO = (o1 - o0) || 1;
-    function X(t) { return L + (t - t0) / dt * (W - L - R); }
-    function Y(o) { return T + (1 - (o - o0) / dO) * (H - T - B); }
-    function fmtT(m) {
-      return fmtBrt(m * 60, true);
-    }
+    var W = 720, H = 300, Lp = 52, R = 24, T = 30, Bp = 42;
+    var dt = (t1 - t0) || 1, dM = (m1 - m0) || 1;
+    function X(t) { return Lp + (t - t0) / dt * (W - Lp - R); }
+    function Y(m) { return T + (1 - (m - m0) / dM) * (H - T - Bp); }
     function fmtDelta(m) {
-      // minutos até o kickoff (negativo = antes)
-      if (!ko) return fmtT(m);
+      if (!ko) return fmtBrt(m * 60, true);
       var mins = Math.round(m - ko);
       if (mins === 0) return "KO";
       if (mins < 0) {
@@ -250,113 +328,95 @@
       return "+" + mins + "m";
     }
 
-    var COR_MAIS = "#2563eb";   // azul
-    var COR_MENOS = "#dc2626";  // vermelho
     var sv = '<svg class="ex-svg" viewBox="0 0 ' + W + " " + H + '" width="100%" preserveAspectRatio="xMidYMid meet">';
-    // fundo
-    sv += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fafaf9"/>';
-    // grid horizontal
+    sv += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fafafa"/>';
     for (var i = 0; i <= 4; i++) {
-      var ov = o0 + dO * i / 4, y = Y(ov);
-      sv += '<line x1="' + L + '" y1="' + y.toFixed(1) + '" x2="' + (W - R) + '" y2="' + y.toFixed(1) +
-        '" stroke="#e5e5e5" stroke-width="1"/>';
-      sv += '<text x="' + (L - 8) + '" y="' + (y + 3.5).toFixed(1) +
-        '" text-anchor="end" font-size="11" fill="#737373" font-family="ui-monospace,monospace">' +
-        ov.toFixed(2) + "</text>";
+      var mv = m0 + dM * i / 4, y = Y(mv);
+      sv += '<line x1="' + Lp + '" y1="' + y.toFixed(1) + '" x2="' + (W - R) + '" y2="' + y.toFixed(1) +
+        '" stroke="#e5e7eb" stroke-width="1"/>';
+      sv += '<text x="' + (Lp - 8) + '" y="' + (y + 3.5).toFixed(1) +
+        '" text-anchor="end" font-size="11" fill="#6b7280" font-family="ui-monospace,monospace">' +
+        mv.toFixed(1) + "</text>";
     }
-    // grid vertical (ticks de tempo)
     var nTicks = 5;
     for (var j = 0; j <= nTicks; j++) {
       var tv = t0 + (t1 - t0) * j / nTicks;
       var x = X(tv);
-      sv += '<line x1="' + x.toFixed(1) + '" y1="' + T + '" x2="' + x.toFixed(1) + '" y2="' + (H - B) +
-        '" stroke="#f0f0f0" stroke-width="1"/>';
+      sv += '<line x1="' + x.toFixed(1) + '" y1="' + T + '" x2="' + x.toFixed(1) + '" y2="' + (H - Bp) +
+        '" stroke="#f3f4f6" stroke-width="1"/>';
       sv += '<text x="' + x.toFixed(1) + '" y="' + (H - 12) +
-        '" text-anchor="middle" font-size="10" fill="#737373">' + fmtDelta(tv) + "</text>";
+        '" text-anchor="middle" font-size="10" fill="#6b7280">' + fmtDelta(tv) + "</text>";
     }
-    // labels eixos
-    sv += '<text x="14" y="' + (H / 2) + '" text-anchor="middle" font-size="10" fill="#525252" ' +
-      'transform="rotate(-90 14 ' + (H / 2) + ')">ODD</text>';
-    sv += '<text x="' + ((L + W - R) / 2) + '" y="' + (H - 2) +
-      '" text-anchor="middle" font-size="10" fill="#525252">TEMPO (até o kickoff)</text>';
-
-    // Fechamento realmente observado, independente do horário de kickoff.
-    if (realClose && realClose >= t0 && realClose <= t1) {
-      sv += '<line x1="' + X(realClose).toFixed(1) + '" y1="' + T + '" x2="' + X(realClose).toFixed(1) +
-        '" y2="' + (H - B) + '" stroke="#d97706" stroke-width="1.5" stroke-dasharray="3,3"/>';
-      sv += '<text x="' + X(realClose).toFixed(1) + '" y="' + (T + 24) +
-        '" text-anchor="middle" font-size="10" fill="#b45309" font-weight="700">Close observado</text>';
-    }
-    // Kickoff agendado.
+    sv += '<text x="14" y="' + (H / 2) + '" text-anchor="middle" font-size="10" fill="#4b5563" ' +
+      'transform="rotate(-90 14 ' + (H / 2) + ')">TOTAL IMPLÍCITO (μ)</text>';
+    sv += '<text x="' + ((Lp + W - R) / 2) + '" y="' + (H - 2) +
+      '" text-anchor="middle" font-size="10" fill="#4b5563">TEMPO (até o kickoff)</text>';
     if (ko && ko >= t0 && ko <= t1) {
       sv += '<line x1="' + X(ko).toFixed(1) + '" y1="' + T + '" x2="' + X(ko).toFixed(1) +
-        '" y2="' + (H - B) + '" stroke="#a3a3a3" stroke-width="1.5" stroke-dasharray="5,4"/>';
-      sv += '<text x="' + X(ko).toFixed(1) + '" y="' + (T + 12) +
-        '" text-anchor="middle" font-size="10" fill="#525252" font-weight="700">Kickoff</text>';
+        '" y2="' + (H - Bp) + '" stroke="#9ca3af" stroke-width="1.5" stroke-dasharray="5,4"/>';
+      sv += '<text x="' + X(ko).toFixed(1) + '" y="' + (T - 6) +
+        '" text-anchor="middle" font-size="10" fill="#4b5563" font-weight="700">Kickoff</text>';
     }
 
-    var lnLab = br(linha, 1); // "20,5"
-    var labMais = "Mais de " + lnLab;
-    var labMenos = "Menos de " + lnLab;
-
-    function drawSeries(s, cor, label) {
-      if (!s || s.length < 1) return;
-      var pts = s.map(function (p) { return X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1); }).join(" ");
-      sv += '<polyline points="' + pts + '" fill="none" stroke="' + cor + '" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
-      s.forEach(function (p, idx) {
-        var r = (idx === 0 || idx === s.length - 1) ? 4 : 2.6;
-        sv += '<circle cx="' + X(p[0]).toFixed(1) + '" cy="' + Y(p[1]).toFixed(1) +
-          '" r="' + r + '" fill="' + cor + '" stroke="#fff" stroke-width="1"/>';
-      });
-      // label no último ponto: "Mais de 20,5 @ 1.80"
-      var last = s[s.length - 1];
-      var tag = label + " · " + Number(last[1]).toFixed(2).replace(".", ",");
-      var tw = Math.max(96, tag.length * 6.2);
-      sv += '<rect x="' + (X(last[0]) + 6).toFixed(1) + '" y="' + (Y(last[1]) - 18).toFixed(1) +
-        '" width="' + tw + '" height="16" rx="4" fill="#fff" stroke="' + cor + '" stroke-width="1"/>';
-      sv += '<text x="' + (X(last[0]) + 6 + tw / 2).toFixed(1) + '" y="' + (Y(last[1]) - 6.5).toFixed(1) +
-        '" text-anchor="middle" font-size="10" fill="' + cor + '" font-weight="700">' + tag + "</text>";
-      // label abertura
-      if (s.length >= 1) {
-        var first = s[0];
-        sv += '<text x="' + X(first[0]).toFixed(1) + '" y="' + (Y(first[1]) - 8).toFixed(1) +
-          '" text-anchor="middle" font-size="9" fill="' + cor + '">' +
-          Number(first[1]).toFixed(2).replace(".", ",") + "</text>";
+    series.forEach(function (s) {
+      var cor = casaCor(s.casa);
+      var pts = s.pts.map(function (p) { return X(p.t).toFixed(1) + "," + Y(p.mu).toFixed(1); }).join(" ");
+      if (s.pts.length >= 2) {
+        sv += '<polyline points="' + pts + '" fill="none" stroke="' + cor +
+          '" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>';
       }
-    }
-    drawSeries(sO, COR_MAIS, labMais);
-    drawSeries(sU, COR_MENOS, labMenos);
+      s.pts.forEach(function (p, idx) {
+        var lineChanged = idx > 0 && p.L !== s.pts[idx - 1].L;
+        var tip = (window.casaNome ? window.casaNome(s.casa) : s.casa) + " · " + fmtBrt(p.t * 60, true) +
+          " · linha " + br(p.L, 1) + " · " + br(p.o, 2) + "/" + br(p.u, 2) +
+          " · μ " + br(p.mu, 1) +
+          (lineChanged ? " · LINHA MUDOU " + br(s.pts[idx - 1].L, 1) + " → " + br(p.L, 1) : "");
+        if (lineChanged) {
+          // marcador de mudança de linha oferecida: losango maior
+          var cx = X(p.t), cy = Y(p.mu), r = 5.5;
+          sv += '<path d="M' + cx.toFixed(1) + " " + (cy - r).toFixed(1) +
+            "L" + (cx + r).toFixed(1) + " " + cy.toFixed(1) +
+            "L" + cx.toFixed(1) + " " + (cy + r).toFixed(1) +
+            "L" + (cx - r).toFixed(1) + " " + cy.toFixed(1) + 'Z" fill="#fff" stroke="' + cor +
+            '" stroke-width="2"><title>' + esc(tip) + "</title></path>";
+        } else {
+          var rr = (idx === 0 || idx === s.pts.length - 1) ? 4 : 2.8;
+          sv += '<circle cx="' + X(p.t).toFixed(1) + '" cy="' + Y(p.mu).toFixed(1) +
+            '" r="' + rr + '" fill="' + cor + '" stroke="#fff" stroke-width="1"><title>' +
+            esc(tip) + "</title></circle>";
+        }
+      });
+      // rótulo do último ponto: "μ 24,7"
+      var last = s.pts[s.pts.length - 1];
+      sv += '<text x="' + (X(last.t) + 7).toFixed(1) + '" y="' + (Y(last.mu) + 3.5).toFixed(1) +
+        '" font-size="10" font-weight="700" fill="' + cor + '">' + br(last.mu, 1) + "</text>";
+    });
     sv += "</svg>";
 
-    // resumo numérico abertura → fechamento
-    function ends(s) {
-      if (!s || !s.length) return { o: null, c: null, n: 0 };
-      return { o: s[0][1], c: s[s.length - 1][1], n: s.length };
-    }
-    var eO = ends(sO), eU = ends(sU);
-    function drift(a, b) {
-      if (a == null || b == null || !a) return "—";
-      var d = (b / a - 1) * 100;
-      return (d > 0 ? "+" : "") + d.toFixed(1).replace(".", ",") + "%";
-    }
-    var sum =
-      '<div class="ex-sum">' +
-      '<div class="ex-sum-item"><span class="dot" style="background:' + COR_MAIS + '"></span><b>' + labMais + "</b> " +
-      br(eO.o, 2) + " → " + br(eO.c, 2) + ' <span class="ex-drift">' + drift(eO.o, eO.c) + "</span>" +
-      ' <span class="pm">(' + eO.n + " pts)</span></div>" +
-      '<div class="ex-sum-item"><span class="dot" style="background:' + COR_MENOS + '"></span><b>' + labMenos + "</b> " +
-      br(eU.o, 2) + " → " + br(eU.c, 2) + ' <span class="ex-drift">' + drift(eU.o, eU.c) + "</span>" +
-      ' <span class="pm">(' + eU.n + " pts)</span></div>" +
-      "</div>";
+    // resumo por casa: abertura → agora (μ) + Δ + mudanças de linha
+    var sum = '<div class="ex-sum">' + series.map(function (s) {
+      var a = s.pts[0], z = s.pts[s.pts.length - 1];
+      var d = z.mu - a.mu;
+      var nCh = 0;
+      for (var q = 1; q < s.pts.length; q++) if (s.pts[q].L !== s.pts[q - 1].L) nCh++;
+      return '<div class="ex-sum-item"><span class="dot" style="background:' + casaCor(s.casa) + '"></span>' +
+        LOGO(s.casa, "house-logo-sm") + " μ " + br(a.mu, 1) + " → <b>" + br(z.mu, 1) + "</b>" +
+        ' <span class="ex-drift">' + (d > 0 ? "+" : "") + br(d, 1) + "</span>" +
+        (nCh ? ' <span class="pm">◇ ' + nCh + " troca" + (nCh > 1 ? "s" : "") + " de linha</span>" : "") +
+        ' <span class="pm">(' + s.pts.length + " pts)</span></div>";
+    }).join("") + "</div>";
 
     var leg =
       '<div class="ex-chart-head">' +
-      '<div class="ex-chart-title-row">Gráfico Odds vs Tempo · <b>' + esc(casa) + "</b> · " +
-      esc(mercado) + " " + lnLab + "</div>" +
+      '<div class="ex-chart-title-row">Total implícito do mercado (μ) · ' + esc(mercado) +
+      (casaSel && casaSel !== "__all__" ? " · " + LOGO(casaSel, "house-logo-sm") : " · todas as casas") + "</div>" +
       '<div class="mv-legend">' +
-      '<span><span class="sw" style="background:' + COR_MAIS + ';height:3px"></span>' + labMais + "</span>" +
-      '<span><span class="sw" style="background:' + COR_MENOS + ';height:3px"></span>' + labMenos + "</span>" +
-      '<span class="ex-leg-note">capturas pré-jogo · close observado ≠ kickoff</span></div></div>';
+      series.map(function (s) {
+        return '<span><span class="sw" style="background:' + casaCor(s.casa) + ';height:3px"></span>' +
+          LOGO(s.casa, "house-logo-sm") + "</span>";
+      }).join("") +
+      '<span class="ex-leg-note">μ = total que a odd embute (sem juice) · ◇ = a casa trocou a linha · odd do over subindo = μ caindo</span>' +
+      "</div></div>";
 
     return leg + sum + '<div class="mv-chart ex-chart ex-chart-ref">' + sv + "</div>";
   }
@@ -496,7 +556,7 @@
           (g.settled ? '<span class="ex-badge done">liquidado</span>' : '<span class="ex-badge live">aberto</span>') +
           (bestQ ? qBadge(bestQ) : "") +
           '<span class="ex-g-m">' + nMerc + " mercado" + (nMerc === 1 ? "" : "s") + "</span>" +
-          '<span class="ex-g-c">' + Object.keys(g.casas).join(" · ") + "</span></div>";
+          '<span class="ex-g-c">' + Object.keys(g.casas).map(function (c) { return LOGO(c, "house-logo-sm"); }).join(" ") + "</span></div>";
         card.onclick = function () {
           state.game = g.id;
           state.mercado = null;
@@ -532,7 +592,7 @@
     title.innerHTML = '<div class="ex-d-name">' + esc(g.jogo) + '</div>' +
       '<div class="ex-d-sub">' + esc(fmtBrt(g.kickoff || g.data, true)) +
       (g.settled ? ' · liquidado' : ' · em aberto') +
-      " · " + Object.keys(g.casas).join(", ") + "</div>";
+      " · " + Object.keys(g.casas).map(function (c) { return LOGO(c, "house-logo-sm"); }).join(" ") + "</div>";
     head.appendChild(title);
     root.appendChild(head);
 
@@ -593,7 +653,7 @@
     var ln = mkt.linhas[String(state.linha)];
     if (!ln) return;
 
-    // chips de CASA (gráfico separado por casa)
+    // chips de CASA: todas as casas (uma cor por casa) ou uma casa só
     var casasSerie = casasComSerie(g.id, state.mercado, state.linha);
     var overRows = (ln.lados["Mais"] || {}).rows || [];
     var underRows = (ln.lados["Menos"] || {}).rows || [];
@@ -602,23 +662,19 @@
     underRows.forEach(function (r) { casasAll[r.casa] = 1; });
     casasSerie.forEach(function (c) { casasAll[c] = 1; });
     var casaList = Object.keys(casasAll);
-    if (!state.casa || casaList.indexOf(state.casa) < 0) {
-      // prefere casa com mais pontos na série
-      var bestC = null, bestN = -1;
-      casaList.forEach(function (c) {
-        var base = g.id + "|" + state.mercado + "|" + state.linha + "|";
-        var n = ((MV[base + "over"] || {})[c] || []).length + ((MV[base + "under"] || {})[c] || []).length;
-        if (n > bestN) { bestN = n; bestC = c; }
-      });
-      state.casa = bestC || casaList[0] || null;
+    if (!state.casa || (state.casa !== "__all__" && casaList.indexOf(state.casa) < 0)) {
+      state.casa = "__all__";
     }
 
     var cbar = document.createElement("div"); cbar.className = "bar";
     var labCasa = document.createElement("span");
     labCasa.className = "ex-bar-lab"; labCasa.textContent = "Casa:";
     cbar.appendChild(labCasa);
+    cbar.appendChild(chip("Todas as casas", state.casa === "__all__", "", function () {
+      state.casa = "__all__"; render();
+    }));
     casaList.forEach(function (c) {
-      cbar.appendChild(chip(esc(c), state.casa === c, "", function () {
+      cbar.appendChild(chip(LOGO(c, "house-logo-sm"), state.casa === c, "", function () {
         state.casa = c; render();
       }));
     });
@@ -640,30 +696,47 @@
       resultHtml = '<div class="ex-result wait"><div class="ex-res-k">Resultado</div><div class="ex-res-v">aguardando liquidação</div></div>';
     }
 
-    var o = overRows.filter(function (r) { return r.casa === state.casa; })[0];
-    var u = underRows.filter(function (r) { return r.casa === state.casa; })[0];
-    var tbl = '<table class="lad ex-odds"><thead><tr><th>Lado</th><th>Abertura</th><th>Fechamento</th><th>Δ%</th><th>CLV</th></tr></thead><tbody>';
-    function rowSide(lab, r, tdCls) {
-      if (!r) return "<tr><td>" + lab + "</td><td colspan='4' class='pm'>—</td></tr>";
-      var close = r.close != null ? r.close : r.last;
-      var d = (r.open && close) ? ((close / r.open - 1) * 100) : null;
-      return "<tr><td><b>" + lab + "</b></td>" +
-        '<td class="' + tdCls + '">' + br(r.open, 2) + "</td>" +
-        '<td class="' + tdCls + '">' + br(close, 2) + "</td>" +
-        '<td class="' + cls(d) + '">' + sign(d, 1) + "</td>" +
-        '<td class="' + (r.clv_valido === false ? "" : cls(r.clv)) + '">' +
-        (r.clv_valido === false ? "—" : sign(r.clv, 1)) + "</td></tr>";
-    }
     var lnTxt = br(state.linha, 1);
-    tbl += rowSide("Mais de " + lnTxt, o, "o") + rowSide("Menos de " + lnTxt, u, "u") + "</tbody></table>";
+    var tbl;
+    if (state.casa === "__all__") {
+      // resumo por casa da linha selecionada (abertura → fechamento dos 2 lados)
+      tbl = '<table class="lad ex-odds"><thead><tr><th>Casa</th><th>+ abre</th><th>+ fecha</th><th>− abre</th><th>− fecha</th><th>CLV +</th></tr></thead><tbody>';
+      casaList.forEach(function (c) {
+        var ro = overRows.filter(function (r) { return r.casa === c; })[0];
+        var ru = underRows.filter(function (r) { return r.casa === c; })[0];
+        function endv(r) { return r ? (r.close != null ? r.close : r.last) : null; }
+        tbl += "<tr><td>" + LOGO(c, "house-logo-sm") + "</td>" +
+          '<td class="o">' + br(ro && ro.open, 2) + '</td><td class="o">' + br(endv(ro), 2) + "</td>" +
+          '<td class="u">' + br(ru && ru.open, 2) + '</td><td class="u">' + br(endv(ru), 2) + "</td>" +
+          '<td class="' + (ro && ro.clv_valido !== false ? cls(ro.clv) : "") + '">' +
+          (ro && ro.clv_valido !== false ? sign(ro.clv, 1) : "—") + "</td></tr>";
+      });
+      tbl += "</tbody></table>";
+    } else {
+      var o = overRows.filter(function (r) { return r.casa === state.casa; })[0];
+      var u = underRows.filter(function (r) { return r.casa === state.casa; })[0];
+      tbl = '<table class="lad ex-odds"><thead><tr><th>Lado</th><th>Abertura</th><th>Fechamento</th><th>Δ%</th><th>CLV</th></tr></thead><tbody>';
+      var rowSide = function (lab, r, tdCls) {
+        if (!r) return "<tr><td>" + lab + "</td><td colspan='4' class='pm'>—</td></tr>";
+        var close = r.close != null ? r.close : r.last;
+        var d = (r.open && close) ? ((close / r.open - 1) * 100) : null;
+        return "<tr><td><b>" + lab + "</b></td>" +
+          '<td class="' + tdCls + '">' + br(r.open, 2) + "</td>" +
+          '<td class="' + tdCls + '">' + br(close, 2) + "</td>" +
+          '<td class="' + cls(d) + '">' + sign(d, 1) + "</td>" +
+          '<td class="' + (r.clv_valido === false ? "" : cls(r.clv)) + '">' +
+          (r.clv_valido === false ? "—" : sign(r.clv, 1)) + "</td></tr>";
+      };
+      tbl += rowSide("Mais de " + lnTxt, o, "o") + rowSide("Menos de " + lnTxt, u, "u") + "</tbody></table>";
+    }
 
     panel.innerHTML =
       '<div class="ex-panel-grid">' + resultHtml +
-      '<div class="ex-odds-wrap"><div class="ex-panel-title">' + esc(state.casa || "—") +
+      '<div class="ex-odds-wrap"><div class="ex-panel-title">' +
+      (state.casa === "__all__" ? "Todas as casas" : LOGO(state.casa || "—", "house-logo-sm")) +
       " · linha " + br(state.linha, 1) + " · " + esc(state.mercado) +
       "</div>" + tbl + "</div></div>" +
-      (state.casa ? houseChart(g.id, state.mercado, state.linha, state.casa) :
-        '<div class="ex-empty">Escolha uma casa.</div>');
+      impliedChart(g.id, state.mercado, state.casa || "__all__");
 
     root.appendChild(panel);
   }
