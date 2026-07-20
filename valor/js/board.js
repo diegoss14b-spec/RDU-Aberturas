@@ -1,35 +1,65 @@
-// Mesa de Aberturas — por mercado · 3 colunas: jogo | mandante | visitante
+// Mesa de Aberturas — linha colapsada por jogo + filtros mercado × casa (20/07/2026)
+// Clique no jogo expande os detalhes (linhas do jogo/mandante/visitante por casa).
 (function () {
   var B = (window.BOARD || { jogos: [], mercados: [], casas: [], gerado: "?" });
   var jogos = B.jogos || [];
   var MERCADOS = B.mercados || ["Cartões", "Faltas", "Finalizações", "Chutes no gol", "Escanteios", "Impedimentos", "Laterais", "Tiros de meta", "Desarmes"];
+  var ABBR = { "Cartões": "CAR", "Faltas": "FAL", "Finalizações": "FIN", "Chutes no gol": "CG",
+    "Escanteios": "ESC", "Impedimentos": "IMP", "Laterais": "LAT", "Tiros de meta": "TM", "Desarmes": "DES" };
+  var LOGO = window.casaLogo || function (c) { return esc(c); };
 
   function hasMkt(j, m) {
     return (j.mercados && j.mercados[m]) || (j.times && j.times[m]);
   }
 
-  /** Abre no mercado com MAIOR cobertura (evita esconder Escanteios atrás de Cartões). */
-  function firstMarket() {
-    var best = null, bestN = -1;
-    for (var i = 0; i < MERCADOS.length; i++) {
-      var m = MERCADOS[i];
-      var n = 0;
-      for (var j = 0; j < jogos.length; j++) {
-        if (hasMkt(jogos[j], m)) n++;
-      }
-      if (n > bestN) { bestN = n; best = m; }
-    }
-    return best || MERCADOS[0] || "Cartões";
-  }
-
   // P0.4 — thresholds de idade da mesa (horas) pro banner; fácil de mudar aqui.
   var AGE_WARN_H = 8, AGE_CRIT_H = 12;
-  var state = { mercado: firstMarket(), soValor: false, ordem: "valor", mostrarTodos: false };
+
+  // ---- filtros persistentes (localStorage) ----
+  var LS_KEY = "rdu_mesa_filtros";
+  function loadFilt() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+      return {
+        mercado: typeof raw.mercado === "string" ? raw.mercado : "todos",
+        casa: typeof raw.casa === "string" ? raw.casa : "todas",
+        soValor: !!raw.soValor,
+        ordem: ["valor", "horario", "casas"].indexOf(raw.ordem) >= 0 ? raw.ordem : "valor"
+      };
+    } catch (e) { return { mercado: "todos", casa: "todas", soValor: false, ordem: "valor" }; }
+  }
+  function saveFilt() {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        mercado: state.mercado, casa: state.casa, soValor: state.soValor, ordem: state.ordem
+      }));
+    } catch (e) { /* privado/quota — segue sem persistir */ }
+  }
+  var _f = loadFilt();
+  var state = { mercado: _f.mercado, casa: _f.casa, soValor: _f.soValor,
+    ordem: _f.ordem, mostrarTodos: false, expanded: {} };
+  // filtro salvo pode apontar pra mercado/casa que não existe mais nesta board
+  if (state.mercado !== "todos" && !jogos.some(function (j) { return hasMkt(j, state.mercado); })) state.mercado = "todos";
+  if (state.casa !== "todas" && (B.casas || []).indexOf(state.casa) < 0) state.casa = "todas";
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
+  }
+
+  function sameCasa(a, b) {
+    return String(a || "").toLowerCase() === String(b || "").toLowerCase();
+  }
+
+  /** Aplica o filtro de casa num objeto {casa: linhas}. */
+  function filterCasas(perCasa) {
+    if (state.casa === "todas" || !perCasa) return perCasa || {};
+    var out = {};
+    Object.keys(perCasa).forEach(function (c) {
+      if (sameCasa(c, state.casa)) out[c] = perCasa[c];
+    });
+    return out;
   }
 
   function parseBrt(value) {
@@ -59,9 +89,6 @@
     return now >= kickoff ? "started" : "upcoming";
   }
 
-
-
-
   function freshness() {
     var ms = parseBrt(B.gerado_iso || B.gerado);
     if (ms == null) return { txt: "?", mins: null, stale: true, band: "unk" };
@@ -73,11 +100,10 @@
     return { txt: txt, mins: mins, stale: mins > 120, band: band };
   }
 
-
-  function chip(label, active, cls, onclick) {
+  function chip(label, active, cls, onclick, isHtml) {
     var c = document.createElement("span");
     c.className = "chip" + (cls ? " " + cls : "") + (active ? " on" : "");
-    c.textContent = label;
+    if (isHtml) c.innerHTML = label; else c.textContent = label;
     c.onclick = onclick;
     c.setAttribute("role", "button");
     c.tabIndex = 0;
@@ -90,58 +116,104 @@
   function renderFiltros() {
     var box = document.getElementById("filtros");
     box.innerHTML = "";
+
+    // linha 1: MERCADO (Todos + cada mercado com cobertura)
+    var rowM = document.createElement("div"); rowM.className = "bar";
+    rowM.appendChild(chip("Todos os mercados", state.mercado === "todos", "", function () {
+      state.mercado = "todos"; saveFilt(); render();
+    }));
     MERCADOS.forEach(function (m) {
       if (!jogos.some(function (j) { return hasMkt(j, m); })) return;
-      box.appendChild(chip(m, state.mercado === m, "", function () {
-        state.mercado = m;
-        render();
+      rowM.appendChild(chip(m, state.mercado === m, "", function () {
+        state.mercado = (state.mercado === m ? "todos" : m);
+        saveFilt(); render();
       }));
     });
-    box.appendChild(chip("🎯 só com valor", state.soValor, "val", function () {
-      state.soValor = !state.soValor;
-      render();
+    box.appendChild(rowM);
+
+    // linha 2: CASA (Todas + logo de cada casa) + toggles + ordenação
+    var rowC = document.createElement("div"); rowC.className = "bar";
+    rowC.appendChild(chip("Todas as casas", state.casa === "todas", "", function () {
+      state.casa = "todas"; saveFilt(); render();
+    }));
+    (B.casas || []).forEach(function (c) {
+      rowC.appendChild(chip(LOGO(c, "house-logo-sm"), sameCasa(state.casa, c), "", function () {
+        state.casa = sameCasa(state.casa, c) ? "todas" : c;
+        saveFilt(); render();
+      }, true));
+    });
+    rowC.appendChild(chip("🎯 só com valor", state.soValor, "val", function () {
+      state.soValor = !state.soValor; saveFilt(); render();
     }));
     // P0.4 — por padrão só jogos próximos; liga pra ver ao vivo/encerrados.
-    box.appendChild(chip(state.mostrarTodos ? "👁 mostrando ao vivo/encerrados" : "👁 ver ao vivo/encerrados", state.mostrarTodos, "", function () {
+    rowC.appendChild(chip(state.mostrarTodos ? "👁 mostrando ao vivo/encerrados" : "👁 ver ao vivo/encerrados", state.mostrarTodos, "", function () {
       state.mostrarTodos = !state.mostrarTodos;
       render();
     }));
     var ords = [["valor", "＄ mais valor"], ["horario", "⏱ horário"], ["casas", "🏦 nº de casas"]];
     ords.forEach(function (o) {
-      box.appendChild(chip(o[1], state.ordem === o[0], "ord", function () {
-        state.ordem = o[0];
-        render();
+      rowC.appendChild(chip(o[1], state.ordem === o[0], "ord", function () {
+        state.ordem = o[0]; saveFilt(); render();
       }));
+    });
+    box.appendChild(rowC);
+  }
+
+  /** Mercados do jogo que passam nos filtros mercado × casa. */
+  function marketsOf(j) {
+    var list = state.mercado === "todos" ? MERCADOS : [state.mercado];
+    return list.filter(function (m) {
+      if (!hasMkt(j, m)) return false;
+      if (state.casa === "todas") return true;
+      var per = (j.mercados && j.mercados[m]) || {};
+      if (Object.keys(per).some(function (c) { return sameCasa(c, state.casa); })) return true;
+      var t = (j.times && j.times[m]) || {};
+      return ["home", "away"].some(function (s) {
+        return t[s] && t[s].casas && Object.keys(t[s].casas).some(function (c) { return sameCasa(c, state.casa); });
+      });
+    });
+  }
+
+  function valsOf(j) {
+    return (j.valor || []).filter(function (v) {
+      if (state.mercado !== "todos" && v.mercado !== state.mercado) return false;
+      if (state.casa !== "todas" && !sameCasa(v.casa, state.casa)) return false;
+      return true;
     });
   }
 
   function passa(j) {
-    if (!hasMkt(j, state.mercado)) return false;
+    if (!marketsOf(j).length) return false;
     // P0.4 — default só upcoming; o toggle mostra ao vivo/encerrados. game_state ausente = mostra.
     if (!state.mostrarTodos && j.game_state && j.game_state !== "upcoming") return false;
-    if (state.soValor) {
-      var has = (j.valor || []).some(function (v) { return v.mercado === state.mercado; });
-      if (!has) return false;
-    }
+    if (state.soValor && !valsOf(j).length) return false;
     return true;
   }
 
-  function topEvMkt(j) {
+  function topEv(j) {
     var best = -999;
-    (j.valor || []).forEach(function (v) {
-      if (v.mercado === state.mercado && v.ev_pct > best) best = v.ev_pct;
-    });
+    valsOf(j).forEach(function (v) { if (v.ev_pct > best) best = v.ev_pct; });
     return best;
+  }
+
+  function nCasasDo(j) {
+    var set = {};
+    marketsOf(j).forEach(function (m) {
+      Object.keys(filterCasas((j.mercados && j.mercados[m]) || {})).forEach(function (c) { set[c] = 1; });
+      var t = (j.times && j.times[m]) || {};
+      ["home", "away"].forEach(function (s) {
+        if (t[s] && t[s].casas) Object.keys(filterCasas(t[s].casas)).forEach(function (c) { set[c] = 1; });
+      });
+    });
+    return Object.keys(set);
   }
 
   function sortFn(a, b) {
     if (state.ordem === "horario") return gameEpoch(a) - gameEpoch(b);
     if (state.ordem === "casas") {
-      var na = Object.keys((a.mercados && a.mercados[state.mercado]) || {}).length;
-      var nb = Object.keys((b.mercados && b.mercados[state.mercado]) || {}).length;
-      return nb - na || gameEpoch(a) - gameEpoch(b);
+      return nCasasDo(b).length - nCasasDo(a).length || gameEpoch(a) - gameEpoch(b);
     }
-    var ea = topEvMkt(a), eb = topEvMkt(b);
+    var ea = topEv(a), eb = topEv(b);
     var va = ea > -999, vb = eb > -999;
     if (va !== vb) return va ? -1 : 1;
     if (va && vb && eb !== ea) return eb - ea;
@@ -235,7 +307,7 @@
       return '<div class="col-empty">Sem linha aberta</div>';
     }
     var head = "<tr><th>Linha</th>" + casas.map(function (c) {
-      return "<th>" + esc(c) + " +</th><th>" + esc(c) + " −</th>";
+      return "<th>" + LOGO(c, "house-logo-sm") + " +</th><th>" + LOGO(c, "house-logo-sm") + " −</th>";
     }).join("") + "</tr>";
     var body = lines.map(function (L) { return lineRow(perCasa, L, vm, mercado); }).join("");
     return '<table class="lad"><thead>' + head + "</thead><tbody>" + body + "</tbody></table>";
@@ -280,7 +352,7 @@
           (mainL != null ? '<span class="side-ln">' + mainL + "</span>" : "") +
         "</div>" +
         '<div class="side-houses">' + (casas.length
-          ? casas.map(function (c) { return '<span class="house">' + esc(c) + "</span>"; }).join("")
+          ? casas.map(function (c) { return LOGO(c); }).join("")
           : '<span class="side-none">sem casa</span>') +
         "</div>" +
         '<div class="side-body">' + bodyMain + "</div>" +
@@ -289,28 +361,21 @@
     );
   }
 
-  function gameCard(j) {
-    var mercado = state.mercado;
-    var perCasa = (j.mercados && j.mercados[mercado]) || {};
+  /** Bloco expandido de UM mercado: valor + 3 colunas (jogo | mandante | visitante). */
+  function marketBlock(j, mercado, staleCasas, valActionable, gsLabel, frCard) {
+    var vm = valMap(j);
+    var perCasa = filterCasas((j.mercados && j.mercados[mercado]) || {});
     var times = (j.times && j.times[mercado]) || {};
     var home = times.home || null;
     var away = times.away || null;
-    var vm = valMap(j);
-    // P0.3 — casas com odd reutilizada (stale): não podem valer como "melhor preço".
-    var staleCasas = {};
-    (j.stale_casas || []).forEach(function (c) { staleCasas[c] = 1; });
-    var casasMatch = Object.keys(perCasa);
-    var allHouses = {};
-    casasMatch.forEach(function (c) { allHouses[c] = 1; });
-    if (home) Object.keys(home.casas || {}).forEach(function (c) { allHouses[c] = 1; });
-    if (away) Object.keys(away.casas || {}).forEach(function (c) { allHouses[c] = 1; });
 
-    var vals = (j.valor || []).filter(function (v) { return v.mercado === mercado; });
-    var el = document.createElement("div");
-    el.className = "game" + ((home || away) ? " game-3col" : "");
-
+    var vals = (j.valor || []).filter(function (v) {
+      if (v.mercado !== mercado) return false;
+      if (state.casa !== "todas" && !sameCasa(v.casa, state.casa)) return false;
+      return true;
+    });
     var valStrip = "";
-    if (vals.length) {
+    if (vals.length && valActionable) {
       // stale por último e sem o selo verde de EV (odd pode ter desatualizado)
       var valsOrd = vals.slice().sort(function (a, b) {
         var sa = staleCasas[a.casa] ? 1 : 0, sb = staleCasas[b.casa] ? 1 : 0;
@@ -322,77 +387,68 @@
           (st ? ' title="Odd da casa reutilizada (stale) — pode estar desatualizada; não conta como melhor preço"' : "") + ">" +
           esc(v.lado) + " " + v.linha + " @ " + v.odd.toFixed(2) +
           (st ? ' <span class="ev-stale">⚠ stale</span>' : ' <span class="ev">+' + v.ev_pct.toFixed(0) + "%</span>") +
-          " · " + esc(v.casa) + "</span>";
+          " · " + LOGO(v.casa, "house-logo-sm") + "</span>";
       }).join("") + "</div>";
+    } else if (vals.length && !valActionable) {
+      // Fail closed: iniciado/encerrado/board stale nunca mostra a faixa acionável.
+      valStrip = '<div class="val-strip muted">' +
+        (frCard.stale ? "Board desatualizado" : ("Jogo " + esc(gsLabel))) +
+        " — valor não acionável</div>";
     }
 
     var homeName = (home && home.nome) || j.home || "Mandante";
     var awayName = (away && away.nome) || j.away || "Visitante";
-    // encurta nomes longos pra caber
     function short(n) {
       n = String(n || "");
       return n.length > 18 ? n.slice(0, 16) + "…" : n;
     }
 
-    var grid =
-      '<div class="side-grid">' +
-        sideCol({
-          kind: "match", tag: "Jogo", title: mercado, sub: "total da partida",
-          perCasa: perCasa, vm: vm, mercado: mercado
-        }) +
-        sideCol({
-          kind: "home", tag: "Time", title: short(homeName), sub: "mandante",
-          perCasa: (home && home.casas) || {}, vm: {}, mercado: mercado
-        }) +
-        sideCol({
-          kind: "away", tag: "Time", title: short(awayName), sub: "visitante",
-          perCasa: (away && away.casas) || {}, vm: {}, mercado: mercado
-        }) +
-      "</div>";
+    var nCasas = Object.keys(perCasa).length;
+    return (
+      '<div class="gr-mkt-block">' +
+        '<div class="gr-mkt-title">' + esc(mercado) +
+          '<span class="ct">' + nCasas + " casa" + (nCasas === 1 ? "" : "s") + "</span></div>" +
+        valStrip +
+        '<div class="side-grid">' +
+          sideCol({ kind: "match", tag: "Jogo", title: mercado, sub: "total da partida",
+            perCasa: perCasa, vm: vm, mercado: mercado }) +
+          sideCol({ kind: "home", tag: "Time", title: short(homeName), sub: "mandante",
+            perCasa: filterCasas((home && home.casas) || {}), vm: {}, mercado: mercado }) +
+          sideCol({ kind: "away", tag: "Time", title: short(awayName), sub: "visitante",
+            perCasa: filterCasas((away && away.casas) || {}), vm: {}, mercado: mercado }) +
+        "</div>" +
+      "</div>"
+    );
+  }
 
-    // se não há NENHUMA linha de time em nenhuma casa, ainda mostramos as colunas vazias
-    // (usuário pediu layout fixo 3 colunas pra usar a tela)
+  function gameKey(j) {
+    return j.sofa_id ? ("s:" + j.sofa_id) : ((j.jogo || "?") + "|" + (j.inicio || "?"));
+  }
 
-    var staleSet = staleCasas;  // P0.3 — mesma info, computada uma vez acima
+  /** Corpo expandido do jogo: um bloco por mercado (respeitando os filtros). */
+  function buildBody(j) {
     var frCard = freshness();
     var gs = liveGameState(j);
     var gsLabel = { upcoming: "próximo", started: "iniciado", finished: "encerrado", unknown: "sem horário" }[gs] || gs;
-    // valor strip só acionável se upcoming e board fresco
     var valActionable = gs === "upcoming" && !frCard.stale;
-    var valStripSafe = valActionable ? valStrip
-      : (gs === "started" || gs === "finished"
-        ? '<div class="val-strip muted">Jogo ' + esc(gsLabel) + ' — valor não acionável</div>'
-        : (frCard.stale ? '<div class="val-strip muted">Board desatualizado — valor desabilitado</div>' : valStrip));
-    // Fail closed: estado desconhecido/iniciado ou board stale nunca herda a faixa acionavel.
-    if (!valActionable) {
-      valStripSafe = vals.length
-        ? '<div class="val-strip muted">' + (frCard.stale ? "Board desatualizado" : ("Jogo " + esc(gsLabel))) + ' &mdash; valor n&atilde;o acion&aacute;vel</div>'
-        : "";
-    }
-    el.innerHTML =
-      '<div class="g-top"><div><div class="g-name">' + esc(j.jogo) +
-      ' <span class="fresh-dot ' + frCard.band + '" title="Frescor da mesa: ' + esc(frCard.txt) + '"></span>' +
-      ' <span class="g-state ' + esc(gs) + '">' + esc(gsLabel) + '</span></div>' +
-      '<div class="g-liga">' + esc(j.liga || "") + "</div>" +
-      '<div class="houses">' + Object.keys(allHouses).map(function (c) {
-        return '<span class="house' + (staleSet[c] ? " house-stale" : "") + '"' +
-          (staleSet[c] ? ' title="Inventário antigo (stale-keep) — última full reutilizada"' : "") +
-          ">" + esc(c) + (staleSet[c] ? " *" : "") + "</span>";
-      }).join("") + "</div>" +
-      (j.stale_casas && j.stale_casas.length
-        ? '<div class="g-stale-note">⚠ casa reutilizada (full anterior): ' + esc(j.stale_casas.join(", ")) + "</div>"
-        : "") +
-      "</div>" +
-      '<div class="g-when">' + esc(j.inicio) + "</div></div>" +
-      valStripSafe +
-      grid;
+    var staleCasas = {};
+    (j.stale_casas || []).forEach(function (c) { staleCasas[c] = 1; });
+    var mkts = marketsOf(j);
+    if (!mkts.length) return '<div class="gr-none">Nenhum mercado com esse filtro.</div>';
+    var staleNote = (j.stale_casas && j.stale_casas.length)
+      ? '<div class="g-stale-note">⚠ casa reutilizada (full anterior): ' + esc(j.stale_casas.join(", ")) + "</div>"
+      : "";
+    return staleNote + mkts.map(function (m) {
+      return marketBlock(j, m, staleCasas, valActionable, gsLabel, frCard);
+    }).join("");
+  }
 
-    // wire alt toggles per column
+  function wireAltButtons(el) {
     el.querySelectorAll(".alt-btn").forEach(function (btn) {
-      var kind = btn.getAttribute("data-kind");
-      var box = el.querySelector('.alt-box[data-kind="' + kind + '"]');
-      if (!box) return;
-      btn.onclick = function () {
+      var box = btn.nextElementSibling;
+      if (!box || !box.classList.contains("alt-box")) return;
+      btn.onclick = function (e) {
+        e.stopPropagation();
         var open = box.hasAttribute("hidden");
         if (open) {
           box.removeAttribute("hidden");
@@ -407,6 +463,75 @@
         }
       };
     });
+  }
+
+  /** Linha COMPACTA do jogo (default). Clique expande os detalhes. */
+  function gameRow(j) {
+    var key = gameKey(j);
+    var frCard = freshness();
+    var gs = liveGameState(j);
+    var gsLabel = { upcoming: "próximo", started: "iniciado", finished: "encerrado", unknown: "sem horário" }[gs] || gs;
+    var mkts = marketsOf(j);
+    var casas = nCasasDo(j);
+    var vals = valsOf(j);
+    var bestEv = topEv(j);
+    var valActionable = gs === "upcoming" && !frCard.stale;
+
+    var pills = mkts.map(function (m) {
+      var perCasa = filterCasas((j.mercados && j.mercados[m]) || {});
+      var mainL = pickMainLine(perCasa, m);
+      return '<span class="gr-pill" title="' + esc(m) + (mainL != null ? " · main line " + mainL : "") + '">' +
+        (ABBR[m] || esc(m)) + (mainL != null ? " <b>" + mainL + "</b>" : "") + "</span>";
+    }).join("");
+
+    var valBadge = (vals.length && valActionable)
+      ? '<span class="gr-val" title="Melhor EV do modelo neste jogo (com os filtros atuais)">🎯 +' + bestEv.toFixed(0) + "%</span>"
+      : "";
+
+    var el = document.createElement("div");
+    el.className = "gr" + (state.expanded[key] ? " open" : "");
+    el.innerHTML =
+      '<div class="gr-head" role="button" tabindex="0" aria-expanded="' + (state.expanded[key] ? "true" : "false") + '">' +
+        '<span class="gr-arw">▸</span>' +
+        '<span class="gr-when">' + esc(j.inicio) + "</span>" +
+        '<div class="gr-names">' +
+          '<div class="gr-title">' + esc(j.jogo) +
+            ' <span class="fresh-dot ' + frCard.band + '" title="Frescor da mesa: ' + esc(frCard.txt) + '"></span>' +
+            (gs !== "upcoming" ? ' <span class="g-state ' + esc(gs) + '">' + esc(gsLabel) + "</span>" : "") +
+          "</div>" +
+          '<div class="gr-liga">' + esc(j.liga || "") + "</div>" +
+        "</div>" +
+        '<div class="gr-sum">' + valBadge + pills + "</div>" +
+        '<div class="gr-houses">' + casas.map(function (c) {
+          var st = (j.stale_casas || []).indexOf(c) >= 0;
+          return st
+            ? '<span title="' + esc(c) + ' — inventário antigo (stale-keep)" style="opacity:.55">' + LOGO(c) + "</span>"
+            : LOGO(c);
+        }).join("") + "</div>" +
+      "</div>" +
+      '<div class="gr-body"></div>';
+
+    var head = el.querySelector(".gr-head");
+    var body = el.querySelector(".gr-body");
+    function fill() {
+      if (!body.getAttribute("data-filled")) {
+        body.innerHTML = buildBody(j);
+        wireAltButtons(body);
+        body.setAttribute("data-filled", "1");
+      }
+    }
+    if (state.expanded[key]) fill();
+    function toggle() {
+      var open = !state.expanded[key];
+      state.expanded[key] = open;
+      if (open) fill();
+      el.classList.toggle("open", open);
+      head.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    head.onclick = toggle;
+    head.onkeydown = function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    };
     return el;
   }
 
@@ -432,20 +557,18 @@
     var meta = document.getElementById("meta");
     var nCasas = {};
     vis.forEach(function (j) {
-      Object.keys((j.mercados && j.mercados[state.mercado]) || {}).forEach(function (c) { nCasas[c] = 1; });
-      var t = (j.times && j.times[state.mercado]) || {};
-      ["home", "away"].forEach(function (s) {
-        if (t[s] && t[s].casas) Object.keys(t[s].casas).forEach(function (c) { nCasas[c] = 1; });
-      });
+      nCasasDo(j).forEach(function (c) { nCasas[c] = 1; });
     });
     meta.innerHTML =
-      "<b>" + esc(state.mercado) + "</b> · " + vis.length + " jogo" + (vis.length === 1 ? "" : "s") +
+      "<b>" + esc(state.mercado === "todos" ? "Todos os mercados" : state.mercado) + "</b>" +
+      (state.casa !== "todas" ? " · <b>" + esc(state.casa) + "</b>" : "") +
+      " · " + vis.length + " jogo" + (vis.length === 1 ? "" : "s") +
       (!state.mostrarTodos ? " (só próximos)" : "") +
       " · " + esc(Object.keys(nCasas).join(", ") || "—") +
       ' · <span class="fresh fresh-' + fr.band + (fr.stale ? " stale" : "") + '">' +
       '<span class="fresh-dot ' + fr.band + '"></span> atualizado ' + esc(fr.txt) +
       (fr.stale ? " ⚠ (pode estar defasado)" : "") + "</span>" +
-      ' · <span class="meta-hint">jogo · mandante · visitante</span>';
+      ' · <span class="meta-hint">clique no jogo pra expandir</span>';
 
     var capEl = document.getElementById("capstatus");
     if (capEl) {
@@ -454,12 +577,12 @@
         var okN = (cap.casas_ok || []).length, failN = (cap.casas_fail || []).length;
         var staleN = (cap.casas_stale || []).length;
         var parts = (cap.casas_ok || []).map(function (c) {
-          return '<span class="cap-ok">' + esc(c) + " ✓</span>";
+          return '<span class="cap-ok">' + LOGO(c, "house-logo-sm") + " ✓</span>";
         }).concat((cap.casas_fail || []).map(function (f) {
           return '<span class="cap-fail" title="' + esc((f.error_class ? f.error_class + ": " : "") + (f.error || "")) + '">' +
-            esc(f.casa) + " ✗</span>";
+            LOGO(f.casa, "house-logo-sm") + " ✗</span>";
         })).concat((cap.casas_stale || []).map(function (c) {
-          return '<span class="cap-stale" title="Full anterior reutilizado (stale-keep)">' + esc(c) + " *</span>";
+          return '<span class="cap-stale" title="Full anterior reutilizado (stale-keep)">' + LOGO(c, "house-logo-sm") + " *</span>";
         }));
         var cls = failN === 0 && staleN === 0 ? "cap-green" : (okN >= 3 || staleN ? "cap-yellow" : "cap-red");
         if (fr.band === "old" || fr.stale) cls = "cap-red";
@@ -487,18 +610,19 @@
     var lista = document.getElementById("lista");
     lista.innerHTML = "";
     if (!vis.length) {
-      lista.innerHTML = '<div class="empty"><div class="big">📭</div>Nenhum jogo com <b>' + esc(state.mercado) +
-        "</b> aberto agora.<br><span style=\"font-size:12px\">Troque o mercado nos chips acima ou volte após a próxima captura.</span></div>";
+      lista.innerHTML = '<div class="empty"><div class="big">📭</div>Nenhum jogo com <b>' +
+        esc(state.mercado === "todos" ? "mercados" : state.mercado) +
+        (state.casa !== "todas" ? "</b> na <b>" + esc(state.casa) : "") +
+        "</b> aberto agora.<br><span style=\"font-size:12px\">Troque os filtros nos chips acima ou volte após a próxima captura.</span></div>";
       return;
     }
-    vis.forEach(function (j) { lista.appendChild(gameCard(j)); });
+    vis.forEach(function (j) { lista.appendChild(gameRow(j)); });
   }
 
   var sub = document.querySelector("#view-board .sub");
   if (sub) {
-    sub.innerHTML = "Escolha um <b>mercado</b> nos chips (abre no de maior cobertura). Cada jogo: " +
-      "<b>linha do jogo</b> · <b>mandante</b> · <b>visitante</b>. " +
-      "Mercados: <b>Cartões · Faltas · Finalizações · Chutes no gol · Escanteios · Impedimentos · Laterais · Tiros de meta · Desarmes</b>. " +
+    sub.innerHTML = "Uma linha por jogo — <b>clique pra expandir</b> as linhas do jogo, do mandante e do visitante por casa. " +
+      "Filtre por <b>mercado</b> e por <b>casa</b> (os filtros combinam e ficam salvos). " +
       "Onde há modelo: <b style=\"color:var(--green)\">valor (+EV)</b>.";
   }
   var disc = document.querySelector("#view-board .disc");
