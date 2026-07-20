@@ -158,7 +158,15 @@ def fetch_tournament(utid, label, max_ts=None):
     for page in range(MAX_PAGES):
         d = get(f"https://api.sofascore.com/api/v1/unique-tournament/{utid}/season/{sid}/events/next/{page}")
         if not isinstance(d, dict):
-            if label not in _GET_DIAG["failed_tournaments"]:
+            # 404 na PRIMEIRA página de eventos futuros = temporada existe mas acabou
+            # (ex.: Copa do Mundo pós-final ainda lista a season 58210, mas /events/next
+            # retorna 404). É INATIVO, não falha — era o 2º modo do incidente de 20/07.
+            le = str(_GET_DIAG.get("last_error") or "")
+            if page == 0 and "404" in le:
+                if label not in _GET_DIAG["inactive_tournaments"]:
+                    _GET_DIAG["inactive_tournaments"].append(label)
+                print(f"[sofa] {label} utid={utid}: sem eventos futuros (404) → INATIVO (não bloqueia)")
+            elif label not in _GET_DIAG["failed_tournaments"]:
                 _GET_DIAG["failed_tournaments"].append(label)
             break
         evs = d.get("events") or []
