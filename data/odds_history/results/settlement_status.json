@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-20T13:48:56.902027-03:00",
+  "generated_at": "2026-07-20T13:59:56.184984-03:00",
   "results_rows": 1055,
   "result_field_coverage": {
     "cards": {
@@ -41,16 +41,16 @@
   },
   "totals_by_status": {
     "settled": 6832,
-    "pending_result": 18097,
-    "open": 3849
+    "pending_result": 18265,
+    "open": 3701
   },
   "by_market": {
     "Cartões": {
-      "total": 2612,
+      "total": 2614,
       "status": {
         "settled": 979,
         "pending_result": 1367,
-        "open": 266
+        "open": 268
       },
       "pending_age": {
         "7-30d": 236,
@@ -66,17 +66,18 @@
       "total": 1199,
       "status": {
         "settled": 470,
-        "pending_result": 575,
-        "open": 154
+        "pending_result": 595,
+        "open": 134
       },
       "pending_age": {
         "7-30d": 25,
         "3-7d": 72,
         "1-3d": 398,
-        "0-24h": 80
+        "0-24h": 80,
+        "not_started": 20
       },
       "pending_reasons": {
-        "game_not_in_results": 575
+        "game_not_in_results": 595
       }
     },
     "Desarmes": {
@@ -97,20 +98,21 @@
       }
     },
     "Escanteios": {
-      "total": 20104,
+      "total": 20122,
       "status": {
-        "pending_result": 14308,
+        "pending_result": 14436,
         "settled": 2645,
-        "open": 3151
+        "open": 3041
       },
       "pending_age": {
         "7-30d": 1903,
         "3-7d": 4488,
         "1-3d": 7312,
-        "0-24h": 605
+        "0-24h": 605,
+        "not_started": 128
       },
       "pending_reasons": {
-        "game_not_in_results": 14052,
+        "game_not_in_results": 14180,
         "stat_missing:corners": 256
       }
     },
@@ -135,17 +137,18 @@
       "total": 1770,
       "status": {
         "settled": 966,
-        "pending_result": 646,
-        "open": 158
+        "pending_result": 666,
+        "open": 138
       },
       "pending_age": {
         "7-30d": 104,
         "3-7d": 64,
         "1-3d": 398,
-        "0-24h": 80
+        "0-24h": 80,
+        "not_started": 20
       },
       "pending_reasons": {
-        "game_not_in_results": 646
+        "game_not_in_results": 666
       }
     },
     "Impedimentos": {
@@ -202,16 +205,17 @@
     }
   },
   "backlog": {
-    "total": 18097,
+    "total": 18265,
     "age": {
       "7-30d": 2542,
       "3-7d": 5010,
       "1-3d": 9299,
-      "0-24h": 1246
+      "0-24h": 1246,
+      "not_started": 168
     },
     "reasons": {
       "stat_missing:offsides": 22,
-      "game_not_in_results": 17819,
+      "game_not_in_results": 17987,
       "stat_missing:corners": 256
     },
     "oldest_samples": [
@@ -347,7 +351,7 @@
         "key": "superbet|2026-07-10|septemvri sofia|ludogorets razgrad|Escanteios|6.5|over",
         "market": "Escanteios",
         "kickoff": "2026-07-10T04:30:00-0300",
-        "age_days": 10.39,
+        "age_days": 10.4,
         "reason": "game_not_in_results",
         "attempts": 13
       },
@@ -355,7 +359,7 @@
         "key": "superbet|2026-07-10|septemvri sofia|ludogorets razgrad|Escanteios|6.5|under",
         "market": "Escanteios",
         "kickoff": "2026-07-10T04:30:00-0300",
-        "age_days": 10.39,
+        "age_days": 10.4,
         "reason": "game_not_in_results",
         "attempts": 13
       },
@@ -363,7 +367,7 @@
         "key": "superbet|2026-07-10|septemvri sofia|ludogorets razgrad|Escanteios|7.5|over",
         "market": "Escanteios",
         "kickoff": "2026-07-10T04:30:00-0300",
-        "age_days": 10.39,
+        "age_days": 10.4,
         "reason": "game_not_in_results",
         "attempts": 13
       },
@@ -371,7 +375,7 @@
         "key": "superbet|2026-07-10|septemvri sofia|ludogorets razgrad|Escanteios|7.5|under",
         "market": "Escanteios",
         "kickoff": "2026-07-10T04:30:00-0300",
-        "age_days": 10.39,
+        "age_days": 10.4,
         "reason": "game_not_in_results",
         "attempts": 13
       },
@@ -379,7 +383,7 @@
         "key": "superbet|2026-07-10|septemvri sofia|ludogorets razgrad|Escanteios|8.5|over",
         "market": "Escanteios",
         "kickoff": "2026-07-10T04:30:00-0300",
-        "age_days": 10.39,
+        "age_days": 10.4,
         "reason": "game_not_in_results",
         "attempts": 13
       },
@@ -387,7 +391,7 @@
         "key": "superbet|2026-07-10|septemvri sofia|ludogorets razgrad|Escanteios|8.5|under",
         "market": "Escanteios",
         "kickoff": "2026-07-10T04:30:00-0300",
-        "age_days": 10.39,
+        "age_days": 10.4,
         "reason": "game_not_in_results",
         "attempts": 13
       },
@@ -395,7 +399,7 @@
         "key": "superbet|2026-07-10|botev vratsa|arda kardzhali|Escanteios|6.5|over",
         "market": "Escanteios",
         "kickoff": "2026-07-10T04:30:00-0300",
-        "age_days": 10.39,
+        "age_days": 10.4,
         "reason": "game_not_in_results",
         "attempts": 13
       },
@@ -403,7 +407,7 @@
         "key": "superbet|2026-07-10|botev vratsa|arda kardzhali|Escanteios|6.5|under",
         "market": "Escanteios",
         "kickoff": "2026-07-10T04:30:00-0300",
-        "age_days": 10.39,
+        "age_days": 10.4,
         "reason": "game_not_in_results",
         "attempts": 13
       },
@@ -411,7 +415,7 @@
         "key": "superbet|2026-07-10|botev vratsa|arda kardzhali|Escanteios|7.5|over",
         "market": "Escanteios",
         "kickoff": "2026-07-10T04:30:00-0300",
-        "age_days": 10.39,
+        "age_days": 10.4,
         "reason": "game_not_in_results",
         "attempts": 13
       }
