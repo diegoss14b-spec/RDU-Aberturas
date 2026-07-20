@@ -72,9 +72,12 @@
     var summaryAge = liveAge(S.ts_brt, S.age_min);
     var boardAge = liveAge(B.gerado, B.age_min);
 
+    var mb = (window.rduModelBadge ? window.rduModelBadge(window.BOARD && window.BOARD.model) : null);
     var head =
       '<div class="sub">Saúde das <b>capturas</b>, cobertura da <b>mesa</b> e qualidade do <b>histórico</b>. '
-      + "Área operacional — não é ranking de tip. Atualizado " + esc(O.gerado || "—") + ".</div>";
+      + "Área operacional — não é ranking de tip. Atualizado " + esc(O.gerado || "—") + "."
+      + (mb ? ' Modelo do board: <span class="mdl-badge ' + mb.cls + '" title="' + esc(mb.title) + '">' + esc(mb.label) + "</span>." : "")
+      + "</div>";
 
     // --- KPI cards ---
     var kpis = [

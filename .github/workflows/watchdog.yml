@@ -96,6 +96,33 @@ jobs:
                   print(f"{reason}; fluxo principal já está {status}")
                   raise SystemExit(0)
 
+          # P1.1 (20/07/2026) — backoff anti-retry-storm: se a última rodada COMPLETA já
+          # FALHOU há pouco, redisparar não ajuda (o motivo do bloqueio persiste — ex.: gate
+          # Sofa). O cron horário continua tentando; o watchdog só re-dispara quando o último
+          # resultado tiver "envelhecido" (>45 min) ou quando não houver rodada recente.
+          try:
+              recent = github(
+                  "GET",
+                  "/actions/workflows/valor.yml/runs?status=completed&per_page=1",
+              )
+              runs_list = recent.get("workflow_runs") or []
+              if runs_list:
+                  last = runs_list[0]
+                  fim = dt.datetime.fromisoformat(
+                      (last.get("updated_at") or "").replace("Z", "+00:00")
+                  )
+                  idade_min = (dt.datetime.now(dt.timezone.utc) - fim).total_seconds() / 60
+                  if last.get("conclusion") == "failure" and idade_min < 45:
+                      print(
+                          f"{reason}; MAS a última rodada falhou há {idade_min:.0f} min — "
+                          "bloqueio persistente, aguardando o cron (backoff anti-storm)"
+                      )
+                      raise SystemExit(0)
+          except SystemExit:
+              raise
+          except Exception as exc:
+              print(f"backoff: leitura das rodadas falhou ({exc}); sigo com o dispatch")
+
           print(f"{reason}; disparando rodada full em {ref}")
           github(
               "POST",

@@ -48,7 +48,7 @@ def _reset_get_diag():
     _GET_DIAG.update({
         "requests": 0, "proxy_attempts": 0, "direct_attempts": 0,
         "statuses": {}, "last_error": None, "consecutive_failures": 0,
-        "circuit_open": False, "failed_tournaments": [],
+        "circuit_open": False, "failed_tournaments": [], "inactive_tournaments": [],
     })
 
 
@@ -62,6 +62,7 @@ def _diag_snapshot():
         "consecutive_failures": int(_GET_DIAG.get("consecutive_failures") or 0),
         "circuit_open": bool(_GET_DIAG.get("circuit_open")),
         "failed_tournaments": list(_GET_DIAG.get("failed_tournaments") or []),
+        "inactive_tournaments": list(_GET_DIAG.get("inactive_tournaments") or []),
     }
 
 
@@ -71,7 +72,8 @@ def _diag_text():
     return (
         f"req={d['requests']} proxy={d['proxy_attempts']} direto={d['direct_attempts']} "
         f"http={statuses} ultimo={d['last_error'] or '-'} "
-        f"circuito={int(d['circuit_open'])} falhas={','.join(d['failed_tournaments']) or '-'}"
+        f"circuito={int(d['circuit_open'])} falhas={','.join(d['failed_tournaments']) or '-'} "
+        f"inativos={','.join(d.get('inactive_tournaments') or []) or '-'}"
     )
 
 
@@ -127,17 +129,30 @@ def get(url, tries=2):
 
 
 def season_id(utid):
+    """Retorna (sid, api_respondeu). sid=None com api_respondeu=True = torneio SEM temporada
+    ativa (encerrado/sazonal, ex: Copa do Mundo pós-final) — é INATIVO, não falha."""
     d = get(f"https://api.sofascore.com/api/v1/unique-tournament/{utid}/seasons")
-    seas = (d or {}).get("seasons") or []
-    return seas[0].get("id") if seas else None
+    if not isinstance(d, dict):
+        return None, False
+    seas = d.get("seasons") or []
+    return (seas[0].get("id") if seas else None), True
 
 
 def fetch_tournament(utid, label, max_ts=None):
-    sid = season_id(utid)
+    sid, api_ok = season_id(utid)
     if not sid:
-        if label not in _GET_DIAG["failed_tournaments"]:
-            _GET_DIAG["failed_tournaments"].append(label)
-        print(f"[sofa] {label} utid={utid}: sem season ({_diag_text()})")
+        if api_ok:
+            # Torneio sem temporada ativa → INATIVO (warning), NÃO falha do source.
+            # Antes: entrava em failed_tournaments → source_healthy=False → o ponteiro
+            # envelhecia → o gate bloqueava o board inteiro após 12h. Foi exatamente o que
+            # travou a Mesa em 20/07/2026, quando a Copa do Mundo (16, "WC") acabou.
+            if label not in _GET_DIAG["inactive_tournaments"]:
+                _GET_DIAG["inactive_tournaments"].append(label)
+            print(f"[sofa] {label} utid={utid}: sem temporada ativa → INATIVO (não bloqueia)")
+        else:
+            if label not in _GET_DIAG["failed_tournaments"]:
+                _GET_DIAG["failed_tournaments"].append(label)
+            print(f"[sofa] {label} utid={utid}: falha de transporte ({_diag_text()})")
         return []
     out = []
     for page in range(MAX_PAGES):

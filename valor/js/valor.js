@@ -100,23 +100,36 @@
           conf: conf, nCasas: nCasas, sofa_id: j.sofa_id || null,
           p_push: v.p_push || 0, push_line: !!v.push_line, fair_odd: v.fair_odd,
           actionable: v.actionable !== false, game_state: j.game_state || null,
-          model_status: v.model_status || (B.model && B.model.status) || "production"
+          stale: (j.stale_casas || []).indexOf(v.casa) >= 0,
+          model_status: v.model_status || (B.model && B.model.status) || ""
         });
       });
     });
     // ordena por confiança desc, depois EV
+    // P1.2 — ordem default DOCUMENTADA (não é EV puro): (1) casa stale por último [P0.3];
+    // (2) confiança desc (qualidade dos dados: cobertura, frescor, fixture, região calibrada);
+    // (3) EV% desc como desempate. EV alto sem cobertura/frescor NÃO sobe sozinho.
     bets.sort(function (a, b) {
+      if (!!a.stale !== !!b.stale) return a.stale ? 1 : -1;
       if (b.conf !== a.conf) return b.conf - a.conf;
       return b.ev_pct - a.ev_pct;
     });
 
     var mod = B.model || {};
-    var head = '<div class="sub">Linhas com <b style="color:var(--green)">valor (+EV)</b> pelos modelos oficiais, ranqueadas por <b>qualidade operacional</b> e, depois, EV%. ' +
-      'Qualidade ≠ EV: o score mede somente cobertura, frescor, fixture e tempo até o jogo. A stake é sua.</div>'
+    var mb = (window.rduModelBadge ? window.rduModelBadge(mod) : { label: "MODELO ?", cls: "mdl-unk", title: "" });
+    // P1.2 — honestidade: KPIs REAIS do HIST.head quando já carregado; senão genérico (HIST é lazy — aba Histórico).
+    // NUNCA recalcula ROI/green no front; só exibe os campos do HIST.
+    var HH = (window.HIST && window.HIST.head) || null;
+    var kpiDisc = HH
+      ? '<div class="disc" style="background:#eef2ff;border-color:#c7d2fe;color:#3730a3"><b>Amostra CLV real</b> (aba Histórico, n=' + HH.n_valid + '): beat close <b>' + HH.beat_close_rate + '%</b> · CLV médio ' + HH.clv_medio + '% · ROI abertura <b>' + HH.roi_abertura + '%</b> · ROI fechamento ' + HH.roi_fechamento + '%. EV é do modelo, <b>não garantia de lucro</b>.</div>'
+      : '<div class="disc" style="background:#eef2ff;border-color:#c7d2fe;color:#3730a3">O <b>EV%</b> é do modelo — <b>não é garantia de lucro</b>. Veja a aba <b>Histórico &amp; CLV</b> pro CLV/ROI real da amostra (beat close, ROI de abertura).</div>';
+    var head = '<div class="sub">Linhas com <b style="color:var(--green)">valor (+EV)</b> pelos modelos do RDU, ranqueadas por <b>confiança</b> (qualidade dos dados) e EV%. ' +
+      'Confiança ≠ previsão: mede cobertura, frescor, fixture e região calibrada. A stake é sua.</div>'
       + '<div class="disc"><b>EV%</b> = p_win × odd + p_push − 1 (linha inteira devolve stake no empate exato). ' +
       '<b>Odd justa</b> = (1 − p_push) / p_win. ' +
-      'Modelo: <b>' + esc(mod.source || "value_pricers") + '</b> · status <b>' + esc(mod.status || "production") + '</b>. ' +
-      'Só jogos <b>ainda não iniciados</b> entram como acionáveis. Odds de um instante — <b>podem ter movido</b>.</div>';
+      'Modelo: <span class="mdl-badge ' + mb.cls + '" title="' + esc(mb.title) + '">' + esc(mb.label) + '</span> ' +
+      '<span style="color:var(--faint)">(' + esc(mod.source || "?") + ')</span>. ' +
+      'Só jogos <b>ainda não iniciados</b> entram como acionáveis. Odds de um instante — <b>podem ter movido</b>.</div>' + kpiDisc;
 
     // filtros — "Todos" ainda exclui jogos iniciados (hard gate)
     var filtHtml = '<div class="vb-filt" id="vb-filt">'
@@ -192,6 +205,7 @@
         + (b.sofa_id ? ' · sofa' : ' · sem fixture')
         + ' · ' + b.nCasas + ' casa' + (b.nCasas > 1 ? 's' : '')
         + pushMeta
+        + (b.stale ? ' · <b style="color:#a16207">⚠ odd pode estar desatualizada (casa stale)</b>' : '')
         + '</div>'
         + '</div>'
         + '<div class="vb-num">'

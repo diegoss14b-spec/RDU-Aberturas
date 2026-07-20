@@ -456,7 +456,7 @@
       games.forEach(function (g) { Object.keys(g.mercados).forEach(function (m) { mkts[m] = 1; }); });
       Object.keys(ABBR).forEach(function (m) {
         if (!mkts[m]) return;
-        filt.appendChild(chip(m, state.merc === m, "", function () { state.merc = m; render(); }));
+        filt.appendChild(chip(esc(m), state.merc === m, "", function () { state.merc = m; render(); }));
       });
       root.appendChild(filt);
 
@@ -539,7 +539,7 @@
     // chips de mercado
     var mbar = document.createElement("div"); mbar.className = "bar";
     Object.keys(g.mercados).forEach(function (m) {
-      mbar.appendChild(chip(m, state.mercado === m, "", function () {
+      mbar.appendChild(chip(esc(m), state.mercado === m, "", function () {
         state.mercado = m;
         state.linha = pickMainLine(g.mercados[m].linhas, m);
         state.casa = null;
@@ -618,7 +618,7 @@
     labCasa.className = "ex-bar-lab"; labCasa.textContent = "Casa:";
     cbar.appendChild(labCasa);
     casaList.forEach(function (c) {
-      cbar.appendChild(chip(c, state.casa === c, "", function () {
+      cbar.appendChild(chip(esc(c), state.casa === c, "", function () {
         state.casa = c; render();
       }));
     });
@@ -676,7 +676,7 @@
       box.appendChild(chip("Todos mercados", state.merc === "todos", "", function () { state.merc = "todos"; render(); }));
       Object.keys(ABBR).forEach(function (m) {
         if (!dataset.some(function (r) { return r.mercado === m; })) return;
-        box.appendChild(chip(m, state.merc === m, "", function () { state.merc = m; render(); }));
+        box.appendChild(chip(esc(m), state.merc === m, "", function () { state.merc = m; render(); }));
       });
     }
     if (state.aba === "liquidadas") {

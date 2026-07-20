@@ -248,6 +248,15 @@ jobs:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
         run: python deploy.py
 
+      # P0.5 (20/07) — smoke pós-deploy sem cache: detecta stub/publicação incorreta.
+      # Se falhar, o run FALHA (não considerar o deploy bem-sucedido) e o alerta dispara.
+      - name: Smoke pós-deploy (anti-stub)
+        id: smoke
+        if: >
+          env.MODE == 'full' &&
+          steps.deploy.outcome == 'success'
+        run: python scripts/smoke_valor_rdu.py https://valor-rdu.netlify.app --max-age-min 240
+
       # Torna falhas de etapas best-effort visíveis sem impedir a persistência diagnóstica.
       - name: Veredito
         if: always()

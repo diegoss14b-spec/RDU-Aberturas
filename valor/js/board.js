@@ -22,7 +22,9 @@
     return best || MERCADOS[0] || "Cartões";
   }
 
-  var state = { mercado: firstMarket(), soValor: false, ordem: "valor" };
+  // P0.4 — thresholds de idade da mesa (horas) pro banner; fácil de mudar aqui.
+  var AGE_WARN_H = 8, AGE_CRIT_H = 12;
+  var state = { mercado: firstMarket(), soValor: false, ordem: "valor", mostrarTodos: false };
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
@@ -99,6 +101,11 @@
       state.soValor = !state.soValor;
       render();
     }));
+    // P0.4 — por padrão só jogos próximos; liga pra ver ao vivo/encerrados.
+    box.appendChild(chip(state.mostrarTodos ? "👁 mostrando ao vivo/encerrados" : "👁 ver ao vivo/encerrados", state.mostrarTodos, "", function () {
+      state.mostrarTodos = !state.mostrarTodos;
+      render();
+    }));
     var ords = [["valor", "＄ mais valor"], ["horario", "⏱ horário"], ["casas", "🏦 nº de casas"]];
     ords.forEach(function (o) {
       box.appendChild(chip(o[1], state.ordem === o[0], "ord", function () {
@@ -110,6 +117,8 @@
 
   function passa(j) {
     if (!hasMkt(j, state.mercado)) return false;
+    // P0.4 — default só upcoming; o toggle mostra ao vivo/encerrados. game_state ausente = mostra.
+    if (!state.mostrarTodos && j.game_state && j.game_state !== "upcoming") return false;
     if (state.soValor) {
       var has = (j.valor || []).some(function (v) { return v.mercado === state.mercado; });
       if (!has) return false;
@@ -287,6 +296,9 @@
     var home = times.home || null;
     var away = times.away || null;
     var vm = valMap(j);
+    // P0.3 — casas com odd reutilizada (stale): não podem valer como "melhor preço".
+    var staleCasas = {};
+    (j.stale_casas || []).forEach(function (c) { staleCasas[c] = 1; });
     var casasMatch = Object.keys(perCasa);
     var allHouses = {};
     casasMatch.forEach(function (c) { allHouses[c] = 1; });
@@ -299,9 +311,18 @@
 
     var valStrip = "";
     if (vals.length) {
-      valStrip = '<div class="val-strip">' + vals.slice(0, 4).map(function (v) {
-        return '<span class="val-item">' + esc(v.lado) + " " + v.linha + " @ " + v.odd.toFixed(2) +
-          ' <span class="ev">+' + v.ev_pct.toFixed(0) + "%</span> · " + esc(v.casa) + "</span>";
+      // stale por último e sem o selo verde de EV (odd pode ter desatualizado)
+      var valsOrd = vals.slice().sort(function (a, b) {
+        var sa = staleCasas[a.casa] ? 1 : 0, sb = staleCasas[b.casa] ? 1 : 0;
+        return sa - sb;
+      });
+      valStrip = '<div class="val-strip">' + valsOrd.slice(0, 4).map(function (v) {
+        var st = staleCasas[v.casa];
+        return '<span class="val-item' + (st ? " val-stale" : "") + '"' +
+          (st ? ' title="Odd da casa reutilizada (stale) — pode estar desatualizada; não conta como melhor preço"' : "") + ">" +
+          esc(v.lado) + " " + v.linha + " @ " + v.odd.toFixed(2) +
+          (st ? ' <span class="ev-stale">⚠ stale</span>' : ' <span class="ev">+' + v.ev_pct.toFixed(0) + "%</span>") +
+          " · " + esc(v.casa) + "</span>";
       }).join("") + "</div>";
     }
 
@@ -332,8 +353,7 @@
     // se não há NENHUMA linha de time em nenhuma casa, ainda mostramos as colunas vazias
     // (usuário pediu layout fixo 3 colunas pra usar a tela)
 
-    var staleSet = {};
-    (j.stale_casas || []).forEach(function (c) { staleSet[c] = 1; });
+    var staleSet = staleCasas;  // P0.3 — mesma info, computada uma vez acima
     var frCard = freshness();
     var gs = liveGameState(j);
     var gsLabel = { upcoming: "próximo", started: "iniciado", finished: "encerrado", unknown: "sem horário" }[gs] || gs;
@@ -394,6 +414,21 @@
     renderFiltros();
     var vis = jogos.filter(passa).sort(sortFn);
     var fr = freshness();
+    // P0.4 — banner de board velha (≥8h vermelho, ≥12h crítico)
+    var ageEl = document.getElementById("boardage");
+    if (ageEl) {
+      var ageH = fr.mins == null ? null : fr.mins / 60;
+      if (ageH != null && ageH >= AGE_CRIT_H) {
+        ageEl.className = "age-banner age-crit";
+        ageEl.innerHTML = "🛑 <b>Mesa MUITO desatualizada</b> — gerada há " + Math.floor(ageH) + "h. NÃO use para decisão; espere uma nova captura.";
+      } else if (ageH != null && ageH >= AGE_WARN_H) {
+        ageEl.className = "age-banner age-red";
+        ageEl.innerHTML = "⚠ <b>Mesa desatualizada</b> (gerada há " + Math.floor(ageH) + "h). Não use para decisão sem recaptura — as odds provavelmente já moveram.";
+      } else {
+        ageEl.className = "";
+        ageEl.innerHTML = "";
+      }
+    }
     var meta = document.getElementById("meta");
     var nCasas = {};
     vis.forEach(function (j) {
@@ -405,6 +440,7 @@
     });
     meta.innerHTML =
       "<b>" + esc(state.mercado) + "</b> · " + vis.length + " jogo" + (vis.length === 1 ? "" : "s") +
+      (!state.mostrarTodos ? " (só próximos)" : "") +
       " · " + esc(Object.keys(nCasas).join(", ") || "—") +
       ' · <span class="fresh fresh-' + fr.band + (fr.stale ? " stale" : "") + '">' +
       '<span class="fresh-dot ' + fr.band + '"></span> atualizado ' + esc(fr.txt) +
@@ -479,6 +515,30 @@
     render();
     if (typeof window.scrollTo === "function") window.scrollTo(sx, sy);
   }, 60000);
+
+  // P0.2 — badge honesto do modelo (candidate vs produção). Regra única, sem mentir:
+  // source candidate_pricer → CANDIDATE (mesmo com status "promoted" no board);
+  // shadow → SHADOW; value_pricers → PRODUÇÃO; qualquer outra coisa → MODELO ? (não "produção").
+  window.rduModelBadge = function (model) {
+    model = model || (window.BOARD && window.BOARD.model) || {};
+    var src = String(model.source || "").toLowerCase();
+    var st = String(model.status || "").toLowerCase();
+    if (st.indexOf("shadow") === 0 || src.indexOf("shadow") >= 0)
+      return { label: "SHADOW", cls: "mdl-shadow", title: "Modelo em sombra — não usar para decisão." };
+    if (src.indexOf("candidate") >= 0)
+      return { label: "CANDIDATE", cls: "mdl-cand", title: "Modelos candidatos (candidate_pricer): promovidos ao board, mas ainda em validação — não é produção." };
+    if (src.indexOf("value_pricer") >= 0)
+      return { label: "PRODUÇÃO", cls: "mdl-prod", title: "Modelos de produção (value_pricers)." };
+    return { label: "MODELO ?", cls: "mdl-unk", title: "Origem do modelo não identificada — trate como não-produção." };
+  };
+  (function () {
+    var el = document.getElementById("model-badge");
+    if (!el) return;
+    var mb = window.rduModelBadge(B.model);
+    el.className = "mdl-badge " + mb.cls;
+    el.textContent = mb.label;
+    el.title = mb.title;
+  })();
 
   render();
 })();
