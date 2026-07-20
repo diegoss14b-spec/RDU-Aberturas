@@ -1,0 +1,161 @@
+{
+ "ts_brt": "2026-07-20 04:30",
+ "reasons": [
+  "SofaScore defasado: 13.4h > 12h"
+ ],
+ "now": {
+  "n_games": 175,
+  "sofa_games": 65,
+  "sofa_pct": 37.142857142857146,
+  "value_games": 4,
+  "value_sofa": 4,
+  "value_sofa_pct": 100.0,
+  "houses": {
+   "Betano": 36,
+   "Superbet": 77,
+   "Pinnacle": 27,
+   "7k": 67,
+   "EstrelaBet": 81
+  },
+  "markets": {
+   "Escanteios": 149,
+   "Cartões": 21,
+   "Chutes no gol": 19,
+   "Finalizações": 18,
+   "Impedimentos": 6,
+   "Faltas": 8,
+   "Laterais": 1
+  },
+  "house_markets": {
+   "Betano": {
+    "Escanteios": 36,
+    "Finalizações": 2,
+    "Chutes no gol": 2,
+    "Impedimentos": 6,
+    "Cartões": 13
+   },
+   "Superbet": {
+    "Escanteios": 139,
+    "Cartões": 46,
+    "Chutes no gol": 48,
+    "Finalizações": 42,
+    "Impedimentos": 12,
+    "Laterais": 1,
+    "Faltas": 2
+   },
+   "Pinnacle": {
+    "Escanteios": 77
+   },
+   "7k": {
+    "Escanteios": 152,
+    "Faltas": 7,
+    "Desarmes": 14
+   },
+   "EstrelaBet": {
+    "Escanteios": 125,
+    "Cartões": 16,
+    "Chutes no gol": 12,
+    "Finalizações": 12
+   }
+  }
+ },
+ "prev": {
+  "n_games": 175,
+  "sofa_games": 66,
+  "sofa_pct": 37.714285714285715,
+  "value_games": 4,
+  "value_sofa": 4,
+  "value_sofa_pct": 100.0,
+  "houses": {
+   "Betano": 36,
+   "Superbet": 68,
+   "Pinnacle": 29,
+   "7k": 67,
+   "EstrelaBet": 81
+  },
+  "markets": {
+   "Escanteios": 149,
+   "Cartões": 20,
+   "Chutes no gol": 19,
+   "Finalizações": 18,
+   "Impedimentos": 6,
+   "Faltas": 8
+  },
+  "house_markets": {
+   "Betano": {
+    "Escanteios": 36,
+    "Finalizações": 2,
+    "Chutes no gol": 2,
+    "Impedimentos": 6,
+    "Cartões": 12
+   },
+   "Superbet": {
+    "Escanteios": 128,
+    "Cartões": 45,
+    "Chutes no gol": 48,
+    "Finalizações": 42,
+    "Impedimentos": 12,
+    "Faltas": 2
+   },
+   "Pinnacle": {
+    "Escanteios": 83
+   },
+   "7k": {
+    "Escanteios": 152,
+    "Faltas": 7,
+    "Desarmes": 14
+   },
+   "EstrelaBet": {
+    "Escanteios": 125,
+    "Cartões": 16,
+    "Chutes no gol": 9,
+    "Finalizações": 9
+   }
+  }
+ },
+ "sofa": {
+  "casa": "sofa",
+  "kind": "fixture",
+  "ok": false,
+  "ts_utc": "2026-07-20T07:22:42Z",
+  "ts_brt": "2026-07-20 04:22",
+  "n_events": 157,
+  "n_fixtures": 157,
+  "n_markets": 0,
+  "min_events": 36,
+  "promoted": false,
+  "pointer_valid": true,
+  "pointer_file": "_snapshots/sofa_6e257eab3137c1460f59.json",
+  "pointer_at": "2026-07-19T15:04:54-03:00",
+  "pointer_n": 143,
+  "pointer_age_h": 13.430788798333333,
+  "duration_sec": 53.0,
+  "error": "snapshot não saudável: n=157, mínimo=36; fallback preservado n=143; transporte req=39 proxy=39 direto=0 http=200:38,404:1 ultimo=- circuito=0 falhas=WC",
+  "error_class": "Other",
+  "transport": {
+   "requests": 39,
+   "proxy_attempts": 39,
+   "direct_attempts": 0,
+   "statuses": {
+    "200": 38,
+    "404": 1
+   },
+   "last_error": null,
+   "consecutive_failures": 0,
+   "circuit_open": false,
+   "failed_tournaments": [
+    "WC"
+   ]
+  }
+ },
+ "model": {
+  "status": "promoted",
+  "source": "candidate_pricer",
+  "markets": [
+   "Cartões",
+   "Faltas",
+   "Finalizações",
+   "Escanteios"
+  ]
+ }
+}
