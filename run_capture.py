@@ -17,6 +17,7 @@ FETCHERS = [
     ("estrelabet", "fetch_odds_estrelabet.py", 10 * 60),
     ("7k",         "fetch_odds_7k.py",        12 * 60),
     ("pinnacle",   "fetch_odds_pinnacle.py",   5 * 60),
+    ("bet365",     "fetch_odds_bet365.py",     8 * 60),
 ]
 FIXTURE_FETCH = ("sofa", "fetch_fixtures_sofascore.py", 4 * 60)
 

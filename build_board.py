@@ -62,8 +62,9 @@ GROUP_FUZZ_NAME = 88   # mesmo dia + semelhança de nomes ≥ isto → mesmo con
 
 # tupla: (cartoes, faltas, finalizacoes, escanteios)
 LEAGUE_RULES = [
-    (lambda l: "brasileir" in l and ("serie b" in l or "série b" in l or "- b" in l), ("B", "BR-B", None, "BR-B")),
-    (lambda l: "brasileir" in l and "serie b" not in l, ("A", "BR-A", "BR", "BR-A")),
+    # "brasileir(ão)" = casas BR; "brazil serie a/b" = nomes em inglês da bet365/BetsAPI
+    (lambda l: ("brasileir" in l or "brazil serie" in l) and ("serie b" in l or "série b" in l or "- b" in l), ("B", "BR-B", None, "BR-B")),
+    (lambda l: ("brasileir" in l or "brazil serie" in l) and "serie b" not in l, ("A", "BR-A", "BR", "BR-A")),
     (lambda l: "premier league" in l or ("premier" in l and "ingl" in l), ("PL", "PL", "PL", "PL")),
     (lambda l: "laliga" in l or "la liga" in l or ("primera" in l and "espan" in l), ("LL", "LL", "LL", "LL")),
     (lambda l: "serie a" in l and ("ital" in l or "itali" in l), ("SA", "SA", "SA", "SA")),
@@ -404,7 +405,8 @@ def main():
     eventos = betano + load_normalized("Superbet", "superbet") \
                      + load_normalized("7k", "7k") \
                      + load_normalized("EstrelaBet", "estrelabet") \
-                     + load_normalized("Pinnacle", "pinnacle")
+                     + load_normalized("Pinnacle", "pinnacle") \
+                     + load_normalized("bet365", "bet365")
     casas_ativas = sorted(set(e["casa"] for e in eventos))
     # SofaScore = base canônica de nomes/horários; casas encaixam por horário + fuzzy
     sofa_fx = load_sofa_fixtures()
@@ -673,7 +675,7 @@ def main():
     print(f"[board] valor flags={n_valor} · skip kickoff/started={n_skip_ko} · skip stale casa={n_skip_stale}"
           f" · skip 3-vias={n_skip_3way} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
     # transparência da captura (brief P0 §2.4): quem entrou e quem falhou nesta rodada
-    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle"}
+    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365"}
     _stdir = ROOT / "data" / "odds" / "_status"
     if _stdir.exists():
         cap = {"casas_ok": [], "casas_fail": [], "casas_stale": []}

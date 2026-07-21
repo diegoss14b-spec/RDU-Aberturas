@@ -191,6 +191,7 @@ jobs:
         env:
           DECODO_USER: ${{ secrets.DECODO_USER }}
           DECODO_PASS: ${{ secrets.DECODO_PASS }}
+          BETSAPI_TOKEN: ${{ secrets.BETSAPI_TOKEN }}   # bet365 via BetsAPI (repo público — só via secret)
           ODDS_WINDOW_H: ${{ env.MODE == 'close' && '2.5' || '' }}
         run: python run_capture.py
 
