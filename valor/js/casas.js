@@ -6,7 +6,7 @@
   var CASAS = {
     betano:     { nome: "Betano",     logo: "logos/betano.svg",     cor: "#ff6b00" },
     superbet:   { nome: "Superbet",   logo: "logos/superbet.svg",   cor: "#df1119" },
-    estrelabet: { nome: "EstrelaBet", logo: "logos/estrelabet.svg", cor: "#e3021b" },
+    estrelabet: { nome: "EstrelaBet", logo: "logos/estrelabet.svg", cor: "#1a2138" }, // azul-marinho (a marca NÃO é vermelha)
     "7k":       { nome: "7k",         logo: "logos/7k.svg",         cor: "#12d16d" },
     pinnacle:   { nome: "Pinnacle",   logo: "logos/pinnacle.svg",   cor: "#ff5c00" }
   };
