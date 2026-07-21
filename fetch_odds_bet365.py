@@ -5,9 +5,13 @@ a Mesa de Aberturas. Plano do Diego: 30 req/s, 3.600 req/h — cada captura usa
 
   lista : GET /v1/bet365/upcoming?sport_id=1&token=&page=   (50/página, ~700 eventos,
           horizonte de meses; POLUÍDO de Esoccer/SRL — filtrar por nome de liga)
-  detalhe: GET /v3/bet365/prematch?token=&FI=               (seções cards_fouls/corners/
-          asian_lines/other/shots; sp.{mercado}.odds[] = {header:'Over'|'Under'|'1'|'2',
+  detalhe: GET /v3/bet365/prematch?token=&FI=a,b,c          (aceita ATÉ ~10 FIs por
+          chamada — validado 21/07; sp.{mercado}.odds[] = {header:'Over'|'Under'|'1'|'2',
           name:'5.5'|'Over 5.5', odds:'2.000', handicap?})
+  ⚠ A resposta tem seções-DICIONÁRIO (main/corners/cards_fouls/other/asian_lines/shots)
+  E a lista `others` (~79 blocos, cada um com seu `sp`). MUITO mercado de partida só
+  existe na LISTA (match_shots_on_target, alternative_corners com 63 odds, asiáticos
+  de escanteios/cartões, team_shots…). O parser varre as duas fontes.
 
 Mercados capturados (só O/U de linha; faixas/race/exatos/3-vias ficam FORA):
   Cartões    : number_of_cards_in_match + asian_total_cards (+ team_cards por time)
@@ -29,8 +33,14 @@ POLÍTICA DE CONSUMO "abertura + fechamento" (21/07 — o token é COMPARTILHADO
   - CLOSE: SEMPRE roda, mas SÓ os jogos iminentes do CACHE de FIs gravado no
     último full (_status/bet365_fis.json) — tipicamente 2-8 req; upcoming só
     como fallback (2 páginas) se o cache não servir.
-  Conta: ~8 fulls/dia × ~75 req + ~72 closes × ~3 req ≈ 700-850 req/dia
-  (vs ~2.250 antes), com limite de 3.600/h — sobra folga pro outro usuário."""
+  Conta (com lotes de 10 FIs): ~8 fulls/dia × ~20 req + ~72 closes × ~2 req ≈
+  300-350 req/dia (era ~2.250), com limite de 3.600/h — folga enorme pro outro usuário.
+
+TOTAL DE CHUTES DO JOGO (Finalizações): a BetsAPI NÃO entrega. `other.sp.match_shots`
+existe no catálogo mas vem sempre com odds:[] — 0 ocorrências em 28 jogos testados
+(21/07), incluindo o jogo mais rico (Atlético-MG×Bahia, 79 blocos) e jogos a 9 min do
+apito. A bet365 mostra o mercado na tela, o provedor não expõe. O que dá pra ter:
+match_shots_on_target (total do jogo, raro) e team_shots/team_shots_on_target (por time)."""
 import sys, os, json, re, time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -59,6 +69,7 @@ MAX_CLOSE_EVENTS = 12    # cap do close (iminentes; tipicamente 2-8)
 MAX_PAGES = 20           # upcoming pagina de 50 em 50 (~700 eventos = 14 páginas)
 FULL_EVERY_H = 2.5       # gate: full de verdade só a cada ~3h (2h30 de guarda, cron atrasa)
 FIS_MAX_AGE_H = 12.0     # cache de FIs mais velho que isso não vale (fallback upcoming)
+FI_BATCH = 10            # o /v3/prematch aceita FI=a,b,c — 10 jogos por request (21/07)
 SLEEP = 0.12             # ≤10 req/s — bem abaixo do limite de 30 req/s do plano
 MIN_EVENTS = 5
 MIN_EFF = MIN_EVENTS     # modo close (ODDS_WINDOW_H) e skip do gate reduzem — ver main()
@@ -181,54 +192,85 @@ def _collect_team(per_team, odds_list, home, away):
         slot.setdefault(side, round(price, 2))
 
 
-# (seção, mercado) → canon da Mesa. Ordem = prioridade (linha principal primeiro).
-MATCH_MARKETS = [
-    ("cards_fouls", "number_of_cards_in_match", "Cartões"),
-    ("asian_lines", "asian_total_cards", "Cartões"),
-    ("corners", "corners_2_way", "Escanteios"),
-    ("corners", "alternative_corners", "Escanteios"),
-    ("corners", "asian_corners", "Escanteios"),
-    ("asian_lines", "asian_total_corners", "Escanteios"),
-    ("other", "match_shots", "Finalizações"),
-    ("shots", "match_shots", "Finalizações"),
-    ("other", "match_shots_on_target", "Chutes no gol"),
-    ("shots", "match_shots_on_target", "Chutes no gol"),
-]
-TEAM_MARKETS = [
-    ("cards_fouls", "team_cards", "Cartões"),
-    ("corners", "team_corners", "Escanteios"),
-    ("other", "team_shots", "Finalizações"),
-    ("shots", "team_shots", "Finalizações"),
-    ("other", "team_shots_on_target", "Chutes no gol"),
-    ("shots", "team_shots_on_target", "Chutes no gol"),
-]
+# ⚠ ACHADO 21/07: além das seções-DICIONÁRIO (main, corners, cards_fouls, other,
+# asian_lines, shots…), a resposta traz `others` = LISTA de ~79 blocos, cada um com
+# seu próprio `sp`. O parser antigo lia só os dicionários e IGNORAVA a lista inteira —
+# por isso "Finalizações/Chutes no gol × bet365" dava 0. Dentro de `others` moram:
+#   match_shots_on_target (O/U 9.5 do JOGO), alternative_corners (63 odds!),
+#   asian_total_corners/cards, team_shots, team_shots_on_target, etc.
+# Agora varremos AMBAS as fontes, casando por NOME de mercado (a seção varia).
+# mercado (nome BetsAPI) → canon da Mesa — total da PARTIDA, só O/U de linha
+MATCH_MARKETS = {
+    "number_of_cards_in_match": "Cartões",
+    "asian_total_cards": "Cartões",
+    "corners_2_way": "Escanteios",
+    "alternative_corners": "Escanteios",
+    "asian_corners": "Escanteios",
+    "asian_total_corners": "Escanteios",
+    "match_shots": "Finalizações",              # existe no catálogo mas a API nunca popula (ver docstring)
+    "match_shots_on_target": "Chutes no gol",
+}
+# mercado → canon, por TIME (header '1'/'2' + handicap 'Over 11.5')
+TEAM_MARKETS = {
+    "team_cards": "Cartões",
+    "team_corners": "Escanteios",
+    "team_shots": "Finalizações",
+    "team_shots_on_target": "Chutes no gol",
+}
+# NADA de jogador entra na Mesa (decisão do Diego, 21/07). Denylist explícita por
+# prefixo/nome, aplicada ANTES do mapeamento — nunca por acaso.
+DENY_PREFIX = ("player_", "goalscorer", "multi_scorer", "either_to_", "team_goalscorer",
+               "goal_method", "first_goal_method", "goalkeeper_")
+DENY_EXACT = {"goalkeeper_saves", "player_tackles", "player_cards", "player_shots",
+              "player_shots_on_target", "player_fouls_committed", "player_to_be_fouled",
+              "player_to_score_or_assist", "goalscorers", "multi_scorers"}
+
+
+def _is_player_market(mk):
+    m = str(mk or "").lower()
+    return m in DENY_EXACT or any(m.startswith(p) for p in DENY_PREFIX) or "player" in m
+
+
+def _iter_sp(res):
+    """Gera (mercado, mv) de TODAS as fontes: seções-dicionário + lista `others`."""
+    for sec in ("main", "corners", "cards_fouls", "asian_lines", "other", "shots",
+                "goals", "half", "player_stats"):
+        sp = (res.get(sec) or {}).get("sp") or {}
+        if isinstance(sp, dict):
+            for mk, mv in sp.items():
+                yield mk, mv
+    for blk in (res.get("others") or []):
+        sp = (blk or {}).get("sp") or {}
+        if isinstance(sp, dict):
+            for mk, mv in sp.items():
+                yield mk, mv
 
 
 def parse_prematch(res, home, away):
-    """results[0] do /v3/bet365/prematch → (mercados, mercados_time)."""
-    merc, merc_t = {}, {}
-    for sec, mk, canon in MATCH_MARKETS:
-        sp = ((res.get(sec) or {}).get("sp") or {})
-        mv = sp.get(mk) or {}
-        odds = mv.get("odds") or []
+    """results[0] do /v3/bet365/prematch → (mercados, mercados_time).
+    Varre seções-dicionário E a lista `others`; jogador nunca entra."""
+    merc, merc_t_raw = {}, {}
+    for mk, mv in _iter_sp(res):
+        if _is_player_market(mk):
+            continue
+        odds = (mv or {}).get("odds") or []
         if not odds:
             continue
-        lines = merc.setdefault(canon, {})
-        _collect(lines, odds)
+        canon = MATCH_MARKETS.get(mk)
+        if canon:
+            _collect(merc.setdefault(canon, {}), odds)
+            continue
+        canon_t = TEAM_MARKETS.get(mk)
+        if canon_t:
+            _collect_team(merc_t_raw.setdefault(canon_t, {}), odds, home, away)
     out = {}
     for canon, lines in merc.items():
         arr = [{"linha": L, "over": v["over"], "under": v["under"]}
                for L, v in sorted(lines.items()) if "over" in v and "under" in v]
         if arr:
             out[canon] = arr
-    for sec, mk, canon in TEAM_MARKETS:
-        sp = ((res.get(sec) or {}).get("sp") or {})
-        mv = sp.get(mk) or {}
-        odds = mv.get("odds") or []
-        if not odds:
-            continue
-        per_team = {}
-        _collect_team(per_team, odds, home, away)
+    merc_t = {}
+    for canon, per_team in merc_t_raw.items():
         for team, lines in per_team.items():
             arr = [{"linha": L, "over": v["over"], "under": v["under"]}
                    for L, v in sorted(lines.items()) if "over" in v and "under" in v]
@@ -345,30 +387,40 @@ def main():
                           at=now.isoformat(timespec="seconds"), promote_full=promote,
                           min_events=MIN_EFF)
 
-    # 2) prematch por FI (sequencial + sleep: gentil com o rate-limit)
+    # 2) prematch em LOTES de FI (o endpoint aceita FI=a,b,c — 21/07: 10 jogos por
+    #    request, validado. Derruba o full de ~75 req pra ~20 e o close pra 1-2.)
     f = open(out_path, "w", encoding="utf-8")
     n_out = n_det = 0
-    for e in events:
-        d = get("/v3/bet365/prematch", {"FI": e["fi"]}, token)
+    for i in range(0, len(events), FI_BATCH):
+        lote = events[i:i + FI_BATCH]
+        d = get("/v3/bet365/prematch", {"FI": ",".join(str(e["fi"]) for e in lote)}, token)
         time.sleep(SLEEP)
-        if not d:
-            continue
-        rs = d.get("results") or []
-        if not rs:
-            continue
-        n_det += 1
-        merc, merc_t = parse_prematch(rs[0], e["home"], e["away"])
-        if not merc and not merc_t:
-            continue
-        rec = {"casa": "bet365", "event_id": e["fi"],
-               "name": f"{e['home']} - {e['away']}",
-               "league": e["league"], "start": e["time"],
-               "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"),
-               "mercados": merc}
-        if merc_t:
-            rec["mercados_time"] = merc_t
-        f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
-        n_out += 1
+        rs = (d or {}).get("results") or []
+        if not rs and len(lote) > 1:
+            # lote falhou: tenta um a um (não perde a rodada inteira por 1 FI ruim)
+            rs = []
+            for e in lote:
+                d1 = get("/v3/bet365/prematch", {"FI": e["fi"]}, token)
+                time.sleep(SLEEP)
+                rs += (d1 or {}).get("results") or []
+        by_fi = {str(r.get("FI") or r.get("event_id")): r for r in rs}
+        for e in lote:
+            r = by_fi.get(str(e["fi"]))
+            if not r:
+                continue
+            n_det += 1
+            merc, merc_t = parse_prematch(r, e["home"], e["away"])
+            if not merc and not merc_t:
+                continue
+            rec = {"casa": "bet365", "event_id": e["fi"],
+                   "name": f"{e['home']} - {e['away']}",
+                   "league": e["league"], "start": e["time"],
+                   "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+                   "mercados": merc}
+            if merc_t:
+                rec["mercados_time"] = merc_t
+            f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
+            n_out += 1
     f.close()
     write_latest(n_out, promote=None)
     if _wh is None and n_out > 0:
