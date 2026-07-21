@@ -289,6 +289,18 @@ tr.mv-open td{background:var(--purple-soft)!important}
 .op-soon-j{font:600 12.5px var(--disp);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:600px){.op-soon-row{grid-template-columns:1fr;gap:2px}.op-table .op-err{display:none}}
 [hidden]{display:none!important}
+/* --- tranca de login (mesmo padrão/projeto Supabase do RDU Stats, 21/07) --- */
+#rduGate{position:fixed;inset:0;z-index:2147483647;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif}
+#rduGate.rdu-off{display:none}
+#rduGate .rduCard{background:#fff;padding:34px 30px;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.45);width:360px;max-width:90vw;text-align:center}
+#rduGate h1{font-size:21px;margin:0 0 4px;color:#1a1a2e}
+#rduGate .rsub{color:#667085;font-size:13px;margin:0 0 22px}
+#rduGate input{width:100%;box-sizing:border-box;padding:12px 14px;margin-bottom:11px;border:1px solid #e2e8f0;border-radius:10px;font-size:14px}
+#rduGate input:focus{outline:none;border-color:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+#rduGate button{width:100%;padding:12px;border:0;border-radius:10px;background:#7c3aed;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s}
+#rduGate button:disabled{opacity:.55;cursor:default}
+#rduGate .rerr{color:#dc2626;font-size:13px;min-height:18px;margin-top:9px}
+#rduLogout{position:fixed;bottom:13px;right:13px;z-index:99998;background:rgba(20,20,35,.72);color:#fff;border:0;padding:7px 13px;border-radius:9px;font-size:12px;font-weight:600;cursor:pointer;display:none}
 /* --- logos das casas (frente A, 20/07) --- */
 .house-logo{height:16px;width:auto;display:inline-block;vertical-align:middle;border-radius:4px}
 .house-logo-sm{height:13px}
@@ -338,6 +350,67 @@ h1 .mdl-badge{font-size:9.5px}
 .ev-stale{font:700 8px var(--disp);color:#fff;background:#a16207;border-radius:4px;padding:1px 5px;letter-spacing:.3px}
 </style>
 </head><body>
+<!-- ===== TRANCA DE LOGIN — mesmo projeto/usuários do RDU Stats (bot @RDUStatsAcessoBot) ===== -->
+<div id="rduGate" class="rdu-off">
+  <div class="rduCard">
+    <h1>Mesa de Aberturas · RDU</h1>
+    <div class="rsub">Acesso restrito — entre com seu login</div>
+    <input id="rduEmail" type="email" placeholder="E-mail" autocomplete="username">
+    <input id="rduPass" type="password" placeholder="Senha" autocomplete="current-password">
+    <button id="rduBtn">Entrar</button>
+    <div class="rerr" id="rduErr"></div>
+  </div>
+</div>
+<button id="rduLogout">Sair</button>
+<script>
+(function(){
+  // ===== TRANCA DE LOGIN (Supabase Auth) — cópia do padrão do RDU Stats =====
+  // Mesmo projeto Supabase = mesmos e-mails/senhas entregues pelo bot.
+  // A sessão do Supabase é por ORIGIN: quem logou no rdustats loga de novo
+  // aqui com as MESMAS credenciais (persiste em localStorage deste site).
+  var ENABLED = true;
+  var URL_ = 'https://zsfijkengcxkuuvipjee.supabase.co';
+  var KEY_ = 'sb_publishable_vGDjU3-S7PmVONJJWKPFpg_Sh3ElDKu'; // publishable key — pública por design
+  if(!ENABLED) return;
+  var gate=document.getElementById('rduGate'), logout=document.getElementById('rduLogout');
+  var emailEl=document.getElementById('rduEmail'), passEl=document.getElementById('rduPass');
+  var btn=document.getElementById('rduBtn'), err=document.getElementById('rduErr');
+  gate.classList.remove('rdu-off'); // mostra a tranca enquanto checa a sessão
+  function loadSupa(cb){
+    if(window.supabase) return cb();
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    s.onload=cb; s.onerror=function(){err.textContent='Falha ao carregar. Recarregue a página.';};
+    document.head.appendChild(s);
+  }
+  loadSupa(function(){
+    var SB=window.supabase.createClient(URL_,KEY_);
+    window.__rduSB=SB;
+    function unlock(){ gate.classList.add('rdu-off'); logout.style.display='block'; }
+    function lock(){ gate.classList.remove('rdu-off'); logout.style.display='none'; }
+    function track(kind){ try{ SB.rpc('log_login', {p_kind: kind}).then(function(){}); }catch(e){} }
+    SB.auth.getSession().then(function(r){
+      if(r.data && r.data.session){
+        unlock();
+        try{
+          var k='rduLastTrack', last=parseInt(localStorage.getItem(k)||'0');
+          if(Date.now()-last > 12*3600*1000){ localStorage.setItem(k, String(Date.now())); track('session'); }
+        }catch(e){}
+      } else lock();
+    });
+    btn.onclick=async function(){
+      btn.disabled=true; err.textContent='';
+      try{
+        var r=await SB.auth.signInWithPassword({email:emailEl.value.trim(), password:passEl.value});
+        if(r.error){ err.textContent='E-mail ou senha inválidos.'; } else { unlock(); try{localStorage.setItem('rduLastTrack', String(Date.now()));}catch(e){} track('login'); }
+      }catch(e){ err.textContent='Erro de conexão. Tente de novo.'; }
+      btn.disabled=false;
+    };
+    passEl.addEventListener('keydown',function(e){ if(e.key==='Enter') btn.click(); });
+    logout.onclick=async function(){ await SB.auth.signOut(); location.reload(); };
+  });
+})();
+</script>
 <div class="wrap">
   <div class="hdr"><div class="mark">R</div><div><h1>Mesa de <span class="rd">Aberturas</span> <span id="model-badge"></span></h1><div class="tag">Rei do Under · odds ao vivo</div></div></div>
   <div class="bar hist-nav" id="viewsel">
