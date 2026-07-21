@@ -32,6 +32,9 @@ cp -a data/fixtures/sofa_latest*.json "$SAVE/fixtures/" 2>/dev/null || true
 stage() {
   git add -A -- data/odds/_status data/odds_history \
     valor/data/history.js valor/data/moves.js valor/data/ops.js
+  # dataset abertura×fechamento (pode não existir num run em que o builder falhou)
+  [ -d data/odds/openclose ]      && git add -A -- data/odds/openclose
+  [ -f valor/data/openclose.js ]  && git add -A -- valor/data/openclose.js
   if [ "$MODE" = "full" ] && [ "$GATE" = "success" ]; then
     git add -A -- valor/data/board.js
     for p in data/odds/*_latest_full.json data/odds/_snapshots \
@@ -53,6 +56,7 @@ reingest_on_new_base() {
   [ -d "$SAVE/fixtures/_snapshots" ] && mkdir -p data/fixtures/_snapshots && cp -a "$SAVE/fixtures/_snapshots/." data/fixtures/_snapshots/ 2>/dev/null || true
   python migrate_history_keys.py && python history_ingest.py && python history_close.py \
     && python history_settle.py && python build_history.py && python build_moves.py || return 1
+  python build_openclose.py || echo ">> build_openclose falhou (segue sem travar a rodada)"
   if [ "$MODE" = "full" ] && [ "$GATE" = "success" ]; then python build_board.py || return 1; fi
   python build_ops.py || true
   return 0

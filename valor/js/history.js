@@ -8,6 +8,9 @@
   var ABBR = { "Cartões": "CAR", "Faltas": "FAL", "Finalizações": "FIN", "Impedimentos": "IMP",
     "Laterais": "LAT", "Tiros de meta": "TM", "Escanteios": "ESC", "Chutes no gol": "CG", "Desarmes": "DES" };
   var MV = window.MOVES || {};
+  // Abre → Fecha: dataset de μ implícito abertura×fechamento (build_openclose.py).
+  // Opcional: se data/openclose.js não carregou, a sub-aba simplesmente não aparece.
+  var OC = (window.OPENCLOSE || {}).rows || [];
   // cores distintas por casa NO GRÁFICO (a cor de marca real repete vermelho
   // em superbet/estrelabet — aqui legibilidade ganha da identidade)
   var CASA_COR = { betano: "#f97316", superbet: "#dc2626", estrelabet: "#6d28d9", "7k": "#059669", pinnacle: "#1d4ed8", bet365: "#db2777", betfast: "#7f1d1d" };
@@ -1003,6 +1006,147 @@
     return t + "</tbody></table></div>";
   }
 
+  // --- ABRE → FECHA: linha implícita de abertura × fechamento por jogo+mercado ---
+  var UNIDADE = { "Cartões": "cartões", "Faltas": "faltas", "Finalizações": "finalizações",
+    "Impedimentos": "impedimentos", "Laterais": "laterais", "Tiros de meta": "tiros de meta",
+    "Escanteios": "escanteios", "Chutes no gol": "chutes no gol", "Desarmes": "desarmes" };
+
+  function ocDelta(mo, mc) {
+    if (mo == null || mc == null) return null;
+    return mc - mo;
+  }
+
+  function ocDeltaCell(d) {
+    if (d == null) return '<td class="pm">—</td>';
+    var arrow = d > 0.05 ? "▲" : (d < -0.05 ? "▼" : "→");
+    var dcls = d > 0.05 ? "up" : (d < -0.05 ? "dn" : "flat");
+    return '<td><span class="hist-mv ' + dcls + '">' + arrow + " " + (d > 0 ? "+" : "") + br(d, 2) + "</span></td>";
+  }
+
+  function ocBadge(lado) {
+    if (lado === "push") return '<span class="oc-badge push" title="Resultado exato na linha — devolve">Push</span>';
+    if (lado === "over") return '<span class="oc-badge win" title="Mais venceu a linha main">🟢 Mais</span>';
+    if (lado === "under") return '<span class="oc-badge win" title="Menos venceu a linha main">🟢 Menos</span>';
+    return "—";
+  }
+
+  function ocEndTxt(line, over, under) {
+    if (line == null) return "—";
+    return br(line, 1) + " · " + br(over, 2) + "/" + br(under, 2);
+  }
+
+  /** Sub-tabela por casa (expande no clique da linha). */
+  function ocExpand(r) {
+    var t = '<table class="lad oc-sub"><thead><tr><th>Casa</th>' +
+      '<th title="Linha · odds Mais/Menos na abertura">Abertura</th><th>μ abre</th>' +
+      '<th title="Linha · odds Mais/Menos na última captura pré-jogo">Fechamento</th><th>μ fecha</th><th>Δ</th></tr></thead><tbody>';
+    Object.keys(r.casas || {}).sort().forEach(function (c) {
+      var e = r.casas[c];
+      var d = e.delta != null ? e.delta : ocDelta(e.mu_open, e.mu_close);
+      t += "<tr><td>" + LOGO(c, "house-logo-sm") + "</td>" +
+        "<td>" + ocEndTxt(e.open_line, e.open_over, e.open_under) + "</td>" +
+        '<td class="ln">' + br(e.mu_open, 2) + "</td>" +
+        "<td>" + ocEndTxt(e.close_line, e.close_over, e.close_under) + "</td>" +
+        '<td class="ln">' + br(e.mu_close, 2) + "</td>" +
+        ocDeltaCell(d) + "</tr>";
+    });
+    t += '<tr class="oc-cons"><td><b>Consenso</b></td><td class="pm">mediana de ' + (r.n_open || 0) + " casa" + (r.n_open === 1 ? "" : "s") + "</td>" +
+      '<td class="ln">' + br(r.mu_open, 2) + "</td>" +
+      '<td class="pm">mediana de ' + (r.n_close || 0) + " casa" + (r.n_close === 1 ? "" : "s") + "</td>" +
+      '<td class="ln">' + br(r.mu_close, 2) + "</td>" +
+      ocDeltaCell(r.delta) + "</tr>";
+    return t + "</tbody></table>";
+  }
+
+  function renderOpenClose(root) {
+    // filtros mercado × casa — mesmos state.merc/state.fcasa das outras abas
+    var bar = document.createElement("div"); bar.className = "bar";
+    bar.appendChild(chip("Todos mercados", state.merc === "todos", "", function () { state.merc = "todos"; render(); }));
+    Object.keys(ABBR).forEach(function (m) {
+      if (!OC.some(function (r) { return r.mercado === m; })) return;
+      bar.appendChild(chip(esc(m), state.merc === m, "", function () { state.merc = m; render(); }));
+    });
+    var casasD = {};
+    OC.forEach(function (r) { Object.keys(r.casas || {}).forEach(function (c) { casasD[c] = 1; }); });
+    var casaKeys = Object.keys(casasD).sort();
+    if (casaKeys.length > 1) {
+      bar.appendChild(chip("Todas as casas", state.fcasa === "todas", "", function () { state.fcasa = "todas"; render(); }));
+      casaKeys.forEach(function (c) {
+        bar.appendChild(chip(LOGO(c, "house-logo-sm"), state.fcasa === c, "", function () {
+          state.fcasa = state.fcasa === c ? "todas" : c; render();
+        }));
+      });
+    }
+    root.appendChild(bar);
+
+    var vis = OC.filter(function (r) {
+      if (state.merc !== "todos" && r.mercado !== state.merc) return false;
+      if (state.fcasa !== "todas" && !(r.casas && r.casas[state.fcasa])) return false;
+      return true;
+    });
+
+    var meta = document.createElement("div"); meta.className = "meta";
+    meta.innerHTML = vis.length + " jogo" + (vis.length === 1 ? "" : "s") + "+mercado liquidados · " +
+      "<b>μ</b> = total implícito do par Mais/Menos (sem juice, mesma conta do gráfico) · " +
+      (state.fcasa !== "todas"
+        ? "μ da <b>" + esc(window.casaNome ? window.casaNome(state.fcasa) : state.fcasa) + "</b>"
+        : "μ = <b>consenso</b> (mediana entre casas)") +
+      " · fechamento = última captura pré-jogo · 🟢 = lado que venceu a linha · toque na linha pra abrir por casa" +
+      ((window.OPENCLOSE || {}).gerado ? " · atualizado " + esc(window.OPENCLOSE.gerado) : "");
+    root.appendChild(meta);
+
+    if (!vis.length) {
+      var em = document.createElement("div"); em.className = "empty";
+      em.innerHTML = '<div class="big">📭</div>Nenhum jogo liquidado com esses filtros.';
+      root.appendChild(em);
+      return;
+    }
+
+    var t = '<div class="hist-scroll"><table class="lad hist-tbl oc-tbl"><thead><tr>' +
+      '<th>Data</th><th class="jg">Jogo</th><th>Merc</th><th>Linha</th>' +
+      '<th title="μ implícito na abertura">μ Abertura</th>' +
+      '<th title="μ implícito na última captura pré-jogo">μ Fechamento</th>' +
+      '<th title="μ fechamento − μ abertura">Δ</th>' +
+      '<th title="Contagem real do jogo">Resultado</th>' +
+      '<th title="Lado da linha main que venceu (não é green de aposta — é o desfecho da linha)">G/R</th></tr></thead><tbody>';
+    vis.forEach(function (r, i) {
+      var src = state.fcasa !== "todas" ? (r.casas[state.fcasa] || {}) : r;
+      var mo = src.mu_open, mc = src.mu_close;
+      var d = src.delta != null ? src.delta : ocDelta(mo, mc);
+      var resTxt = r.resultado == null ? "—"
+        : br(r.resultado, 0) + ' <span class="pm">' + esc(UNIDADE[r.mercado] || r.mercado.toLowerCase()) + "</span>";
+      t += '<tr class="oc-row" data-oc="' + i + '" title="Toque pra abrir por casa">' +
+        "<td>" + esc(fmtBrt(r.kickoff_epoch || r.kickoff || r.data, false)) + "</td>" +
+        '<td class="jg">' + esc(r.jogo) + "</td>" +
+        '<td title="' + esc(r.mercado) + '">' + (ABBR[r.mercado] || esc(r.mercado)) + "</td>" +
+        '<td class="ln">' + br(r.linha, 1) + "</td>" +
+        '<td class="ln">' + (mo == null ? '<span class="pm">—</span>' : br(mo, 2)) + "</td>" +
+        '<td class="ln">' + (mc == null ? '<span class="pm" title="Sem par Mais/Menos completo pré-jogo nesta ponta">—</span>' : br(mc, 2)) + "</td>" +
+        ocDeltaCell(d) +
+        "<td>" + resTxt + "</td>" +
+        "<td>" + ocBadge(r.lado) + "</td></tr>";
+    });
+    t += "</tbody></table></div>";
+    var tbl = document.createElement("div");
+    tbl.innerHTML = t;
+    root.appendChild(tbl);
+
+    // expandir por casa (mesmo padrão da Mesa: clique alterna o detalhe)
+    tbl.querySelectorAll("tr.oc-row").forEach(function (tr) {
+      tr.style.cursor = "pointer";
+      tr.onclick = function () {
+        var next = tr.nextElementSibling;
+        if (next && next.classList.contains("oc-exp")) { next.remove(); return; }
+        var r = vis[+tr.getAttribute("data-oc")];
+        if (!r) return;
+        var det = document.createElement("tr");
+        det.className = "oc-exp";
+        det.innerHTML = '<td colspan="9">' + ocExpand(r) + "</td>";
+        tr.parentNode.insertBefore(det, tr.nextSibling);
+      };
+    });
+  }
+
   function render() {
     var root = document.getElementById("hist-root");
     if (!root) return;
@@ -1027,10 +1171,20 @@
       state.aba === "abertas", "", function () {
         state.aba = "abertas"; render();
       }));
+    if (OC.length) {
+      nav.appendChild(chip("Abre → Fecha <span class='ct2'>" + OC.length + "</span>",
+        state.aba === "openclose", "", function () {
+          state.aba = "openclose"; render();
+        }));
+    }
     root.appendChild(nav);
 
     if (state.aba === "explorar") {
       renderExplorar(root);
+      return;
+    }
+    if (state.aba === "openclose") {
+      renderOpenClose(root);
       return;
     }
 

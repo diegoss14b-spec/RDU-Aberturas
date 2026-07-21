@@ -207,6 +207,8 @@ jobs:
           python history_settle.py
           python build_history.py
           python build_moves.py
+          # dataset abertura×fechamento (μ implícito) — guardado: falha aqui não bloqueia o board
+          python build_openclose.py || echo "::warning::build_openclose falhou (board segue)"
 
       # Board + deploy SÓ no full (close é captura de fechamento pro banco; o board
       # filtrado da janela curta NÃO deve substituir o board cheio do site)

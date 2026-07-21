@@ -152,6 +152,18 @@ h1 .rd{color:var(--purple)}
 .hist-tbl th.jg{text-align:left}
 .lad tr.sm td{color:var(--faint);opacity:.72}
 .pm{font:600 8.5px var(--mono);color:var(--faint)}
+/* --- Abre → Fecha (μ abertura × fechamento) --- */
+.oc-tbl th,.oc-sub th{text-transform:none}  /* uppercase viraria o μ em M */
+.oc-badge{display:inline-block;font:700 10px var(--disp);letter-spacing:.2px;padding:2px 7px;border-radius:6px;white-space:nowrap}
+.oc-badge.win{background:var(--green-soft);color:var(--green)}
+.oc-badge.push{background:var(--line2);color:var(--dim)}
+tr.oc-row:hover td{background:var(--purple-soft)}
+tr.oc-exp>td{background:var(--panel);padding:8px 10px!important}
+.oc-sub{min-width:480px}
+.oc-sub th{font-size:8.5px}
+.oc-sub td{padding:5px 6px;border-bottom:1px solid var(--line2)}
+.oc-sub tr:last-child td{border-bottom:0}
+tr.oc-cons td{background:var(--card);border-top:1px solid var(--line)}
 /* --- gráficos de movimentação --- */
 .spark{display:inline-block;vertical-align:middle;cursor:pointer}
 .spark polyline{fill:none;stroke:var(--purple);stroke-width:1.6}
@@ -468,10 +480,18 @@ h1 .mdl-badge{font-size:9.5px}
         };
         document.body.appendChild(s);
       }
-      // ordem: dados → dados → view (a view lê HIST/MOVES no load e renderiza sozinha)
+      // openclose é OPCIONAL: se falhar, a sub-aba Abre → Fecha some e o resto vive
+      function injectSoft(src, next) {
+        var s = document.createElement("script");
+        s.src = src; s.onload = next; s.onerror = next;
+        document.body.appendChild(s);
+      }
+      // ordem: dados → dados → view (a view lê HIST/MOVES/OPENCLOSE no load e renderiza sozinha)
       inject("data/history.js", function () {
         inject("data/moves.js", function () {
-          inject("js/history.js", function () { histLoaded = true; histLoading = false; });
+          injectSoft("data/openclose.js", function () {
+            inject("js/history.js", function () { histLoaded = true; histLoading = false; });
+          });
         });
       });
     }
