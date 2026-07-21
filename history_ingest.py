@@ -28,7 +28,7 @@ from migrate_history_keys import migrate_keys_dict, migrate_tick_file, unify_key
 
 ODDS = ROOT / "data" / "odds"
 HIST = ROOT / "data" / "odds_history"
-CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365"]
+CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365", "betfast"]
 
 BETANO_MK = {
     "Total de Cartões": "Cartões", "Total de Faltas": "Faltas", "Total de chutes": "Finalizações",

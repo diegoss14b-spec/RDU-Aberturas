@@ -29,9 +29,10 @@ BRT = timezone(timedelta(hours=-3))
 
 DISP = {
     "betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet",
-    "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365", "sofa": "SofaScore",
+    "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365", "betfast": "Betfast",
+    "sofa": "SofaScore",
 }
-CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365"]
+CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365", "betfast"]
 MERCADOS = [
     "Cartões", "Faltas", "Finalizações", "Chutes no gol", "Escanteios",
     "Impedimentos", "Laterais", "Tiros de meta", "Desarmes",

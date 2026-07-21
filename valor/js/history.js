@@ -10,7 +10,7 @@
   var MV = window.MOVES || {};
   // cores distintas por casa NO GRÁFICO (a cor de marca real repete vermelho
   // em superbet/estrelabet — aqui legibilidade ganha da identidade)
-  var CASA_COR = { betano: "#f97316", superbet: "#dc2626", estrelabet: "#6d28d9", "7k": "#059669", pinnacle: "#1d4ed8", bet365: "#db2777" };
+  var CASA_COR = { betano: "#f97316", superbet: "#dc2626", estrelabet: "#6d28d9", "7k": "#059669", pinnacle: "#1d4ed8", bet365: "#db2777", betfast: "#7f1d1d" };
   function casaCor(c) { return CASA_COR[String(c || "").toLowerCase()] || "#6b7280"; }
   var LOGO = window.casaLogo || function (c) { return esc(c); };
   var LADO_EN = { "Mais": "over", "Menos": "under", over: "over", under: "under" };

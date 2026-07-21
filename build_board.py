@@ -406,7 +406,8 @@ def main():
                      + load_normalized("7k", "7k") \
                      + load_normalized("EstrelaBet", "estrelabet") \
                      + load_normalized("Pinnacle", "pinnacle") \
-                     + load_normalized("bet365", "bet365")
+                     + load_normalized("bet365", "bet365") \
+                     + load_normalized("Betfast", "betfast")
     casas_ativas = sorted(set(e["casa"] for e in eventos))
     # SofaScore = base canônica de nomes/horários; casas encaixam por horário + fuzzy
     sofa_fx = load_sofa_fixtures()

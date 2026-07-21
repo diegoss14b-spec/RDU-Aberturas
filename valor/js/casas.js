@@ -9,7 +9,8 @@
     estrelabet: { nome: "EstrelaBet", logo: "logos/estrelabet.svg", cor: "#1a2138" }, // azul-marinho (a marca NÃO é vermelha)
     "7k":       { nome: "7k",         logo: "logos/7k.svg",         cor: "#12d16d" },
     pinnacle:   { nome: "Pinnacle",   logo: "logos/pinnacle.svg",   cor: "#ff5c00" },
-    bet365:     { nome: "bet365",     logo: "logos/bet365.svg",     cor: "#14805e" }
+    bet365:     { nome: "bet365",     logo: "logos/bet365.svg",     cor: "#14805e" },
+    betfast:    { nome: "Betfast",    logo: "logos/betfast.svg",    cor: "#9c1116" } // vinho da marca (≠ vermelho vivo da Superbet); badge preto+vermelho (≠ 7k preto+verde)
   };
 
   function info(casa) {
