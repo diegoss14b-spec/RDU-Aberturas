@@ -20,7 +20,17 @@ Mercados capturados (só O/U de linha; faixas/race/exatos/3-vias ficam FORA):
 
 SEGREDO: token via env BETSAPI_TOKEN (GitHub Actions secret — o repo é público, o
 token JAMAIS vai em código/commit) com fallback betsapi_config.json local (gitignored).
-Saída: data/odds/bet365_{stamp}.jsonl + bet365_latest.json (formato normalizado do board)."""
+Saída: data/odds/bet365_{stamp}.jsonl + bet365_latest.json (formato normalizado do board).
+
+POLÍTICA DE CONSUMO "abertura + fechamento" (21/07 — o token é COMPARTILHADO):
+  - FULL: só a cada ~3h (gate por timestamp em _status/bet365_gate.json; fulls
+    intermediários pulam SEM chamada nenhuma, reaproveitando o pointer atual —
+    vira stale-keep honesto no board). Pega a abertura + pontos intermediários.
+  - CLOSE: SEMPRE roda, mas SÓ os jogos iminentes do CACHE de FIs gravado no
+    último full (_status/bet365_fis.json) — tipicamente 2-8 req; upcoming só
+    como fallback (2 páginas) se o cache não servir.
+  Conta: ~8 fulls/dia × ~75 req + ~72 closes × ~3 req ≈ 700-850 req/dia
+  (vs ~2.250 antes), com limite de 3.600/h — sobra folga pro outro usuário."""
 import sys, os, json, re, time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -38,14 +48,21 @@ except Exception:
     def odds_window(): return None
     def in_window(_s, _w): return True
 OUTDIR = ROOT / "data" / "odds"; OUTDIR.mkdir(parents=True, exist_ok=True)
+STATUS_DIR = OUTDIR / "_status"
+GATE_F = STATUS_DIR / "bet365_gate.json"   # timestamp do último full (persistido no repo)
+FIS_F = STATUS_DIR / "bet365_fis.json"     # cache FI→jogo do último full (pro close barato)
 BRT = timezone(timedelta(hours=-3))
 BASE = "https://api.b365api.com"
 DAYS_AHEAD = 5           # janela da Mesa
-MAX_EVENTS = 60          # cap de chamadas de prematch por captura (orçamento ~75 req no total)
+MAX_EVENTS = 60          # cap de chamadas de prematch por FULL (~75 req no total)
+MAX_CLOSE_EVENTS = 12    # cap do close (iminentes; tipicamente 2-8)
 MAX_PAGES = 20           # upcoming pagina de 50 em 50 (~700 eventos = 14 páginas)
+FULL_EVERY_H = 2.5       # gate: full de verdade só a cada ~3h (2h30 de guarda, cron atrasa)
+FIS_MAX_AGE_H = 12.0     # cache de FIs mais velho que isso não vale (fallback upcoming)
 SLEEP = 0.12             # ≤10 req/s — bem abaixo do limite de 30 req/s do plano
 MIN_EVENTS = 5
-MIN_EFF = MIN_EVENTS     # modo close (ODDS_WINDOW_H) reduz — ver main()
+MIN_EFF = MIN_EVENTS     # modo close (ODDS_WINDOW_H) e skip do gate reduzem — ver main()
+N_REQ = 0                # contador de requests da captura (auditoria de consumo)
 
 # ligas falsas (bots/simulação) — NUNCA entram
 EXCL_LEAGUE = re.compile(r"esoccer|e-?soccer|srl\b|\(srl\)|virtual|simulat", re.I)
@@ -76,10 +93,12 @@ def _token():
 
 def get(path, params, token):
     """GET com retry; loga SEM o token (o token nunca pode vazar em log público)."""
+    global N_REQ
     url = f"{BASE}{path}"
     q = dict(params); q["token"] = token
     for a in range(3):
         try:
+            N_REQ += 1
             r = requests.get(url, params=q, timeout=30)
             if r.status_code == 200:
                 d = r.json()
@@ -218,15 +237,25 @@ def parse_prematch(res, home, away):
     return out, merc_t
 
 
-def main():
-    token = _token()
-    now = datetime.now(BRT)
-    now_utc = datetime.now(timezone.utc)
+def _load_json(path):
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return None
 
-    # 1) upcoming paginado (barato: ~14 req) → filtra liga real + janela de dias
-    events, total = [], None
-    page = 1
-    while page <= MAX_PAGES:
+
+def _save_json(path, obj):
+    try:
+        STATUS_DIR.mkdir(parents=True, exist_ok=True)
+        Path(path).write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        print(f"[bet365] aviso: não gravei {Path(path).name}: {type(e).__name__}")
+
+
+def _sweep_upcoming(token, now_utc, max_pages):
+    """Varre o upcoming (barato: 50/página) → eventos reais na janela de DAYS_AHEAD."""
+    events, total, page = [], None, 1
+    while page <= max_pages:
         d = get("/v1/bet365/upcoming", {"sport_id": 1, "page": page}, token)
         if not d:
             break
@@ -253,22 +282,60 @@ def main():
         page += 1
         time.sleep(SLEEP)
     print(f"[bet365] upcoming: {total} eventos brutos · {len(events)} reais na janela de {DAYS_AHEAD}d ({page} páginas)")
+    return events
 
+
+def main():
+    global MIN_EFF
+    token = _token()
+    now = datetime.now(BRT)
+    now_utc = datetime.now(timezone.utc)
     _wh = odds_window()
-    if _wh is not None:  # modo close: só jogos iminentes
-        global MIN_EFF
-        _tot = len(events)
-        events = [e for e in events if in_window(e["time"], _wh)]
-        MIN_EFF = (min(MIN_EVENTS, 1) if events else 0)
-        print(f"[bet365] modo close: janela {_wh:g}h -> {len(events)} de {_tot} eventos")
 
-    # prioridade: ligas com modelo > competições acompanhadas > resto; depois kickoff
-    def prio(e):
-        lg = e["league"]
-        p = 0 if PRIO_LEAGUE.search(lg) else (1 if SEC_LEAGUE.search(lg) else 2)
-        return (p, e["time"])
-    events.sort(key=prio)
-    events = events[:MAX_EVENTS]
+    if _wh is None:
+        # ===== FULL: só a cada FULL_EVERY_H (token compartilhado — ver docstring) =====
+        gate = _load_json(GATE_F) or {}
+        last = float(gate.get("last_full_epoch") or 0)
+        age_h = (time.time() - last) / 3600.0 if last else 1e9
+        from capture_common import resolve_odds_pointer
+        if age_h < FULL_EVERY_H:
+            meta, _srcp = resolve_odds_pointer("bet365", prefer_full=False)
+            n_prev = int((meta or {}).get("_actual_n") or 0)
+            if n_prev > 0:
+                # pulo SEM chamada nenhuma; pointer atual segue valendo (stale-keep honesto)
+                MIN_EFF = 1
+                print(f"[bet365] gate: último full há {age_h:.1f}h (<{FULL_EVERY_H:g}h) — "
+                      f"pulando captura (0 req; inventário atual: {n_prev} jogos)")
+                return n_prev
+            print(f"[bet365] gate: dentro da janela mas SEM pointer válido — full de recuperação")
+        events = _sweep_upcoming(token, now_utc, MAX_PAGES)
+        # cache de FIs pro modo close (todos da janela, ANTES do cap)
+        _save_json(FIS_F, {"at": now.isoformat(timespec="seconds"),
+                           "at_epoch": time.time(), "events": events})
+        # prioridade: ligas com modelo > competições acompanhadas > resto; depois kickoff
+        def prio(e):
+            lg = e["league"]
+            p = 0 if PRIO_LEAGUE.search(lg) else (1 if SEC_LEAGUE.search(lg) else 2)
+            return (p, e["time"])
+        events.sort(key=prio)
+        events = events[:MAX_EVENTS]
+    else:
+        # ===== CLOSE: sempre roda, mas SÓ iminentes, via cache de FIs do último full =====
+        cache = _load_json(FIS_F) or {}
+        cache_age_h = (time.time() - float(cache.get("at_epoch") or 0)) / 3600.0 \
+            if cache.get("at_epoch") else 1e9
+        events = [e for e in (cache.get("events") or []) if in_window(e.get("time"), _wh)]
+        if cache_age_h > FIS_MAX_AGE_H or (not events and not cache.get("events")):
+            print(f"[bet365] close: cache de FIs {'velho' if cache else 'ausente'} "
+                  f"({cache_age_h:.1f}h) — fallback upcoming (2 páginas)")
+            swept = _sweep_upcoming(token, now_utc, 2)
+            events = [e for e in swept if in_window(e.get("time"), _wh)]
+        else:
+            print(f"[bet365] close: cache de FIs ({cache_age_h:.1f}h) → "
+                  f"{len(events)} jogos iminentes na janela {_wh:g}h")
+        events.sort(key=lambda e: e.get("time") or 0)
+        events = events[:MAX_CLOSE_EVENTS]
+        MIN_EFF = (min(MIN_EVENTS, 1) if events else 0)
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
     out_path = OUTDIR / f"bet365_{stamp}.jsonl"
@@ -304,7 +371,13 @@ def main():
         n_out += 1
     f.close()
     write_latest(n_out, promote=None)
+    if _wh is None and n_out > 0:
+        # full concluído: arma o gate das próximas ~3h (auditoria: req da rodada junto)
+        _save_json(GATE_F, {"last_full_epoch": time.time(),
+                            "last_full_at": now.isoformat(timespec="seconds"),
+                            "last_full_req": N_REQ, "last_full_n": n_out})
     print(f"[bet365] {n_det} prematch consultados · {n_out} jogos com mercado de estatística salvos em {out_path.name}")
+    print(f"[bet365] req nesta captura: {N_REQ} (modo {'close' if _wh is not None else 'full'})")
     return n_out
 
 
