@@ -7,6 +7,12 @@ on:
   schedule:
     - cron: "7 * * * *"           # full candidate
     - cron: "22,37,52 * * * *"    # close densify
+    # Redundância anti-starvation (20/07): o agendador do GitHub entrega ~1,5 dos 4
+    # disparos/hora configurados (medido nos últimos 28 runs) — jogos abriam com a última
+    # captura a 40-60min (contador "sem close" do Histórico). Estes disparos extras são
+    # BARATOS: o gate decide em ~30s sem checkout e o espaçamento mínimo de 12min entre
+    # capturas segura o gasto de proxy. Só viram captura quando há jogo em ≤90min.
+    - cron: "2,12,17,27,32,42,47,57 * * * *"    # close densify (redundância)
   workflow_dispatch: {}           # manual = sempre full
 
 permissions:
