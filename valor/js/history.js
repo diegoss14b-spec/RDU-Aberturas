@@ -16,7 +16,9 @@
   var LADO_EN = { "Mais": "over", "Menos": "under", over: "over", under: "under" };
 
   // explorar | liquidadas | abertas
-  var state = { aba: "explorar", merc: "todos", res: "todos", quality: "todos",
+  // merc/fcasa = filtros combináveis (mercado × casa) — também viram o contexto
+  // default do gráfico ao clicar num jogo/linha (pedido do Diego, 21/07)
+  var state = { aba: "explorar", merc: "todos", fcasa: "todas", quality: "todos", mainOnly: true,
     game: null, mercado: null, linha: null, casa: null };
 
   var Q_LABEL = {
@@ -73,17 +75,6 @@
     if (p.length >= 1 && String(p[0]).indexOf("sofa:") === 0) return p[0];
     if (p.length >= 3) return p[0] + "|" + p[1] + "|" + p[2];
     return (r.data || "") + "|" + (r.jogo || "");
-  }
-
-  function mvSeries(gk, casa) {
-    var g = MV[gk];
-    return (g && g[casa] && g[casa].length >= 2) ? g[casa] : null;
-  }
-
-  function anyMv(gk) {
-    var g = MV[gk];
-    if (!g) return false;
-    return Object.keys(g).some(function (c) { return c.charAt(0) !== "_" && g[c] && g[c].length >= 2; });
   }
 
   // --- índices jogo → mercados → linhas ---
@@ -421,21 +412,6 @@
     return leg + sum + '<div class="mv-chart ex-chart ex-chart-ref">' + sv + "</div>";
   }
 
-  function sparkline(gk, casa) {
-    var s = mvSeries(gk, casa);
-    if (!s) return '<span class="pm">—</span>';
-    var w = 84, h = 22, p = 2;
-    var ts = s.map(function (x) { return x[0]; }), os = s.map(function (x) { return x[1]; });
-    var t0 = Math.min.apply(null, ts), t1 = Math.max.apply(null, ts);
-    var o0 = Math.min.apply(null, os), o1 = Math.max.apply(null, os);
-    var dt = (t1 - t0) || 1, dO = (o1 - o0) || 1;
-    var pts = s.map(function (x) {
-      return (p + (x[0] - t0) / dt * (w - 2 * p)).toFixed(1) + "," + (h - p - (x[1] - o0) / dO * (h - 2 * p)).toFixed(1);
-    }).join(" ");
-    var dir = os[os.length - 1] > os[0] ? "dn" : (os[os.length - 1] < os[0] ? "up" : "");
-    return '<svg class="spark ' + dir + '" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '"><polyline points="' + pts + '"/></svg>';
-  }
-
   // --- banner / headline (CLV) ---
   function banner() {
     var b = H.banco || {}, nv = (H.head || {}).n_valid || 0, head = H.head || {};
@@ -495,6 +471,20 @@
     return wrap;
   }
 
+  /** O mercado m deste jogo tem alguma linha desta casa? (combinação mercado×casa) */
+  function mercTemCasa(g, m, casa) {
+    var mkt = g.mercados[m];
+    if (!mkt) return false;
+    var ok = false;
+    Object.keys(mkt.linhas || {}).forEach(function (Lk) {
+      var ln = mkt.linhas[Lk];
+      Object.keys(ln.lados || {}).forEach(function (lado) {
+        (((ln.lados[lado] || {}).rows) || []).forEach(function (r) { if (r.casa === casa) ok = true; });
+      });
+    });
+    return ok;
+  }
+
   // --- EXPLORAR ---
   function renderExplorar(root) {
     var idx = buildGameIndex();
@@ -520,12 +510,37 @@
       });
       root.appendChild(filt);
 
+      // filtro por CASA (combinável com o de mercado) — vira o default do gráfico
+      var casasAllG = {};
+      games.forEach(function (g) { Object.keys(g.casas).forEach(function (c) { casasAllG[c] = 1; }); });
+      var casaKeys = Object.keys(casasAllG).sort();
+      if (casaKeys.length > 1) {
+        var cfilt = document.createElement("div"); cfilt.className = "bar";
+        cfilt.appendChild(chip("Todas as casas", state.fcasa === "todas", "", function () {
+          state.fcasa = "todas"; render();
+        }));
+        casaKeys.forEach(function (c) {
+          cfilt.appendChild(chip(LOGO(c, "house-logo-sm"), state.fcasa === c, "", function () {
+            state.fcasa = state.fcasa === c ? "todas" : c; render();
+          }));
+        });
+        root.appendChild(cfilt);
+      }
+
       var list = games.filter(function (g) {
-        if (state.merc === "todos") return true;
-        return !!g.mercados[state.merc];
+        if (state.merc !== "todos" && !g.mercados[state.merc]) return false;
+        if (state.fcasa !== "todas") {
+          // combinação de verdade: a casa tem que estar NO mercado filtrado
+          if (state.merc !== "todos") { if (!mercTemCasa(g, state.merc, state.fcasa)) return false; }
+          else if (!g.casas[state.fcasa]) return false;
+        }
+        return true;
       });
       var meta = document.createElement("div"); meta.className = "meta";
-      meta.innerHTML = list.length + " jogo" + (list.length === 1 ? "" : "s") + " no histórico · toque pra abrir o gráfico";
+      meta.innerHTML = list.length + " jogo" + (list.length === 1 ? "" : "s") + " no histórico" +
+        (state.merc !== "todos" ? " · <b>" + esc(state.merc) + "</b>" : "") +
+        (state.fcasa !== "todas" ? " · <b>" + esc(window.casaNome ? window.casaNome(state.fcasa) : state.fcasa) + "</b>" : "") +
+        " · toque pra abrir o gráfico";
       root.appendChild(meta);
 
       var box = document.createElement("div"); box.className = "ex-games";
@@ -561,12 +576,39 @@
           state.game = g.id;
           state.mercado = null;
           state.linha = null;
-          state.casa = null;
+          // filtros ativos = contexto default do gráfico: abre já no mercado
+          // filtrado e com a casa filtrada isolada (se o jogo as tiver)
           var ms = Object.keys(g.mercados);
-          if (ms.indexOf("Cartões") >= 0) state.mercado = "Cartões";
-          else if (ms.length) state.mercado = ms[0];
+          if (state.merc !== "todos" && g.mercados[state.merc]) state.mercado = state.merc;
+          else {
+            var pool = state.fcasa === "todas" ? ms
+              : ms.filter(function (m) { return mercTemCasa(g, m, state.fcasa); });
+            if (!pool.length) pool = ms;
+            state.mercado = pool.indexOf("Cartões") >= 0 ? "Cartões" : pool[0];
+          }
+          state.casa = (state.fcasa !== "todas" && state.mercado &&
+            mercTemCasa(g, state.mercado, state.fcasa)) ? state.fcasa : null;
           if (state.mercado) {
-            state.linha = pickMainLine(g.mercados[state.mercado].linhas, state.mercado);
+            var linhasObj = g.mercados[state.mercado].linhas;
+            state.linha = pickMainLine(linhasObj, state.mercado);
+            if (state.casa) {
+              // se a casa filtrada não tem a main line, cai pra linha DELA mais próxima
+              var temCasa = function (L) {
+                var ln = linhasObj[String(L)];
+                if (!ln) return false;
+                return Object.keys(ln.lados || {}).some(function (ld) {
+                  return ((ln.lados[ld] || {}).rows || []).some(function (r) { return r.casa === state.casa; });
+                });
+              };
+              if (state.linha == null || !temCasa(state.linha)) {
+                var ref = state.linha;
+                var cands = Object.keys(linhasObj).map(Number).filter(temCasa)
+                  .sort(function (a, b) {
+                    return Math.abs(a - (ref == null ? a : ref)) - Math.abs(b - (ref == null ? b : ref));
+                  });
+                if (cands.length) state.linha = cands[0];
+              }
+            }
           }
           render();
         };
@@ -741,7 +783,7 @@
     root.appendChild(panel);
   }
 
-  // --- tabelas legadas ---
+  // --- tabelas: padronizadas pela PROJEÇÃO (μ implícito), 21/07 ---
   function filtros(dataset) {
     if (state.merc !== "todos" && !dataset.some(function (r) { return r.mercado === state.merc; })) state.merc = "todos";
     var box = document.createElement("div"); box.className = "bar";
@@ -752,76 +794,211 @@
         box.appendChild(chip(esc(m), state.merc === m, "", function () { state.merc = m; render(); }));
       });
     }
-    if (state.aba === "liquidadas") {
-      box.appendChild(chip("🟢 green", state.res === "green", "val", function () { state.res = state.res === "green" ? "todos" : "green"; render(); }));
-      box.appendChild(chip("🔴 red", state.res === "red", "ord", function () { state.res = state.res === "red" ? "todos" : "red"; render(); }));
-      if (dataset.some(function (r) { return r.push; })) {
-        box.appendChild(chip("⚪ push", state.res === "push", "", function () { state.res = state.res === "push" ? "todos" : "push"; render(); }));
-      }
-    }
-    // filtro qualidade (liquidadas + abertas)
-    if (state.aba === "liquidadas" || state.aba === "abertas") {
-      ["todos", "full_prematch", "late_open", "no_close", "post_kickoff"].forEach(function (q) {
-        var lab = q === "todos" ? "Qualidade: todas" : (Q_LABEL[q] || q);
-        box.appendChild(chip(lab, state.quality === q, "", function () {
-          state.quality = q; render();
+    // filtro por CASA (combinável com o de mercado)
+    var casasD = {};
+    dataset.forEach(function (r) { if (r.casa) casasD[r.casa] = 1; });
+    var casaKeys = Object.keys(casasD).sort();
+    if (casaKeys.length > 1) {
+      box.appendChild(chip("Todas as casas", state.fcasa === "todas", "", function () {
+        state.fcasa = "todas"; render();
+      }));
+      casaKeys.forEach(function (c) {
+        box.appendChild(chip(LOGO(c, "house-logo-sm"), state.fcasa === c, "", function () {
+          state.fcasa = state.fcasa === c ? "todas" : c; render();
         }));
       });
     }
+    // main line por padrão; o chip abre a escada de alternativas
+    box.appendChild(chip(state.mainOnly ? "Só main line" : "Mostrando alternativas", state.mainOnly, "ord", function () {
+      state.mainOnly = !state.mainOnly; render();
+    }));
+    // filtro qualidade (liquidadas + abertas)
+    ["todos", "full_prematch", "late_open", "no_close", "post_kickoff"].forEach(function (q) {
+      var lab = q === "todos" ? "Qualidade: todas" : (Q_LABEL[q] || q);
+      box.appendChild(chip(lab, state.quality === q, "", function () {
+        state.quality = q; render();
+      }));
+    });
     return box;
   }
 
   function applyFilters(rows) {
     return rows.filter(function (r) {
       if (state.merc !== "todos" && r.mercado !== state.merc) return false;
-      if (state.aba === "liquidadas" && state.res !== "todos") {
-        if (state.res === "green" && r.won !== true) return false;
-        if (state.res === "red" && r.won !== false) return false;
-        if (state.res === "push" && !r.push) return false;
-      }
+      if (state.fcasa !== "todas" && r.casa !== state.fcasa) return false;
       if (state.quality !== "todos" && (r.quality || "") !== state.quality) return false;
       return true;
     });
   }
 
-  function tblLiquidadas(rows) {
-    if (!rows.length) return '<div class="empty"><div class="big">📭</div>Nenhuma linha liquidada com esses filtros.</div>';
-    var t = '<div class="hist-scroll"><table class="lad hist-tbl"><thead><tr>' +
-      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Fecha</th><th>CLV</th><th>Qual.</th><th>Res.</th><th>Mov.</th></tr></thead><tbody>';
+  /** Colapsa rows por lado num registro só por jogo+mercado+linha+casa (o par O/U). */
+  function groupPairs(rows) {
+    var map = {}, order = [];
     rows.forEach(function (r) {
-      var invalid = !r.clv_valido;
-      var resultTxt = r.push ? "push" : (r.won === true ? "green" : (r.won === false ? "red" : "—"));
-      var resultCls = r.push ? "hist-mv flat" : (r.won === true ? "hist-mv up" : (r.won === false ? "hist-mv dn" : ""));
-      t += '<tr class="' + (invalid ? "sm" : "") + (anyMv(r.gk) ? " has-mv" : "") + '" data-gk="' + esc(r.gk || "") +
-        '" data-gid="' + esc(r.gid || "") + '" data-merc="' + esc(r.mercado || "") + '" data-line="' + esc(r.linha) + '">' +
-        '<td class="jg">' + esc(r.jogo) + "</td>" +
-        "<td>" + (ABBR[r.mercado] || esc(r.mercado)) + "</td>" +
-        '<td class="ln">' + br(r.linha, 1) + "</td><td>" + esc(r.lado) + "</td>" +
-        '<td class="o">' + br(r.open, 2) + '</td><td class="u">' + br(r.close, 2) + "</td>" +
-        '<td class="' + (invalid ? "" : cls(r.clv)) + '">' + (invalid ? "—" : sign(r.clv, 1)) + "</td>" +
-        "<td>" + qBadge(r.quality) + "</td>" +
-        '<td class="' + resultCls + '">' + resultTxt + "</td>" +
-        "<td>" + sparkline(r.gk, r.casa) + "</td></tr>";
+      var k = (r.gid || "") + "|" + r.mercado + "|" + r.linha + "|" + r.casa;
+      var g = map[k];
+      if (!g) {
+        g = map[k] = { gid: r.gid, gk: r.gk, jogo: r.jogo, data: r.data,
+          mercado: r.mercado, linha: +r.linha, casa: r.casa, kickoff: r.kickoff,
+          kickoff_epoch: r.kickoff_epoch, quality: r.quality, result: null, push: false,
+          n_moves: 0, lados: {} };
+        order.push(g);
+      }
+      g.lados[LADO_EN[r.lado] || "over"] = r;
+      if (r.result != null) g.result = r.result;
+      if (r.push) g.push = true;
+      if ((r.n_moves || 0) > g.n_moves) g.n_moves = r.n_moves || 0;
+    });
+    return order;
+  }
+
+  /** μ implícito do par O/U do grupo (mesma matemática do gráfico). */
+  function pairMu(g, useClose) {
+    var o = g.lados.over, u = g.lados.under;
+    if (!o || !u) return null;
+    function v(r) { return useClose ? (r.close != null ? r.close : r.last) : r.open; }
+    var vo = v(o), vu = v(u);
+    if (!(vo > 1 && vu > 1)) return null;
+    var p = (1 / vo) / (1 / vo + 1 / vu);
+    return solveMu(g.linha, p);
+  }
+
+  /** Célula PROJEÇÃO: "10,3 ▲ +0,4" (μ atual + direção desde a abertura). */
+  function projCell(g) {
+    var mNow = pairMu(g, true), mOpen = pairMu(g, false);
+    if (mNow == null && mOpen == null) return '<td class="pm" title="Sem o par Mais/Menos da mesma casa — não dá pra tirar a projeção">—</td>';
+    if (mNow == null) mNow = mOpen;
+    var d = (mOpen != null) ? (mNow - mOpen) : null;
+    var arrow = d == null ? "" : (d > 0.05 ? "▲" : (d < -0.05 ? "▼" : "→"));
+    var dcls = d == null ? "flat" : (d > 0.05 ? "up" : (d < -0.05 ? "dn" : "flat"));
+    var o = g.lados.over, u = g.lados.under;
+    function odds(r, useClose) {
+      if (!r) return "—";
+      var v = useClose ? (r.close != null ? r.close : r.last) : r.open;
+      return br(v, 2);
+    }
+    var tip = "Odds cruas (Mais/Menos) · abertura " + odds(o, false) + "/" + odds(u, false) +
+      (mOpen != null ? " (μ " + br(mOpen, 1) + ")" : "") +
+      " → agora " + odds(o, true) + "/" + odds(u, true) +
+      " (μ " + br(mNow, 1) + ")";
+    return '<td class="ln" title="' + esc(tip) + '"><b>' + br(mNow, 1) + "</b>" +
+      (d != null ? ' <span class="hist-mv ' + dcls + '">' + arrow + " " + (d > 0 ? "+" : "") + br(d, 1) + "</span>" : "") +
+      "</td>";
+  }
+
+  /** Sparkline do μ implícito (par O/U pareado por minuto) — mesma régua do gráfico. */
+  function muSparkline(gid, mercado, linha, casa) {
+    var base = gid + "|" + mercado + "|" + linha + "|";
+    var sO = ((MV[base + "over"] || {})[casa]) || [];
+    var sU = ((MV[base + "under"] || {})[casa]) || [];
+    if (sO.length < 2 || sU.length < 2) return '<span class="pm">—</span>';
+    var uByT = {};
+    sU.forEach(function (p) { uByT[p[0]] = p[1]; });
+    var pts = [];
+    sO.forEach(function (p) {
+      var uo = uByT[p[0]];
+      if (!(uo > 1 && p[1] > 1)) return;
+      var pf = (1 / p[1]) / (1 / p[1] + 1 / uo);
+      var mu = solveMu(+linha, pf);
+      if (mu != null) pts.push([p[0], mu]);
+    });
+    if (pts.length < 2) return '<span class="pm">—</span>';
+    var w = 84, h = 22, pd = 2;
+    var ts = pts.map(function (x) { return x[0]; }), ms = pts.map(function (x) { return x[1]; });
+    var t0 = Math.min.apply(null, ts), t1 = Math.max.apply(null, ts);
+    var m0 = Math.min.apply(null, ms), m1 = Math.max.apply(null, ms);
+    var dt = (t1 - t0) || 1, dM = (m1 - m0) || 1;
+    var poly = pts.map(function (x) {
+      return (pd + (x[0] - t0) / dt * (w - 2 * pd)).toFixed(1) + "," + (h - pd - (x[1] - m0) / dM * (h - 2 * pd)).toFixed(1);
+    }).join(" ");
+    var dir = ms[ms.length - 1] > ms[0] ? "up" : (ms[ms.length - 1] < ms[0] ? "dn" : "");
+    return '<svg class="spark ' + dir + '" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h +
+      '"><title>Projeção (μ) ao longo do tempo · ' + esc(window.casaNome ? window.casaNome(casa) : casa) + "</title>" +
+      '<polyline points="' + poly + '"/></svg>';
+  }
+
+  /** Main line por jogo+mercado (menor gap médio |Mais−Menos| na abertura, só linhas de partida). */
+  function markMainLines(groups) {
+    var byGM = {};
+    groups.forEach(function (g) {
+      (byGM[g.gid + "|" + g.mercado] = byGM[g.gid + "|" + g.mercado] || []).push(g);
+    });
+    Object.keys(byGM).forEach(function (k) {
+      var gs = byGM[k];
+      var linhasObj = {};
+      gs.forEach(function (g) { linhasObj[g.linha] = 1; });
+      var okSet = {};
+      matchLineSet(linhasObj, gs[0].mercado).forEach(function (L) { okSet[L] = 1; });
+      var best = null, score = Infinity;
+      var gaps = {};
+      gs.forEach(function (g) {
+        if (!okSet[g.linha]) return;
+        var o = g.lados.over, u = g.lados.under;
+        if (!o || !u || !(o.open > 1 && u.open > 1)) return;
+        (gaps[g.linha] = gaps[g.linha] || []).push(Math.abs(o.open - u.open));
+      });
+      Object.keys(gaps).forEach(function (L) {
+        var arr = gaps[L];
+        var avg = arr.reduce(function (a, b) { return a + b; }, 0) / arr.length;
+        if (avg < score) { score = avg; best = +L; }
+      });
+      if (best == null) {
+        var ls = Object.keys(okSet).map(Number).sort(function (a, b) { return a - b; });
+        best = ls.length ? ls[Math.floor(ls.length / 2)] : gs[0].linha;
+      }
+      gs.forEach(function (g) { g.isMain = (g.linha === best); });
+    });
+    return groups;
+  }
+
+  function rowAttrs(g) {
+    return ' data-gid="' + esc(g.gid || "") + '" data-merc="' + esc(g.mercado || "") +
+      '" data-line="' + esc(g.linha) + '" data-casa="' + esc(g.casa || "") + '"';
+  }
+
+  function tblLiquidadas(rows) {
+    var groups = markMainLines(groupPairs(rows));
+    if (state.mainOnly) groups = groups.filter(function (g) { return g.isMain; });
+    if (!groups.length) return '<div class="empty"><div class="big">📭</div>Nenhuma linha liquidada com esses filtros.</div>';
+    var t = '<div class="hist-scroll"><table class="lad hist-tbl"><thead><tr>' +
+      '<th class="jg">Jogo</th><th>Merc</th><th>Casa</th><th>Linha</th>' +
+      '<th title="Total implícito (μ) do par Mais/Menos, sem juice — e quanto subiu/desceu desde a abertura">Projeção</th>' +
+      '<th>Qual.</th><th>Resultado</th><th>Mov.</th></tr></thead><tbody>';
+    groups.forEach(function (g) {
+      var hit = lineHit(g.linha, g.result);
+      var hitCls = hit === "Mais" ? "o" : (hit === "Menos" ? "u" : "");
+      var resTxt = g.result == null ? "—"
+        : br(g.result, 0) + " · " + (hit === "Push" ? "push" : hit);
+      t += '<tr class="' + (g.isMain ? "" : "sm") + '"' + rowAttrs(g) + ">" +
+        '<td class="jg">' + esc(g.jogo) + "</td>" +
+        "<td>" + (ABBR[g.mercado] || esc(g.mercado)) + "</td>" +
+        "<td>" + LOGO(g.casa, "house-logo-sm") + "</td>" +
+        '<td class="ln">' + br(g.linha, 1) + (g.isMain ? "" : ' <span class="pm">alt</span>') + "</td>" +
+        projCell(g) +
+        "<td>" + qBadge(g.quality) + "</td>" +
+        '<td class="' + hitCls + '">' + resTxt + "</td>" +
+        "<td>" + muSparkline(g.gid, g.mercado, g.linha, g.casa) + "</td></tr>";
     });
     return t + "</tbody></table></div>";
   }
 
   function tblAbertas(rows) {
-    if (!rows.length) return '<div class="empty"><div class="big">🕓</div>Nenhuma linha aberta com movimento.</div>';
+    var groups = markMainLines(groupPairs(rows));
+    if (state.mainOnly) groups = groups.filter(function (g) { return g.isMain; });
+    if (!groups.length) return '<div class="empty"><div class="big">🕓</div>Nenhuma linha aberta com movimento.</div>';
     var t = '<div class="hist-scroll"><table class="lad hist-tbl"><thead><tr>' +
-      '<th class="jg">Jogo</th><th>Merc</th><th>Ln</th><th>Lado</th><th>Abre</th><th>Agora</th><th>Δ%</th><th>Qual.</th><th>Obs</th><th>Mov.</th></tr></thead><tbody>';
-    rows.forEach(function (r) {
-      var d = r.drift_pct;
-      var mv = d == null ? "flat" : (d < 0 ? "up" : (d > 0 ? "dn" : "flat"));
-      t += '<tr class="' + (anyMv(r.gk) ? "has-mv" : "") + '" data-gk="' + esc(r.gk || "") +
-        '" data-gid="' + esc(r.gid || "") + '" data-merc="' + esc(r.mercado || "") + '" data-line="' + esc(r.linha) + '">' +
-        '<td class="jg">' + esc(r.jogo) + "</td><td>" + (ABBR[r.mercado] || esc(r.mercado)) + "</td>" +
-        '<td class="ln">' + br(r.linha, 1) + "</td><td>" + esc(r.lado) + "</td>" +
-        '<td class="o">' + br(r.open, 2) + '</td><td class="u">' + br(r.last, 2) + "</td>" +
-        '<td class="hist-mv ' + mv + '">' + sign(d, 1) + "</td>" +
-        "<td>" + qBadge(r.quality) + "</td>" +
-        "<td>" + (r.n_moves || 0) + "</td>" +
-        "<td>" + sparkline(r.gk, r.casa) + "</td></tr>";
+      '<th class="jg">Jogo</th><th>Merc</th><th>Casa</th><th>Linha</th>' +
+      '<th title="Total implícito (μ) do par Mais/Menos, sem juice — e quanto subiu/desceu desde a abertura">Projeção</th>' +
+      '<th>Qual.</th><th>Obs</th><th>Mov.</th></tr></thead><tbody>';
+    groups.forEach(function (g) {
+      t += '<tr class="' + (g.isMain ? "" : "sm") + '"' + rowAttrs(g) + ">" +
+        '<td class="jg">' + esc(g.jogo) + "</td><td>" + (ABBR[g.mercado] || esc(g.mercado)) + "</td>" +
+        "<td>" + LOGO(g.casa, "house-logo-sm") + "</td>" +
+        '<td class="ln">' + br(g.linha, 1) + (g.isMain ? "" : ' <span class="pm">alt</span>') + "</td>" +
+        projCell(g) +
+        "<td>" + qBadge(g.quality) + "</td>" +
+        "<td>" + g.n_moves + "</td>" +
+        "<td>" + muSparkline(g.gid, g.mercado, g.linha, g.casa) + "</td></tr>";
     });
     return t + "</tbody></table></div>";
   }
@@ -843,12 +1020,12 @@
     var settledChip = shownSettled + (totalSettled > shownSettled ? ("/" + totalSettled + " · limite " + (H.liquidadas_limit || shownSettled)) : "");
     nav.appendChild(chip("Liquidadas <span class='ct2'>" + settledChip + "</span>",
       state.aba === "liquidadas", "", function () {
-        state.aba = "liquidadas"; state.merc = "todos"; state.res = "todos"; render();
+        state.aba = "liquidadas"; render();
       }));
     var nAbertasMv = (H.abertas || []).filter(function (r) { return (r.n_moves || 0) >= 1; }).length;
     nav.appendChild(chip("Abertas <span class='ct2'>" + nAbertasMv + "</span>",
       state.aba === "abertas", "", function () {
-        state.aba = "abertas"; state.merc = "todos"; state.res = "todos"; render();
+        state.aba = "abertas"; render();
       }));
     root.appendChild(nav);
 
@@ -865,15 +1042,16 @@
     var limitNote = state.aba === "liquidadas" && totalSettled > shownSettled
       ? " · exibindo no máximo " + (H.liquidadas_limit || shownSettled) + " de " + totalSettled
       : "";
-    meta.innerHTML = vis.length + " linha" + (vis.length === 1 ? "" : "s") + limitNote +
+    meta.innerHTML = vis.length + " lado" + (vis.length === 1 ? "" : "s") + " de linha (pares Mais/Menos colapsados na tabela)" + limitNote +
+      ' · <b>Projeção</b> = total implícito (μ) do par, sem juice — odds cruas no tooltip' +
       " · atualizado " + esc(H.gerado_iso || H.gerado || "?");
     root.appendChild(meta);
     var tbl = document.createElement("div");
     tbl.innerHTML = state.aba === "liquidadas" ? tblLiquidadas(vis) : tblAbertas(vis);
     root.appendChild(tbl);
 
-    // clique em linha → abre explorador naquele jogo/mercado/linha
-    tbl.querySelectorAll("tr.has-mv, tr[data-gk]").forEach(function (tr) {
+    // clique em linha → abre o gráfico naquele jogo/mercado/linha, respeitando o filtro de casa
+    tbl.querySelectorAll("tr[data-gid]").forEach(function (tr) {
       tr.style.cursor = "pointer";
       tr.onclick = function () {
         var gid = tr.getAttribute("data-gid") || "";
@@ -884,6 +1062,8 @@
         state.game = gid;
         state.mercado = mercado;
         state.linha = linha;
+        // casa filtrada (ou a casa da própria linha clicada) vira o default do gráfico
+        state.casa = state.fcasa !== "todas" ? state.fcasa : (tr.getAttribute("data-casa") || null);
         render();
       };
     });
