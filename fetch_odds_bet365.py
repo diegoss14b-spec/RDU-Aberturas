@@ -18,7 +18,17 @@ Mercados capturados (só O/U de linha; faixas/race/exatos/3-vias ficam FORA):
   Escanteios : corners_2_way + alternative_corners + asian_corners + asian_total_corners
                (+ team_corners por time)  — corners.corners é 3-VIAS (Over/Exactly/Under), NÃO entra
   Finalizações / Chutes no gol: match_shots / match_shots_on_target (+ team_*)
-  Faltas de JOGO: a bet365 não oferece (só player props) — casa entra sem faltas.
+  Impedimentos / Desarmes: a bet365 abre só em "especiais/outros" e raramente — QUANDO
+      abrem vêm na lista `others`. Mapeamos as variantes plausíveis do padrão BetsAPI
+      (match_/total_/asian_total_/.._2_way/number_of_.._in_match + team_*); se abrirem
+      com nome fora da lista, o DETECTOR (abaixo) loga o nome oficial pra mapear.
+  Faltas de JOGO / laterais / tiros de meta: a bet365 só abre no "Criar Aposta" (bet
+      builder), NÃO na API — não captáveis, casa entra sem eles.
+DETECTOR (rede de segurança, 21/07): parse_prematch flagra QUALQUER mercado com cara de
+  O/U-de-total (Over+Under+linha .5) que não seja mapeado, nem player, nem ruído conhecido
+  (gols/faixa/meio-tempo/handicap/timing) e LOGA em _status/bet365_unknown_markets.jsonl
+  (dedup 1x/dia por key). NÃO adivinha canon — só observabilidade, pra nunca mais perder
+  mercado por nomenclatura nova em silêncio. NADA de jogador entra (denylist _is_player_market).
 ⚠ Mercados enchem ao longo do dia do jogo (team_cards/match_shots vazios de madrugada):
   gravamos o que houver a cada captura; o modelo abertura→close da Mesa lida com isso.
 
@@ -61,6 +71,7 @@ OUTDIR = ROOT / "data" / "odds"; OUTDIR.mkdir(parents=True, exist_ok=True)
 STATUS_DIR = OUTDIR / "_status"
 GATE_F = STATUS_DIR / "bet365_gate.json"   # timestamp do último full (persistido no repo)
 FIS_F = STATUS_DIR / "bet365_fis.json"     # cache FI→jogo do último full (pro close barato)
+UNKNOWN_MK_F = STATUS_DIR / "bet365_unknown_markets.jsonl"  # rede de segurança: totais O/U desconhecidos
 BRT = timezone(timedelta(hours=-3))
 BASE = "https://api.b365api.com"
 DAYS_AHEAD = 5           # janela da Mesa
@@ -209,6 +220,22 @@ MATCH_MARKETS = {
     "asian_total_corners": "Escanteios",
     "match_shots": "Finalizações",              # existe no catálogo mas a API nunca popula (ver docstring)
     "match_shots_on_target": "Chutes no gol",
+    # IMPEDIMENTOS e DESARMES: a bet365 abre no "especiais/outros" e, QUANDO abrem, vêm
+    # na API (lista `others`). Hoje (21/07) raramente estão abertos, então a nomenclatura
+    # EXATA não dá pra observar ao vivo. Mapeamos TODAS as variantes plausíveis do padrão
+    # BetsAPI já confirmado nos outros mercados (match_/total_/asian_total_/.._2_way/
+    # number_of_.._in_match) — é barato e não colide com nada. Se a bet365 abrir com um
+    # nome fora desta lista, o DETECTOR (parse_prematch) loga o nome oficial pra mapear.
+    "match_offsides": "Impedimentos",
+    "total_offsides": "Impedimentos",
+    "offsides_2_way": "Impedimentos",
+    "asian_total_offsides": "Impedimentos",
+    "number_of_offsides_in_match": "Impedimentos",
+    "match_tackles": "Desarmes",
+    "total_tackles": "Desarmes",
+    "tackles_2_way": "Desarmes",
+    "asian_total_tackles": "Desarmes",
+    "number_of_tackles_in_match": "Desarmes",
 }
 # mercado → canon, por TIME (header '1'/'2' + handicap 'Over 11.5')
 TEAM_MARKETS = {
@@ -216,6 +243,8 @@ TEAM_MARKETS = {
     "team_corners": "Escanteios",
     "team_shots": "Finalizações",
     "team_shots_on_target": "Chutes no gol",
+    "team_offsides": "Impedimentos",
+    "team_tackles": "Desarmes",
 }
 # NADA de jogador entra na Mesa (decisão do Diego, 21/07). Denylist explícita por
 # prefixo/nome, aplicada ANTES do mapeamento — nunca por acaso.
@@ -229,6 +258,85 @@ DENY_EXACT = {"goalkeeper_saves", "player_tackles", "player_cards", "player_shot
 def _is_player_market(mk):
     m = str(mk or "").lower()
     return m in DENY_EXACT or any(m.startswith(p) for p in DENY_PREFIX) or "player" in m
+
+
+# --- DETECTOR de mercado-total-desconhecido (rede de segurança) ----------------
+# Objetivo: NUNCA mais perder um mercado de estatística por nomenclatura nova em
+# silêncio. Se a bet365 abrir impedimentos/desarmes (ou qualquer stat) com um nome
+# que não mapeamos, o detector LOGA o nome oficial num jsonl — daí é 1 min pra
+# mapear. Ele NÃO adivinha o canon (não contamina o board); é só observabilidade.
+_HALF_LINE = re.compile(r"^\d+\.5$")   # linha O/U meio-inteira (2.5, 5.5, 20.5…)
+# RUÍDO CONHECIDO de total O/U que a Mesa NÃO cobre — validado contra catálogo real
+# (21/07): são exatamente os mercados que "têm cara de total" mas são gols/faixa/
+# meio-tempo/timing/handicap/corrida. NENHUM contém offside/tackle/card/shot/foul —
+# então uma variante nova DESSES stats sempre cai FORA daqui e é logada.
+KNOWN_TOTAL_EXCL = re.compile(
+    r"goal|corner|1st_half|2nd_half|half_time|_half\b|_minutes|_brackets|"
+    r"race|handicap|both_teams|_range$|range_|exact|odd_even|winning_margin|"
+    r"correct_score|to_score|time_of", re.I)
+_unknown_seen = None   # set 'YYYY-MM-DD|market_key' já logados (dedup: 1x por key por dia)
+
+
+def _looks_ou_total(odds):
+    """True se a lista de odds parece um par O/U de total: tem ao menos um Over E um
+    Under (header) e ao menos uma linha meio-inteira (name/handicap ^\\d+\\.5$)."""
+    n_over = n_under = 0
+    has_half = False
+    for o in odds:
+        h = str(o.get("header") or "").strip().lower()
+        if h == "over":
+            n_over += 1
+        elif h == "under":
+            n_under += 1
+        nm = str(o.get("name") or "").strip()
+        hc = str(o.get("handicap") or "").strip()
+        if _HALF_LINE.match(nm) or _HALF_LINE.match(hc):
+            has_half = True
+    return n_over >= 1 and n_under >= 1 and has_half
+
+
+def _detect_unknown_total(mk, mv, gid, jogo):
+    """Loga um mercado com cara de O/U-de-total que NÃO é mapeado, NÃO é player e NÃO
+    é ruído conhecido. Dedup por (dia, market_key). Barato, não muda o board."""
+    global _unknown_seen
+    if mk in MATCH_MARKETS or mk in TEAM_MARKETS:
+        return
+    if _is_player_market(mk):
+        return
+    if KNOWN_TOTAL_EXCL.search(str(mk or "")):
+        return
+    odds = (mv or {}).get("odds") or []
+    if len(odds) < 2 or not _looks_ou_total(odds):
+        return
+    today = datetime.now(BRT).strftime("%Y-%m-%d")
+    key = f"{today}|{mk}"
+    if _unknown_seen is None:
+        _unknown_seen = set()
+        try:
+            for ln in UNKNOWN_MK_F.read_text(encoding="utf-8").splitlines():
+                try:
+                    j = json.loads(ln)
+                    _unknown_seen.add(f"{str(j.get('ts', ''))[:10]}|{j.get('market_key')}")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+    if key in _unknown_seen:
+        return
+    _unknown_seen.add(key)
+    rec = {"ts": datetime.now(BRT).isoformat(timespec="seconds"),
+           "gid": gid, "jogo": jogo, "market_key": mk,
+           "name_oficial": (mv or {}).get("name"), "n_odds": len(odds),
+           "amostra_de_odds": [{k: o.get(k) for k in ("header", "name", "handicap", "odds")}
+                               for o in odds[:4]]}
+    try:
+        STATUS_DIR.mkdir(parents=True, exist_ok=True)
+        with open(UNKNOWN_MK_F, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        print(f"[bet365] ⚑ mercado-total DESCONHECIDO: {mk} "
+              f"(name={rec['name_oficial']}, {len(odds)} odds) — logado pra mapear")
+    except Exception as ex:
+        print(f"[bet365] aviso: não gravei unknown_markets: {type(ex).__name__}")
 
 
 def _iter_sp(res):
@@ -246,9 +354,10 @@ def _iter_sp(res):
                 yield mk, mv
 
 
-def parse_prematch(res, home, away):
+def parse_prematch(res, home, away, gid=None, jogo=None):
     """results[0] do /v3/bet365/prematch → (mercados, mercados_time).
-    Varre seções-dicionário E a lista `others`; jogador nunca entra."""
+    Varre seções-dicionário E a lista `others`; jogador nunca entra. Mercado não
+    mapeado com cara de O/U-de-total vai pro detector (rede de segurança)."""
     merc, merc_t_raw = {}, {}
     for mk, mv in _iter_sp(res):
         if _is_player_market(mk):
@@ -263,6 +372,9 @@ def parse_prematch(res, home, away):
         canon_t = TEAM_MARKETS.get(mk)
         if canon_t:
             _collect_team(merc_t_raw.setdefault(canon_t, {}), odds, home, away)
+            continue
+        # não mapeado e não é player → rede de segurança (só loga, não entra no board)
+        _detect_unknown_total(mk, mv, gid, jogo)
     out = {}
     for canon, lines in merc.items():
         arr = [{"linha": L, "over": v["over"], "under": v["under"]}
@@ -409,7 +521,8 @@ def main():
             if not r:
                 continue
             n_det += 1
-            merc, merc_t = parse_prematch(r, e["home"], e["away"])
+            merc, merc_t = parse_prematch(r, e["home"], e["away"],
+                                          gid=e["fi"], jogo=f"{e['home']} - {e['away']}")
             if not merc and not merc_t:
                 continue
             rec = {"casa": "bet365", "event_id": e["fi"],
