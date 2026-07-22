@@ -12,12 +12,29 @@ Uso:
   python scripts/smoke_valor_rdu.py <url> --max-age-min 240               # tolerância de idade
 Sai com 0 = passou; 1 = FALHOU (não considerar o deploy bem-sucedido).
 """
-import json, re, sys, time, urllib.request
+import hashlib, json, re, sys, time, urllib.request
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+try:
+    from manifest_common import ARTIFACTS, parse_manifest_text, sha256_bytes, strip_window
+except Exception:  # pragma: no cover - fallback se rodar isolado
+    ARTIFACTS = []
+    def parse_manifest_text(t): return json.loads(t.split("=", 1)[1].strip().rstrip(";"))
+    def sha256_bytes(b): return hashlib.sha256(b).hexdigest()
+    def strip_window(t, p=None): return json.loads(t.split("=", 1)[1].strip().rstrip(";"))
+
 
 def get(url):
     req = urllib.request.Request(url, headers={"User-Agent": "rdu-smoke/1.0", "Cache-Control": "no-cache"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return r.status, r.read().decode("utf-8", errors="replace")
+
+
+def get_bytes(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "rdu-smoke/1.0", "Cache-Control": "no-cache"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return r.status, r.read()
 
 def main():
     if len(sys.argv) < 2:
@@ -67,6 +84,43 @@ def main():
         json.loads(oraw.split("=", 1)[1].strip().rstrip(";"))
     except Exception as e:
         fails.append(f"OPS não parseia: {e}")
+
+    # 5) §8 — MANIFESTO ATÔMICO: baixa os 5 artefatos SERVIDOS (cache-bust), reparseia e
+    # compara hash/contagem com o manifesto. Pega history/moves/openclose defasados, ausentes,
+    # com schema inválido ou hash divergente (build misturado na produção).
+    man = None
+    try:
+        _, mraw = get(f"{base}/data/manifest.js?{cb}")
+        man = parse_manifest_text(mraw)
+    except Exception as e:
+        fails.append(f"manifesto ausente/ilegível (build não atômico): {e}")
+    if man:
+        arts = man.get("artifacts") or {}
+        prefixes = {rel: prefix for rel, prefix, _n in ARTIFACTS}
+        for rel in ("/data/board.js", "/data/ops.js", "/data/history.js",
+                    "/data/moves.js", "/data/openclose.js"):
+            meta = arts.get(rel)
+            if not meta:
+                fails.append(f"manifesto não lista artefato crítico {rel}")
+                continue
+            try:
+                st, raw = get_bytes(f"{base}{rel}?{cb}")
+                if st != 200:
+                    fails.append(f"{rel} HTTP {st}")
+                    continue
+                got = sha256_bytes(raw)
+                if got != meta.get("sha256"):
+                    fails.append(f"{rel} DEFASADO/divergente: served {got[:12]} ≠ manifesto {str(meta.get('sha256'))[:12]}")
+                    continue
+                # schema: precisa parsear como o window.X= esperado
+                try:
+                    strip_window(raw.decode("utf-8", errors="replace"), prefixes.get(rel))
+                except Exception as pe:
+                    fails.append(f"{rel} schema inválido: {pe}")
+            except Exception as e:
+                fails.append(f"{rel} erro: {e}")
+        bid = str(man.get("build_id") or "")[:8]
+        print(f"[smoke] manifesto build {bid} · {len(arts)} artefatos verificados contra o servido")
 
     if fails:
         print("❌ SMOKE FALHOU:")

@@ -21,6 +21,10 @@ try:
 except Exception:
     pass
 
+ROOT_FOR_IMPORT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT_FOR_IMPORT))
+from history_quality import parse_iso_flex  # noqa: E402  (parser único §10)
+
 ROOT = Path(__file__).resolve().parent
 STATUS = ROOT / "data" / "odds" / "_status"
 ODDS = ROOT / "data" / "odds"
@@ -69,12 +73,12 @@ def parse_ts_brt(s):
     if not s:
         return None
     raw = str(s).strip()
+    # ISO (com T / Z / offset com ou sem ':') → parser único §10 (idêntico py3.9/3.12)
+    if "T" in raw or raw.endswith(("Z", "z")) or re.search(r"[+-]\d\d:?\d\d$", raw):
+        dt = parse_iso_flex(raw, default_tz=BRT)
+        return dt.astimezone(BRT) if dt is not None else None
+    # legado "%Y-%m-%d %H:%M" (status/summary) — sem offset
     try:
-        if "T" in raw or raw.endswith("Z") or re.search(r"[+-]\d\d:\d\d$", raw):
-            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=BRT)
-            return dt.astimezone(BRT)
         return datetime.strptime(raw[:16], "%Y-%m-%d %H:%M").replace(tzinfo=BRT)
     except Exception:
         return None
@@ -177,11 +181,66 @@ def load_runs(days=7, limit=40):
     return slim, hist7
 
 
+def coverage_from_jogos(jogos):
+    """§11 — cobertura por mercado com a MESMA definição do gate (gate_board.board_coverage):
+    um jogo entra num mercado se QUALQUER casa oferece linha de partida OU de time; a contagem
+    por casa e o multicasa usam CONJUNTOS de índice de jogo (sem dupla contagem). Sem isso o
+    painel mostrava só o total-de-partida (ex.: Escanteios 168 vs 187 do board; 7k 42 vs 88) e
+    zerava mercados que só existem por linha de time (Desarmes).
+
+    Retorna (por_mercado, houses_games) onde:
+      por_mercado[m] = {jogos, linhas, multi_casa, casas:{casa:jogos}}
+      houses_games[casa] = nº de jogos distintos em que a casa aparece (qualquer mercado)."""
+    games_by_m = defaultdict(set)                      # m -> {idx}
+    house_by_m = defaultdict(lambda: defaultdict(set))  # m -> casa -> {idx}
+    lines_by_m = defaultdict(int)                       # m -> nº de linhas (ladders)
+    houses_games = defaultdict(set)                     # casa -> {idx} (qualquer mercado)
+
+    def _nlines(lines):
+        return len(lines) if isinstance(lines, (list, dict)) else 0
+
+    for idx, j in enumerate(jogos):
+        for m, per_casa in (j.get("mercados") or {}).items():
+            if not isinstance(per_casa, dict):
+                continue
+            for casa, lines in per_casa.items():
+                if not lines:
+                    continue
+                games_by_m[m].add(idx)
+                house_by_m[m][casa].add(idx)
+                houses_games[casa].add(idx)
+                lines_by_m[m] += _nlines(lines)
+        for m, sides in (j.get("times") or {}).items():
+            for side in (sides or {}).values():
+                for casa, lines in ((side or {}).get("casas") or {}).items():
+                    if not lines:
+                        continue
+                    games_by_m[m].add(idx)
+                    house_by_m[m][casa].add(idx)
+                    houses_games[casa].add(idx)
+                    lines_by_m[m] += _nlines(lines)
+
+    por_mercado = {}
+    ordered = [m for m in MERCADOS if m in games_by_m] + \
+              [m for m in games_by_m if m not in MERCADOS]
+    for m in ordered:
+        games = games_by_m[m]
+        casas = {h: len(s) for h, s in house_by_m[m].items()}
+        multi = sum(1 for g in games
+                    if sum(1 for s in house_by_m[m].values() if g in s) >= 2)
+        por_mercado[m] = {
+            "jogos": len(games),
+            "linhas": lines_by_m[m],
+            "multi_casa": multi,
+            "casas": casas,
+        }
+    return por_mercado, {h: len(s) for h, s in houses_games.items()}
+
+
 def board_coverage(board):
     if not board:
         return None
     jogos = board.get("jogos") or []
-    por_mercado = {}
     n_sofa = 0
     n_valor = 0
     casas_board = set(board.get("casas") or [])
@@ -190,53 +249,8 @@ def board_coverage(board):
             n_sofa += 1
         if j.get("valor"):
             n_valor += len(j["valor"])
-        for m, per_casa in (j.get("mercados") or {}).items():
-            slot = por_mercado.setdefault(m, {
-                "jogos": 0, "casas": defaultdict(int), "linhas": 0, "multi_casa": 0,
-            })
-            slot["jogos"] += 1
-            if isinstance(per_casa, dict):
-                n_c = 0
-                for casa, lines in per_casa.items():
-                    slot["casas"][casa] += 1
-                    n_c += 1
-                    if isinstance(lines, list):
-                        slot["linhas"] += len(lines)
-                    elif isinstance(lines, dict):
-                        slot["linhas"] += len(lines)
-                if n_c >= 2:
-                    slot["multi_casa"] += 1
-        # times (linhas de time) contam cobertura extra de mercado
-        for m, sides in (j.get("times") or {}).items():
-            slot = por_mercado.setdefault(m, {
-                "jogos": 0, "casas": defaultdict(int), "linhas": 0, "multi_casa": 0,
-            })
-            # não incrementa jogos de novo se já contou no match market
-            for side in (sides or {}).values():
-                for casa, lines in ((side or {}).get("casas") or {}).items():
-                    slot["casas"][casa] += 0  # presença
-                    if isinstance(lines, list):
-                        slot["linhas"] += len(lines)
 
-    # freeze defaultdicts
-    out_m = {}
-    for m in MERCADOS:
-        if m not in por_mercado:
-            continue
-        s = por_mercado[m]
-        out_m[m] = {
-            "jogos": s["jogos"],
-            "linhas": s["linhas"],
-            "multi_casa": s["multi_casa"],
-            "casas": dict(s["casas"]),
-        }
-    # mercados extras fora da ordem
-    for m, s in por_mercado.items():
-        if m not in out_m:
-            out_m[m] = {
-                "jogos": s["jogos"], "linhas": s["linhas"],
-                "multi_casa": s["multi_casa"], "casas": dict(s["casas"]),
-            }
+    out_m, houses_games = coverage_from_jogos(jogos)
 
     # próximos kickoffs (24h)
     now = now_brt()
@@ -250,7 +264,10 @@ def board_coverage(board):
         try:
             dt = datetime(now.year, int(mo.group(2)), int(mo.group(1)),
                           int(mo.group(3)), int(mo.group(4)), tzinfo=BRT)
-            if dt < now - timedelta(hours=6):
+            # §13 — "dd/mm" sem ano só é ambíguo na virada dez→jan. Rolar pro ano seguinte
+            # SÓ quando o kickoff cairia >180 dias no passado (ex.: 01/01 visto em 31/12).
+            # O antigo 6h transformava um jogo de ontem em "ano que vem".
+            if dt < now - timedelta(days=180):
                 dt = dt.replace(year=now.year + 1)
             mins = (dt - now).total_seconds() / 60
             if 0 <= mins <= 24 * 60:
@@ -280,6 +297,8 @@ def board_coverage(board):
         "age_min": age_mins(board.get("gerado")),
         "n_jogos": len(jogos),
         "casas": list(board.get("casas") or sorted(casas_board)),
+        # jogos distintos por casa (mesma definição de conjunto do gate) — reconcilia com o board
+        "houses": houses_games,
         "por_mercado": out_m,
         "sofa_matched": n_sofa,
         "sofa_pct": round(100 * n_sofa / len(jogos), 1) if jogos else 0,
@@ -452,12 +471,23 @@ def main():
 
     avisos = build_avisos(summary, casas, board_cov, hist_h, runs)
     if settle_h:
-        age = (settle_h.get("backlog") or {}).get("age") or {}
+        backlog = settle_h.get("backlog") or {}
+        age = backlog.get("age") or {}
         stale = (age.get("7-30d") or 0) + (age.get("30d+") or 0)
         if stale:
             avisos.append({
                 "level": "warn",
                 "txt": f"Liquidação atrasada: {stale} keys aguardam resultado há 7+ dias",
+            })
+        # §10: data não parseável vira age=unknown e ESCONDE o backlog. Com o parser
+        # único isso deve ser ~0; qualquer valor relevante é bug de formato, não "recente".
+        unk = backlog.get("age_unknown") or age.get("unknown") or 0
+        total_pending = backlog.get("total") or 0
+        if unk and total_pending and unk >= max(50, 0.05 * total_pending):
+            avisos.append({
+                "level": "bad",
+                "txt": f"{unk} pendências com data ilegível (age=unknown) — backlog pode estar "
+                       f"subnotificado; conferir formato do kickoff (§10)",
             })
     for nome, h in (hist7 or {}).items():
         if h.get("total", 0) >= 3 and (h.get("rate") or 100) < 70:

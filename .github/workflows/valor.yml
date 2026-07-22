@@ -207,8 +207,9 @@ jobs:
           python history_settle.py
           python build_history.py
           python build_moves.py
-          # dataset abertura×fechamento (μ implícito) — guardado: falha aqui não bloqueia o board
-          python build_openclose.py || echo "::warning::build_openclose falhou (board segue)"
+          # dataset abertura×fechamento (μ implícito) — CRÍTICO no full (§8): se falhar, a etapa
+          # falha e o deploy é bloqueado (não pode publicar board fresco + openclose stale).
+          python build_openclose.py
 
       # Board + deploy SÓ no full (close é captura de fechamento pro banco; o board
       # filtrado da janela curta NÃO deve substituir o board cheio do site)
@@ -229,6 +230,14 @@ jobs:
         if: env.MODE == 'full' && steps.capture.outcome == 'success'
         continue-on-error: true
         run: python gate_board.py
+
+      # §8 — Manifesto atômico: amarra board/ops/history/moves/openclose a UM build.
+      # Falha aqui = build misturado/stale → deploy bloqueado (não publica meio-build).
+      - name: Manifesto atômico do build
+        id: manifest
+        if: env.MODE == 'full' && steps.capture.outcome == 'success' && steps.board.outcome == 'success'
+        continue-on-error: true
+        run: python build_manifest.py
 
 
       # Persistência versionada RESILIENTE: se main avançou durante a rodada, em vez de
@@ -252,9 +261,12 @@ jobs:
           steps.board.outcome == 'success' &&
           steps.ops.outcome == 'success' &&
           steps.gate.outcome == 'success' &&
+          steps.manifest.outcome == 'success' &&
           steps.persist.outcome == 'success'
         env:
           NETLIFY_TOKEN: ${{ secrets.NETLIFY_TOKEN }}
+          # trava anti-encolhimento do histórico válido compara com a produção ao vivo
+          DEPLOY_LIVE_BASE: https://valor-rdu.netlify.app
         run: python deploy.py
 
       # P0.5 (20/07) — smoke pós-deploy sem cache: detecta stub/publicação incorreta.
@@ -276,6 +288,7 @@ jobs:
           BOARD_OUTCOME: ${{ steps.board.outcome }}
           OPS_OUTCOME: ${{ steps.ops.outcome }}
           GATE_OUTCOME: ${{ steps.gate.outcome }}
+          MANIFEST_OUTCOME: ${{ steps.manifest.outcome }}
           DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
         run: |
           fail=0
@@ -300,6 +313,9 @@ jobs:
               fail=1
             elif [ "$GATE_OUTCOME" != "success" ]; then
               echo "::error::Gate de qualidade bloqueou o deploy."
+              fail=1
+            elif [ "$MANIFEST_OUTCOME" != "success" ]; then
+              echo "::error::Manifesto atômico falhou (build misturado/stale) — deploy bloqueado."
               fail=1
             elif [ "$DEPLOY_OUTCOME" != "success" ]; then
               echo "::error::Netlify não confirmou a publicação."

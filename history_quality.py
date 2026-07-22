@@ -11,9 +11,53 @@ capture_quality:
 """
 from __future__ import annotations
 import math
+import re
 from datetime import datetime, timezone, timedelta
 
 BRT = timezone(timedelta(hours=-3))
+
+# offset colado sem ':' no fim de um horário: '+0000' / '-0300'
+_OFFSET_NO_COLON = re.compile(r"(?<=\d)([+-])(\d{2})(\d{2})$")
+# separador de data e hora por espaço -> 'T'
+_SPACE_SEP = re.compile(r"^(\d{4}-\d{2}-\d{2})[ ](\d{2}:)")
+# fração de segundo além de 6 dígitos (3.9 rejeita)
+_FRAC_TRIM = re.compile(r"(\.\d{6})\d+")
+
+
+def parse_iso_flex(s, default_tz=None):
+    """Parser ISO-8601 tolerante a fuso — IDÊNTICO no Python 3.9 e no 3.12.
+
+    §10 do brief de auditoria (22/07): o ``datetime.fromisoformat`` do 3.9 rejeita
+    ``Z`` e offsets sem ``:`` (``-0300``), então a mesma pendência virava ``age=unknown``
+    no Mac (3.9) e idade válida no CI (3.12), escondendo o backlog. Aqui normalizamos
+    ANTES do fromisoformat, então a classificação não depende da versão do Python.
+
+    Aceita: ``Z``, ``-03:00``, ``-0300``, separador espaço ou ``T`` e stamps ingênuos.
+    Nunca chuta fuso em silêncio: um stamp ingênuo permanece ingênuo, a menos que
+    ``default_tz`` seja passado explicitamente (os chamadores usam BRT via ensure_aware).
+    Retorna ``None`` só quando é genuinamente impossível parsear — nunca "recente" mudo.
+    """
+    if s is None:
+        return None
+    if isinstance(s, datetime):
+        if s.tzinfo is None and default_tz is not None:
+            return s.replace(tzinfo=default_tz)
+        return s
+    txt = str(s).strip()
+    if not txt:
+        return None
+    if txt[-1] in ("Z", "z"):
+        txt = txt[:-1] + "+00:00"
+    txt = _SPACE_SEP.sub(r"\1T\2", txt)
+    txt = _OFFSET_NO_COLON.sub(r"\1\2:\3", txt)
+    txt = _FRAC_TRIM.sub(r"\1", txt)
+    try:
+        dt = datetime.fromisoformat(txt)
+    except ValueError:
+        return None
+    if dt.tzinfo is None and default_tz is not None:
+        dt = dt.replace(tzinfo=default_tz)
+    return dt
 CLOSE_EPS = timedelta(seconds=45)       # close deve ser antes de kickoff − ε
 LATE_OPEN = timedelta(hours=3)          # open < 3h do KO = late
 PREMATCH_MIN = timedelta(minutes=2)     # só fecha key se agora ≥ KO − 2min
@@ -21,20 +65,11 @@ ACCEPTED_CLV_QUALITY = frozenset(("full_prematch", "late_open"))
 
 
 def parse_ts(s):
+    """Alias histórico: parser tz-flex, ingênuo permanece ingênuo (o chamador aplica
+    ensure_aware p/ o default BRT). Agora cobre também ``Z`` e ``-0300`` no py3.9."""
     if not s:
         return None
-    try:
-        return datetime.fromisoformat(str(s))
-    except Exception:
-        pass
-    try:
-        s = str(s)
-        if len(s) >= 5 and s[-5] in "+-" and s[-3] != ":":
-            s2 = s[:-2] + ":" + s[-2:]
-            return datetime.fromisoformat(s2)
-    except Exception:
-        pass
-    return None
+    return parse_iso_flex(s)
 
 
 def ensure_aware(dt, default_tz=BRT):

@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from canonical import norm_team, parse_history_key  # noqa: E402
 from history_merge import atomic_write_text, merge_records  # noqa: E402
+from history_quality import parse_iso_flex  # noqa: E402  (parser único §10)
 
 HIST = ROOT / "data" / "odds_history"
 RES_AUTO = HIST / "results" / "results_auto.json"
@@ -160,15 +161,10 @@ def persist_consolidated_documents(documents, merged, owners):
 
 
 def _parse_dt(value):
-    if not value:
-        return None
-    try:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=BRT)
-        return parsed.astimezone(BRT)
-    except (TypeError, ValueError):
-        return None
+    """Parser único §10 — aceita Z / -03:00 / -0300 igual no py3.9 e py3.12.
+    Stamp ingênuo recebe BRT explicitamente (não é chute mudo: BRT é o fuso do banco)."""
+    parsed = parse_iso_flex(value, default_tz=BRT)
+    return parsed.astimezone(BRT) if parsed is not None else None
 
 
 def _mark_pending(record, reason, now):
@@ -349,6 +345,9 @@ def build_settlement_status(records, results, now):
         "backlog": {
             "total": total_status.get(PENDING_STATUS, 0),
             "age": dict(backlog_age),
+            # §10: pendências cuja data não parseou. Com o parser único deve ser ~0;
+            # um valor alto = kickoff corrompido ou formato novo → alerta, não "recente".
+            "age_unknown": backlog_age.get("unknown", 0),
             "reasons": dict(backlog_reasons),
             "oldest_samples": backlog_samples[:25],
         },
@@ -402,6 +401,10 @@ def main():
         f"[settle] {outcomes['settled']:,} liquidadas · "
         f"{outcomes['pending']:,} em retry · {outcomes['unavailable']:,} sem mapeamento"
     )
+    _age_unknown = (status.get("backlog") or {}).get("age_unknown", 0)
+    if _age_unknown:
+        print(f"[settle] ⚠ {_age_unknown:,} pendências com data NÃO parseável (age=unknown) — "
+              f"verifique o formato do kickoff (§10)")
     if duplicates:
         print(f"[settle] {duplicates:,} duplicatas mensais consolidadas · {changed_files} arquivos atualizados")
     for market, row in status["by_market"].items():

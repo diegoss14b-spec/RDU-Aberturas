@@ -141,7 +141,8 @@ class FixtureHealthTest(unittest.TestCase):
             {"id": 2, "startTimestamp": 2_100},
         ]
         payload = {"events": events, "hasNextPage": True}
-        with patch.object(ff, "season_id", return_value=123):
+        # season_id passou a devolver (sid, api_ok) desde 18/07 (e677fd7) — mock alinhado ao contrato
+        with patch.object(ff, "season_id", return_value=(123, True)):
             with patch.object(ff, "get", return_value=payload) as request:
                 with patch.object(ff.time, "sleep", return_value=None):
                     out = ff.fetch_tournament(325, "BR-A", max_ts=max_ts)

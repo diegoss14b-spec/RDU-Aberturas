@@ -78,8 +78,15 @@
     var m = /(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/.exec((j && j.inicio) || "");
     if (!m) return Number.MAX_SAFE_INTEGER;
     var year = new Date().getFullYear();
-    return Date.parse(year + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2) +
+    var t = Date.parse(year + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2) +
       "T" + ("0" + m[3]).slice(-2) + ":" + m[4] + ":00-03:00");
+    // §13 — "dd/mm" sem ano só é ambíguo na virada dez→jan: rola pro ano seguinte só se
+    // cairia >180 dias no passado (ex.: 01/01 visto em 31/12), nunca por um jogo de ontem.
+    if (t - Date.now() < -180 * 86400 * 1000) {
+      t = Date.parse((year + 1) + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2) +
+        "T" + ("0" + m[3]).slice(-2) + ":" + m[4] + ":00-03:00");
+    }
+    return t;
   }
   function liveGameState(j, nowMs) {
     if (j && j.game_state === "finished") return "finished";
@@ -184,8 +191,9 @@
 
   function passa(j) {
     if (!marketsOf(j).length) return false;
-    // P0.4 — default só upcoming; o toggle mostra ao vivo/encerrados. game_state ausente = mostra.
-    if (!state.mostrarTodos && j.game_state && j.game_state !== "upcoming") return false;
+    // §13 — "só próximos" usa o estado calculado AO VIVO (não o game_state congelado do build):
+    // um jogo que começou depois da captura sai da lista sem esperar rebuild.
+    if (!state.mostrarTodos && liveGameState(j) !== "upcoming") return false;
     if (state.soValor && !valsOf(j).length) return false;
     return true;
   }
@@ -194,6 +202,20 @@
     var best = -999;
     valsOf(j).forEach(function (v) { if (v.ev_pct > best) best = v.ev_pct; });
     return best;
+  }
+
+  /** Melhor flag (maior EV) do jogo com os filtros atuais. */
+  function bestVal(j) {
+    var best = null;
+    valsOf(j).forEach(function (v) { if (!best || v.ev_pct > best.ev_pct) best = v; });
+    return best;
+  }
+
+  /** §13 — texto da aposta completa: "Menos 5.5 · @1.90 · Betano · +9%". */
+  function betLabel(v) {
+    if (!v) return "";
+    return esc(v.mercado) + " " + esc(v.lado) + " " + v.linha +
+      " @ " + Number(v.odd).toFixed(2) + " · " + esc(v.casa) + " · EV +" + v.ev_pct.toFixed(0) + "%";
   }
 
   function nCasasDo(j) {
@@ -220,10 +242,13 @@
     return gameEpoch(a) - gameEpoch(b);
   }
 
+  // §13 — a chave do selo +EV inclui a CASA: a mesma linha/lado pode ter valor em várias
+  // casas e cada uma tem que mostrar sua própria marca (antes só a última casa era marcada).
   function valMap(j) {
-    var m = {};
+    var m = {};   // "mercado|linha|lado" -> { casa: v }
     (j.valor || []).forEach(function (v) {
-      m[v.mercado + "|" + v.linha + "|" + v.lado] = v;
+      var k = v.mercado + "|" + v.linha + "|" + v.lado;
+      (m[k] = m[k] || {})[v.casa] = v;
     });
     return m;
   }
@@ -289,16 +314,17 @@
 
   function lineRow(perCasa, L, vm, mercado) {
     var casas = Object.keys(perCasa);
-    var vO = vm[mercado + "|" + L + "|Mais"];
-    var vU = vm[mercado + "|" + L + "|Menos"];
+    var vO = vm[mercado + "|" + L + "|Mais"] || {};    // { casa: v }
+    var vU = vm[mercado + "|" + L + "|Menos"] || {};
+    var anyO = Object.keys(vO).length, anyU = Object.keys(vU).length;
     var cells = casas.map(function (c) {
       var row = (perCasa[c] || []).filter(function (x) { return +x.linha === +L; })[0];
       var o = row && row.over != null ? (+row.over).toFixed(2) : "—";
       var u = row && row.under != null ? (+row.under).toFixed(2) : "—";
-      return '<td class="o">' + o + (vO && vO.casa === c ? '<span class="vtag">+' + vO.ev_pct.toFixed(0) + "%</span>" : "") + "</td>" +
-        '<td class="u">' + u + (vU && vU.casa === c ? '<span class="vtag">+' + vU.ev_pct.toFixed(0) + "%</span>" : "") + "</td>";
+      return '<td class="o">' + o + (vO[c] ? '<span class="vtag">+' + vO[c].ev_pct.toFixed(0) + "%</span>" : "") + "</td>" +
+        '<td class="u">' + u + (vU[c] ? '<span class="vtag">+' + vU[c].ev_pct.toFixed(0) + "%</span>" : "") + "</td>";
     }).join("");
-    return '<tr class="' + ((vO || vU) ? "val-row" : "") + '"><td class="ln">' + L + "</td>" + cells + "</tr>";
+    return '<tr class="' + ((anyO || anyU) ? "val-row" : "") + '"><td class="ln">' + L + "</td>" + cells + "</tr>";
   }
 
   function ladderTable(perCasa, lines, vm, mercado) {
@@ -381,14 +407,19 @@
         var sa = staleCasas[a.casa] ? 1 : 0, sb = staleCasas[b.casa] ? 1 : 0;
         return sa - sb;
       });
+      var moreN = valsOrd.length - 4;
       valStrip = '<div class="val-strip">' + valsOrd.slice(0, 4).map(function (v) {
         var st = staleCasas[v.casa];
         return '<span class="val-item' + (st ? " val-stale" : "") + '"' +
-          (st ? ' title="Odd da casa reutilizada (stale) — pode estar desatualizada; não conta como melhor preço"' : "") + ">" +
+          (st ? ' title="Odd da casa reutilizada (stale) — pode estar desatualizada; não conta como melhor preço"'
+              : ' title="' + esc(betLabel(v)) + '"') + ">" +
           esc(v.lado) + " " + v.linha + " @ " + v.odd.toFixed(2) +
           (st ? ' <span class="ev-stale">⚠ stale</span>' : ' <span class="ev">+' + v.ev_pct.toFixed(0) + "%</span>") +
           " · " + LOGO(v.casa, "house-logo-sm") + "</span>";
-      }).join("") + "</div>";
+      }).join("") +
+      // §13 — "+N sinais" quando o card tem mais de 4 flags
+      (moreN > 0 ? '<span class="val-more">+' + moreN + " sinal" + (moreN > 1 ? "es" : "") + "</span>" : "") +
+      "</div>";
     } else if (vals.length && !valActionable) {
       // Fail closed: iniciado/encerrado/board stale nunca mostra a faixa acionável.
       valStrip = '<div class="val-strip muted">' +
@@ -484,8 +515,14 @@
         (ABBR[m] || esc(m)) + (mainL != null ? " <b>" + mainL + "</b>" : "") + "</span>";
     }).join("");
 
-    var valBadge = (vals.length && valActionable)
-      ? '<span class="gr-val" title="Melhor EV do modelo neste jogo (com os filtros atuais)">🎯 +' + bestEv.toFixed(0) + "%</span>"
+    // §13 — mostra a MELHOR aposta completa no card (não só o EV) + "+N sinais" quando há mais.
+    var bv = bestVal(j);
+    var moreN = vals.length - 1;
+    var valBadge = (bv && valActionable)
+      ? '<span class="gr-val" title="' + esc(betLabel(bv)) + '">🎯 ' + esc(bv.lado) + " " + bv.linha +
+        " @" + Number(bv.odd).toFixed(2) + " · " + LOGO(bv.casa, "house-logo-sm") + " +" + bv.ev_pct.toFixed(0) + "%" +
+        (moreN > 0 ? '<span class="gr-more" title="mais ' + moreN + ' sinal' + (moreN > 1 ? "es" : "") + ' neste jogo">+' + moreN + "</span>" : "") +
+        "</span>"
       : "";
 
     var el = document.createElement("div");

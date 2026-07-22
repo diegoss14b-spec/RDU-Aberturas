@@ -8,7 +8,10 @@ este arquivo alimenta modelos futuros.
 
 Matemática do μ = a MESMA do gráfico do Histórico (valor/js/history.js):
   p_over_fair = (1/over) / (1/over + 1/under)      [de-vig do par O/U]
-  μ resolve P(X > L) = p_over_fair sob Poisson      [bisseção, P(X>L)=1−CDF(⌊L⌋)]
+  μ resolve  P(X>L) / (P(X>L)+P(X<L)) = p_over_fair  sob Poisson  [§9: push-aware]
+Em linha INTEIRA o empate exato (X=L) devolve stake e sai do de-vig — por isso o alvo
+é a probabilidade CONDICIONAL aos resultados decididos, não P(X>L) puro. Em meia linha
+o denominador é 1, então o valor é idêntico à regra antiga (sem regressão).
 A bisseção replica solveMu do JS (mesmos limites/tolerância) pros números baterem.
 
 Honestidade dos endpoints:
@@ -62,22 +65,46 @@ def poisson_cdf(k, mu):
     return min(1.0, s)
 
 
+def _is_integer_line(L):
+    return abs(float(L) - round(float(L))) < 1e-9
+
+
 def p_over_from_mu(L, mu):
+    """P(X > L). Linha inteira L: X>L ⇔ X≥L+1 ⇒ 1−CDF(L). Meia linha idem via floor."""
     return 1.0 - poisson_cdf(math.floor(L), mu)
 
 
+def p_under_from_mu(L, mu):
+    """P(X < L). Linha inteira L: X<L ⇔ X≤L−1 ⇒ CDF(L−1). Meia linha: X≤floor(L) ⇒ CDF(floor(L))."""
+    fl = math.floor(L)
+    if _is_integer_line(L):
+        return poisson_cdf(fl - 1, mu)
+    return poisson_cdf(fl, mu)
+
+
+def p_cond_over(L, mu):
+    """§9 — P(over | resultado decidido), EXCLUINDO o push. Em linha inteira o empate
+    exato (X=L) devolve stake e NÃO entra no de-vig; em meia linha o denominador é 1,
+    então o valor é idêntico à regra antiga (sem regressão)."""
+    po = p_over_from_mu(L, mu)
+    pu = p_under_from_mu(L, mu)
+    denom = po + pu
+    return po / denom if denom > 0.0 else po
+
+
 def solve_mu(L, p_over):
-    """Réplica exata do solveMu do JS (bisseção, tolerância 5e-4)."""
+    """Bisseção em μ com ``p_cond_over(L, μ) = p_over`` (push-aware em linha inteira,
+    meia linha inalterada). Réplica exata do solveMu do JS — tolerância 5e-4."""
     if not (0.0 < p_over < 1.0) or L is None or L < 0:
         return None
     lo, hi = 1e-6, max(2.0 * L + 10.0, 20.0)
     i = 0
-    while i < 40 and p_over_from_mu(L, hi) < p_over:
+    while i < 40 and p_cond_over(L, hi) < p_over:
         hi *= 1.5
         i += 1
     for _ in range(80):
         mid = (lo + hi) / 2.0
-        if p_over_from_mu(L, mid) < p_over:
+        if p_cond_over(L, mid) < p_over:
             lo = mid
         else:
             hi = mid

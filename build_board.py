@@ -277,8 +277,10 @@ def game_state(inicio_str, now=None):
         kick = datetime(y, mo, d, h, mi, tzinfo=BRT)
     except ValueError:
         return "unknown"
-    # virada de ano: se kick ficou >12h no passado no calendário local, tenta ano seguinte
-    if (kick - now).total_seconds() < -12 * 3600:
+    # §13 — "dd/mm" sem ano só é ambíguo na virada dez→jan. Rolar pro ano seguinte SÓ quando
+    # o kickoff cairia >180 dias no passado (ex.: 01/01 visto em 31/12). O antigo limiar de 12h
+    # transformava QUALQUER jogo de ontem em "ano que vem" → jogo velho voltava a "upcoming".
+    if (kick - now).total_seconds() < -180 * 86400:
         try:
             kick = datetime(y + 1, mo, d, h, mi, tzinfo=BRT)
         except ValueError:
@@ -699,7 +701,8 @@ def main():
     print(f"[board] valor flags={n_valor} · skip kickoff/started={n_skip_ko} · skip stale casa={n_skip_stale}"
           f" · skip 3-vias={n_skip_3way} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
     # transparência da captura (brief P0 §2.4): quem entrou e quem falhou nesta rodada
-    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365"}
+    # §11 — Betfast estava OMITIDA aqui (7 casas, não 6): passa a aparecer no painel/hist7
+    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365", "betfast": "Betfast"}
     _stdir = ROOT / "data" / "odds" / "_status"
     if _stdir.exists():
         cap = {"casas_ok": [], "casas_fail": [], "casas_stale": []}

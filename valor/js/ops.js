@@ -90,9 +90,10 @@
       },
       {
         lab: "Casas ok",
-        val: (S.n_ok != null ? S.n_ok : "—") + " / " + ((S.n_ok || 0) + (S.n_fail || 0) || 5),
+        // §11 — 7 casas (com Betfast); antes o fallback era 5 e escondia casas
+        val: (S.n_ok != null ? S.n_ok : "—") + " / " + ((S.n_ok || 0) + (S.n_fail || 0) || 7),
         sub: (S.total_events != null ? S.total_events + " eventos" : "—") + (S.reason && S.reason !== "ok" ? " · " + S.reason : ""),
-        tone: (S.n_fail || 0) === 0 ? "good" : (S.n_ok || 0) >= 2 ? "mid" : "bad",
+        tone: (S.n_fail || 0) === 0 ? "good" : (S.n_ok || 0) >= 4 ? "mid" : "bad",
       },
       {
         lab: "Mesa",
@@ -267,14 +268,25 @@
           + '<td class="op-num">' + esc((age["7-30d"] || 0) + (age["30d+"] || 0)) + "</td>"
           + "<td>" + esc(topReason) + "</td></tr>";
       }).join("");
+      var bk = L.backlog || {};
+      var ageUnknown = bk.age_unknown != null ? bk.age_unknown : ((bk.age || {}).unknown || 0);
+      var unkNote = ageUnknown
+        ? '<div class="op-av op-av-bad">' + esc(String(ageUnknown))
+          + " pend&ecirc;ncias com data ileg&iacute;vel (age=unknown) &mdash; o backlog acima pode estar "
+          + "subnotificado. Conferir formato do kickoff.</div>"
+        : "";
       settleHtml = '<div class="op-sec"><div class="op-sec-h">Liquida&ccedil;&atilde;o &mdash; backlog retryable por mercado e idade</div>'
+        + unkNote
         + '<div class="op-table-wrap"><table class="op-table"><thead><tr>'
         + "<th>Mercado</th><th>Retry</th><th>0-24h</th><th>1-3d</th><th>3-7d</th><th>7d+</th><th>Motivo principal</th>"
         + "</tr></thead><tbody>"
         + (settleRows || '<tr><td colspan="7">Sem backlog &mdash; liquida&ccedil;&atilde;o em dia.</td></tr>')
         + "</tbody></table></div>"
         + '<div class="op-muted op-note">Resultado dispon&iacute;vel em ' + esc(L.results_rows || 0)
-        + " jogos &middot; atualizado " + esc(L.generated_at) + ".</div></div>";
+        + " jogos &middot; atualizado " + esc(L.generated_at) + ".</div>"
+        + '<div class="op-muted op-note">A liquida&ccedil;&atilde;o &eacute; <b>parcial</b>: s&oacute; casa placar/estat&iacute;stica das '
+        + "ligas cobertas pelo RDU Stats. Mercados fora dessa cobertura (ex.: muitos escanteios de "
+        + "ligas menores) ficam em <b>retry</b> por falta de fonte &mdash; &eacute; esperado, n&atilde;o &eacute; erro de captura.</div></div>";
     }
 
     function kpiMini(lab, val) {

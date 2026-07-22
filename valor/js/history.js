@@ -202,8 +202,10 @@
    *
    * Pra cada snapshot (linha L, odd_over, odd_under) de uma casa:
    *   p_over_fair = (1/over) / (1/over + 1/under)          [remove o juice]
-   *   μ resolve P(X > L) = p_over_fair sob Poisson          [bisseção em μ]
-   *   com P(X > L) = 1 − CDF(floor(L))  (L meio-inteiro).
+   *   μ resolve P(X>L)/(P(X>L)+P(X<L)) = p_over_fair        [§9: push-aware]
+   * Em linha INTEIRA o empate exato (X=L) devolve stake e sai do de-vig, então o alvo é
+   * a probabilidade CONDICIONAL aos resultados decididos (não P(X>L) puro — isso inflava
+   * o μ ~0,5 em linhas inteiras). Em meia linha o denominador é 1 ⇒ sem regressão.
    * Assim "over 24.5 @ 1.90/1.90" vira μ≈24.7 — e uma linha nova (24.5→26.5)
    * não quebra a série: o μ continua comparável. Odd do over SUBINDO = μ CAINDO.
    * Em cada minuto usamos a linha mais equilibrada (menor |over−under|) da casa.
@@ -214,14 +216,26 @@
     for (var i = 1; i <= k; i++) { t *= mu / i; s += t; }
     return Math.min(1, s);
   }
+  function isIntegerLine(L) { return Math.abs(L - Math.round(L)) < 1e-9; }
   function pOverFromMu(L, mu) { return 1 - poissonCdf(Math.floor(L), mu); }
+  // P(X < L): linha inteira ⇒ X≤L−1 ⇒ CDF(L−1); meia linha ⇒ X≤floor(L) ⇒ CDF(floor(L)).
+  function pUnderFromMu(L, mu) {
+    var fl = Math.floor(L);
+    return isIntegerLine(L) ? poissonCdf(fl - 1, mu) : poissonCdf(fl, mu);
+  }
+  // §9 — P(over | resultado decidido), excluindo o push. Linha inteira: o empate exato
+  // (X=L) devolve stake e sai do de-vig. Meia linha: denominador 1 ⇒ idêntico ao antigo.
+  function pCondOver(L, mu) {
+    var po = pOverFromMu(L, mu), pu = pUnderFromMu(L, mu), denom = po + pu;
+    return denom > 0 ? po / denom : po;
+  }
   function solveMu(L, pOver) {
     if (!(pOver > 0 && pOver < 1) || L == null || L < 0) return null;
     var lo = 1e-6, hi = Math.max(2 * L + 10, 20), i;
-    for (i = 0; i < 40 && pOverFromMu(L, hi) < pOver; i++) hi *= 1.5;
+    for (i = 0; i < 40 && pCondOver(L, hi) < pOver; i++) hi *= 1.5;
     for (i = 0; i < 80; i++) {
       var mid = (lo + hi) / 2;
-      if (pOverFromMu(L, mid) < pOver) lo = mid; else hi = mid;
+      if (pCondOver(L, mid) < pOver) lo = mid; else hi = mid;
       if (hi - lo < 5e-4) break;
     }
     return (lo + hi) / 2;
