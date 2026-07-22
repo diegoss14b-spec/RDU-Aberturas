@@ -79,7 +79,7 @@ def test_match_to_sofa_pair():
         "_hn": norm_team("Ceará"), "_an": norm_team("Athletic Club MG"),
         "_lfp": "br-b",
     }]
-    fx, sc, method = match_to_sofa(
+    fx, sc, method, _info = match_to_sofa(
         norm_team("Ceará CE"), norm_team("Athletic Club"),
         day, start, fixtures, book_league="Série B",
     )
@@ -89,7 +89,8 @@ def test_match_to_sofa_pair():
 
 
 def test_match_to_sofa_one_side():
-    """1 lado forte + horário único no slot → match."""
+    """Contrato NOVO (brief 22/07 §6): 1 lado forte só casa com evidência do
+    SEGUNDO lado. Segundo lado lixo → quarentena (sem match)."""
     BRT = timezone(timedelta(hours=-3))
     day = "2026-07-13"
     start = datetime(2026, 7, 13, 16, 0, tzinfo=BRT)
@@ -101,12 +102,19 @@ def test_match_to_sofa_one_side():
         "_hn": norm_team("Londrina"), "_an": norm_team("Novorizontino"),
         "_lfp": "br-b",
     }]
-    fx, sc, method = match_to_sofa(
+    # segundo lado plausível (variante de grafia) → casa
+    fx, sc, method, _info = match_to_sofa(
+        norm_team("Londrina PR"), norm_team("Grêmio Novorizontino"),
+        day, start, fixtures, book_league="Brasileirão Série B",
+    )
+    assert fx is not None, f"one-side c/ 2º lado ok deveria casar, sc={sc} m={method}"
+    assert fx["sofa_id"] == 777
+    # segundo lado lixo → NÃO casa (antes casava — era a brecha do caso Sporting)
+    fx2, sc2, m2, _i2 = match_to_sofa(
         norm_team("Londrina PR"), "time esquisito xyz",
         day, start, fixtures, book_league="Brasileirão Série B",
     )
-    assert fx is not None, f"one-side should match, sc={sc} m={method}"
-    assert fx["sofa_id"] == 777
+    assert fx2 is None, f"2º lado lixo não pode casar (sc={sc2} m={m2})"
 
 
 def test_resolve_fixture_unmatched():

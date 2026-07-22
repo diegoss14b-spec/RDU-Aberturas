@@ -39,6 +39,7 @@ from pricing_math import expected_value, edge_vs_market, is_integer_line, fair_o
 from canonical import (
     norm_team, gscore as _gscore, side_hit as _side_hit, match_to_sofa,
     load_sofa_fixtures, parse_start, n as _n, SOFA_TOKEN_MIN,
+    flags_compatible, _day_delta,
 )
 
 BRT = timezone(timedelta(hours=-3))
@@ -59,6 +60,19 @@ FUZZ_MIN = 88
 # dedup de confronto entre casas (mesmo jogo grafado diferente por cada casa)
 GROUP_FUZZ_TIME = 75   # mesmo horário exato + semelhança de nomes ≥ isto → mesmo confronto
 GROUP_FUZZ_NAME = 88   # mesmo dia + semelhança de nomes ≥ isto → mesmo confronto (horário pode divergir)
+# virada de meia-noite/fuso (brief 22/07 §7): dias civis DIFERENTES só agrupam se o
+# kickoff real estiver a ≤ GROUP_KICK_TOL_MIN minutos (Atlante 24/07 23:00 × 25/07 00:00)
+GROUP_KICK_TOL_MIN = int(os.environ.get("GROUP_KICKOFF_TOL_MIN", "75"))
+
+
+def _iso_delta_min(a, b):
+    """|Δ| em minutos entre dois ISO com tz, ou None se não parseável."""
+    try:
+        da = datetime.fromisoformat(a)
+        db = datetime.fromisoformat(b)
+        return abs((da - db).total_seconds()) / 60.0
+    except (TypeError, ValueError):
+        return None
 
 # tupla: (cartoes, faltas, finalizacoes, escanteios)
 LEAGUE_RULES = [
@@ -436,7 +450,7 @@ def main():
         j = None
         fx, sc, method = (None, 0, None)
         if len(parts) == 2 and sofa_fx:
-            fx, sc, method = match_to_sofa(hn, an, day, dt, sofa_fx, book_league=e.get("league") or "")
+            fx, sc, method, _minfo = match_to_sofa(hn, an, day, dt, sofa_fx, book_league=e.get("league") or "")
             if fx is not None:
                 j = by_sofa.get(fx["sofa_id"])
                 if j is None:
@@ -464,21 +478,30 @@ def main():
         # fallback: fuzzy entre casas (sem sofa)
         if j is None and len(parts) == 2:
             for jj in jogos:
+                s = _gscore(hn, an, jj["_hn"], jj["_an"])
+                # guarda de gênero/time B (F/B/II/U20): marcador de um lado só = jogos diferentes
+                if not flags_compatible(hn, an, jj["_hn"], jj["_an"]):
+                    continue
                 if jj.get("sofa_id"):  # não misturar órfão com grupo sofa
                     # mas permite se fuzzy fortíssimo no mesmo horário
-                    s = _gscore(hn, an, jj["_hn"], jj["_an"])
                     if jj["_day"] == day and ((jj["_ini"] == ini and s >= GROUP_FUZZ_TIME) or s >= 95):
                         j = jj
                         n_sofa_hit += 1  # colou em grupo sofa por fuzzy
                         break
                 else:
-                    if jj["_day"] != day:
-                        continue
-                    s = _gscore(hn, an, jj["_hn"], jj["_an"])
-                    if (jj["_ini"] == ini and s >= GROUP_FUZZ_TIME) or s >= GROUP_FUZZ_NAME:
-                        j = jj
-                        n_fuzzy += 1
-                        break
+                    if jj["_day"] == day:
+                        if (jj["_ini"] == ini and s >= GROUP_FUZZ_TIME) or s >= GROUP_FUZZ_NAME:
+                            j = jj
+                            n_fuzzy += 1
+                            break
+                    elif _day_delta(jj["_day"], day) == 1 and s >= GROUP_FUZZ_NAME:
+                        # virada de meia-noite/fuso: dia civil difere, mas o kickoff
+                        # real está a ≤ GROUP_KICK_TOL_MIN → mesmo jogo (§7)
+                        dmin = _iso_delta_min(jj.get("inicio_iso"), ini_iso)
+                        if dmin is not None and dmin <= GROUP_KICK_TOL_MIN:
+                            j = jj
+                            n_fuzzy += 1
+                            break
 
         if j is None:
             j = {"jogo": e["name"], "liga": e["league"], "inicio": ini,

@@ -137,6 +137,40 @@ def sofa_reasons(cov, sofa):
     return reasons
 
 
+def purity_reasons(board):
+    """Pureza de identidade por sofa_id (brief 22/07 §6 req.7): um sofa_id do board
+    cujo banco contenha pares crus INCOMPATÍVEIS (duas partidas reais sob o mesmo
+    id — caso Sporting) BLOQUEIA a publicação."""
+    sids = {str(j.get("sofa_id")) for j in (board or {}).get("jogos") or [] if j.get("sofa_id")}
+    if not sids:
+        return []
+    try:
+        sys.path.insert(0, str(ROOT))
+        from canonical import sofa_purity
+    except Exception as e:
+        return [f"pureza: canonical indisponível ({type(e).__name__})"]
+    keys = {}
+    kdir = ROOT / "data" / "odds_history" / "keys"
+    for f in sorted(kdir.glob("*.json")):
+        try:
+            raw = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for k, v in raw.items():
+            if k.startswith("__") or not isinstance(v, dict):
+                continue
+            keys[k] = v
+    reasons = []
+    for sid, rep in sorted(sofa_purity(keys, only_ids=sids).items()):
+        if rep.get("impure"):
+            exemplo = " ×VS× ".join(c[0] for c in rep["clusters"][:3])
+            reasons.append(
+                f"identidade impura sofa:{sid} — {rep['n_clusters']} partidas reais "
+                f"sob o mesmo id ({exemplo}); board não pode publicar odds misturadas"
+            )
+    return reasons
+
+
 def load_json(path):
     try: return json.loads(Path(path).read_text(encoding="utf-8"))
     except Exception: return {}
@@ -189,7 +223,7 @@ def main():
         print(f"[gate] aviso: não li o board ao vivo ({type(e).__name__}) — sigo sem baseline")
 
     now_cov = board_coverage(new); prev_cov = board_coverage(prev or {})
-    reasons = status_reasons(summary) + sofa_reasons(now_cov, sofa)
+    reasons = status_reasons(summary) + sofa_reasons(now_cov, sofa) + purity_reasons(new)
     # Baseline defasado (18/07): comparar contra um board AO VIVO velho (ex.: durante um freeze)
     # é sem sentido — o cardápio de jogos/mercados mudou naturalmente e as "quedas" viram
     # fantasmas que travavam a Mesa em loop (não publica porque o baseline é velho... porque

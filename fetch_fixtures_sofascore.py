@@ -26,6 +26,10 @@ TOURNAMENTS = [
     (23, "SerieA"), (35, "Bundesliga"), (34, "Ligue1"), (242, "MLS"),
     (155, "Argentina"), (649, "CSL"), (40, "Allsvenskan"), (278, "Uruguay"),
     (240, "Ecuador"), (203, "Russia"), (20, "Eliteserien"),
+    # 22/07 (caso Sporting): a Sul-Americana FALTAVA aqui — sem o fixture do
+    # Cristal×Bragantino, o one_side casou o jogo no evento da MLS. Libertadores
+    # e Liga MX entram pelo mesmo motivo (fingerprint §6 + fragmentação §7).
+    (384, "Libertadores"), (480, "Sudamericana"), (352, "LigaMX"),
 ]
 DAYS_AHEAD = 7
 MAX_PAGES = 3

@@ -20,15 +20,22 @@ except Exception:
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from canonical import resolve_fixture, history_key, load_sofa_fixtures, parse_start, norm_team
+from canonical import resolve_fixture, history_key, load_sofa_fixtures, parse_start, norm_team, gscore
 from history_quality import (
     compute_capture_quality, is_pre_kickoff, pick_main_line, parse_ts, ensure_aware, BRT,
 )
+from history_merge import atomic_write_text
 from migrate_history_keys import migrate_keys_dict, migrate_tick_file, unify_keys_dict
 
 ODDS = ROOT / "data" / "odds"
 HIST = ROOT / "data" / "odds_history"
+HOUSE_MAP = HIST / "house_event_map.json"
 CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365", "betfast"]
+
+# métodos fortes o bastante pra FIXAR a identidade no mapa por casa (event_id).
+# one_side/slot_unique re-resolvem a cada rodada — pin errado não pode ficar grudado.
+PIN_METHODS = {"pair"}
+HOUSE_MAP_TTL_DAYS = 30
 
 BETANO_MK = {
     "Total de Cartões": "Cartões", "Total de Faltas": "Faltas", "Total de chutes": "Finalizações",
@@ -73,6 +80,7 @@ def load_events(casa):
             evs.append({
                 "name": name, "start": e.get("start"), "league": e.get("league") or "",
                 "mercados": merc, "home_raw": home_raw, "away_raw": away_raw,
+                "event_id": e.get("event_id"),
             })
         return evs
     except Exception as ex:
@@ -84,6 +92,101 @@ def _gid(idt, djogo, h, a):
     if idt.get("sofa_id"):
         return f"sofa:{idt['sofa_id']}"
     return f"{djogo}|{h}|{a}"
+
+
+# ---------------------------------------------------------------------------
+# Mapa persistente de event_id POR CASA (brief 22/07 §6 req.1 e §7): uma vez que
+# um evento da casa foi associado com método forte, a identidade fica estável
+# entre rodadas (não fragmenta na virada de meia-noite nem "migra" por fuzzy).
+# ---------------------------------------------------------------------------
+def load_house_map():
+    try:
+        d = json.loads(HOUSE_MAP.read_text(encoding="utf-8"))
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def prune_house_map(hmap, now):
+    cut = (now - timedelta(days=HOUSE_MAP_TTL_DAYS)).strftime("%Y-%m-%dT%H:%M:%S%z")
+    return {k: v for k, v in hmap.items()
+            if isinstance(v, dict) and str(v.get("last_seen") or "") >= cut}
+
+
+def save_house_map(hmap):
+    atomic_write_text(HOUSE_MAP, json.dumps(hmap, ensure_ascii=False))
+
+
+def resolve_identity(casa, ev, fixtures, hmap, now_iso):
+    """Identidade do evento: mapa por casa (pin) > resolve_fixture.
+
+    - pin sofa: reutiliza a identidade fixada, se os nomes crus ainda baterem;
+    - pin legado: mantém o gid estável (dia/nomes), mas PROMOVE pra sofa se o
+      resolve atual achar match forte (fixture pode ter aparecido depois);
+    - sem pin: resolve e, se o método for forte (PIN_METHODS), fixa no mapa.
+    """
+    ev_id = ev.get("event_id")
+    map_key = f"{casa}:{ev_id}" if ev_id not in (None, "") else None
+    pinned = hmap.get(map_key) if map_key else None
+    hn_now, an_now = norm_team(ev.get("home_raw")), norm_team(ev.get("away_raw"))
+
+    if pinned:
+        same_names = gscore(hn_now, an_now, pinned.get("hn") or "", pinned.get("an") or "") >= 80
+        if not same_names:
+            pinned = None  # a casa reaproveitou o event_id pra outro jogo — descarta pin
+            hmap.pop(map_key, None)
+
+    idt = resolve_fixture(
+        ev["home_raw"], ev["away_raw"], ev["start"],
+        league=ev.get("league") or "", fixtures=fixtures,
+    )
+
+    if pinned:
+        pinned["last_seen"] = now_iso
+        if pinned.get("sofa_id"):
+            return {
+                "home": pinned.get("home") or ev["home_raw"],
+                "away": pinned.get("away") or ev["away_raw"],
+                "hn": pinned["hn"], "an": pinned["an"],
+                "day": pinned["day"], "sofa_id": pinned["sofa_id"],
+                "match_method": "house_map",
+                "kickoff_iso": pinned.get("kickoff_iso") or idt.get("kickoff_iso"),
+                "match_confidence": pinned.get("confidence") or 90,
+                "match_evidence": {"method": "house_map", "pinned_by": pinned.get("method")},
+                "league": ev.get("league") or "",
+            }
+        if idt.get("sofa_id") and idt.get("match_method") in PIN_METHODS:
+            hmap[map_key] = _pin_from_idt(idt, now_iso)   # promove legado → sofa
+            return idt
+        # pin legado: preserva o gid (dia civil da 1ª captura) contra flutuação de fuso
+        idt = dict(idt)
+        idt.update({"hn": pinned["hn"], "an": pinned["an"], "day": pinned["day"],
+                    "sofa_id": None, "match_method": "house_map_legacy",
+                    "match_confidence": pinned.get("confidence") or idt.get("match_confidence")})
+        return idt
+
+    if map_key and idt.get("day") and idt["day"] != "?":
+        if idt.get("sofa_id") and idt.get("match_method") in PIN_METHODS:
+            hmap[map_key] = _pin_from_idt(idt, now_iso)
+        elif not idt.get("sofa_id"):
+            hmap[map_key] = {
+                "sofa_id": None, "hn": idt["hn"], "an": idt["an"], "day": idt["day"],
+                "home": idt.get("home"), "away": idt.get("away"),
+                "kickoff_iso": idt.get("kickoff_iso"),
+                "method": idt.get("match_method"), "confidence": idt.get("match_confidence"),
+                "first_seen": now_iso, "last_seen": now_iso,
+            }
+    return idt
+
+
+def _pin_from_idt(idt, now_iso):
+    return {
+        "sofa_id": idt["sofa_id"], "hn": idt["hn"], "an": idt["an"], "day": idt["day"],
+        "home": idt.get("home"), "away": idt.get("away"),
+        "kickoff_iso": idt.get("kickoff_iso"),
+        "method": idt.get("match_method"), "confidence": idt.get("match_confidence"),
+        "first_seen": now_iso, "last_seen": now_iso,
+    }
 
 
 def main():
@@ -111,13 +214,12 @@ def main():
     # batch: (casa,gid,mercado) -> list of {linha,over,under}
     batch_ou = defaultdict(list)
 
+    hmap = prune_house_map(load_house_map(), now)
+
     n_ticks = n_new = n_obs = n_sofa = n_skip_post = n_line_moves = 0
     for casa in CASAS:
         for ev in load_events(casa):
-            idt = resolve_fixture(
-                ev["home_raw"], ev["away_raw"], ev["start"],
-                league=ev.get("league") or "", fixtures=fixtures,
-            )
+            idt = resolve_identity(casa, ev, fixtures, hmap, now_iso)
             if not idt["day"] or idt["day"] == "?":
                 continue
             if idt.get("sofa_id"):
@@ -170,6 +272,7 @@ def main():
                                 "sofa_id": idt.get("sofa_id"),
                                 "match_method": idt.get("match_method"),
                                 "match_confidence": idt.get("match_confidence"),
+                                "match_evidence": idt.get("match_evidence"),
                                 "result": None, "won": None, "clv_pct": None, "status": "open",
                             }
                             n_new += 1
@@ -178,6 +281,8 @@ def main():
                                 k["sofa_id"] = idt["sofa_id"]
                                 k["match_method"] = idt.get("match_method")
                                 k["match_confidence"] = idt.get("match_confidence")
+                                if idt.get("match_evidence"):
+                                    k["match_evidence"] = idt["match_evidence"]
                             if kick_iso and not k.get("kickoff"):
                                 k["kickoff"] = kick_iso
 
@@ -232,6 +337,7 @@ def main():
     keys["__main_lines__"] = main_store
     tick_f.close()
     kf.write_text(json.dumps(keys, ensure_ascii=False), encoding="utf-8")
+    save_house_map(hmap)
     print(
         f"[ingest] {n_obs:,} obs · {n_ticks:,} ticks ({n_line_moves} line_move) · "
         f"{n_new:,} keys novas · sofa_match={n_sofa} · skip_post_ko={n_skip_post} · "

@@ -167,6 +167,16 @@ def migrate_keys_dict(keys, fixtures):
     return new, stats
 
 
+def _kick_epoch(rec):
+    """Epoch (s) do kickoff do registro, ou None."""
+    try:
+        from history_quality import parse_ts, ensure_aware
+        dt = ensure_aware(parse_ts(rec.get("kickoff")))
+        return int(dt.timestamp()) if dt else None
+    except Exception:
+        return None
+
+
 def _gid_of(key_meta, rec):
     """Identidade de jogo (gid) de uma key + registro."""
     if key_meta.get("format") == "sofa":
@@ -194,12 +204,16 @@ def unify_keys_dict(keys):
             continue
         gid, day, hn, an = _gid_of(meta, v)
         g = games.setdefault(gid, {"day": day, "hn": hn, "an": an, "n": 0,
-                                   "sofa": gid.startswith("sofa:")})
+                                   "sofa": gid.startswith("sofa:"),
+                                   "kick_ts": None})
         g["n"] += 1
         if not g["day"] and day:
             g["day"] = day
         if not g["hn"] and hn:
             g["hn"], g["an"] = hn, an
+        ke = _kick_epoch(v)
+        if ke and (g["kick_ts"] is None or ke < g["kick_ts"]):
+            g["kick_ts"] = ke  # kickoff mais cedo observado do confronto
 
     alias = unify_gids(games)
     stats = {"gid_merges": len(alias), "key_merges": 0, "main_line_merges": 0}
