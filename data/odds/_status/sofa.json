@@ -1,34 +1,36 @@
 {
  "casa": "sofa",
  "kind": "fixture",
- "ok": true,
- "ts_utc": "2026-07-22T18:50:36Z",
- "ts_brt": "2026-07-22 15:50",
- "n_events": 166,
- "n_fixtures": 166,
+ "ok": false,
+ "ts_utc": "2026-07-22T19:42:26Z",
+ "ts_brt": "2026-07-22 16:42",
+ "n_events": 172,
+ "n_fixtures": 172,
  "n_markets": 0,
  "min_events": 42,
- "promoted": true,
+ "promoted": false,
  "pointer_valid": true,
- "pointer_file": "_snapshots/sofa_681bf64eb99a04c88dc6.json",
- "pointer_at": "2026-07-22T15:50:36-03:00",
+ "pointer_file": "_snapshots/sofa_254caaa472418d8be4f0.json",
+ "pointer_at": "2026-07-22T15:19:41-03:00",
  "pointer_n": 166,
- "pointer_age_h": 0.0,
- "duration_sec": 51.9,
- "error": null,
- "error_class": null,
+ "pointer_age_h": 1.379,
+ "duration_sec": 63.2,
+ "error": "snapshot não saudável: n=172, mínimo=42; fallback preservado n=166; transporte req=44 proxy=44 direto=0 http=200:42,404:2 ultimo=HTTP 404 via proxy circuito=0 falhas=LigaMX inativos=WC",
+ "error_class": "Other",
  "transport": {
-  "requests": 39,
-  "proxy_attempts": 39,
+  "requests": 44,
+  "proxy_attempts": 44,
   "direct_attempts": 0,
   "statuses": {
-   "200": 38,
-   "404": 1
+   "200": 42,
+   "404": 2
   },
-  "last_error": null,
+  "last_error": "HTTP 404 via proxy",
   "consecutive_failures": 0,
   "circuit_open": false,
-  "failed_tournaments": [],
+  "failed_tournaments": [
+   "LigaMX"
+  ],
   "inactive_tournaments": [
    "WC"
   ]
