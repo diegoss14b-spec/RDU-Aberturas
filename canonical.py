@@ -108,6 +108,13 @@ def n(s):
 
 def norm_team(name: str) -> str:
     s = n(name).strip()
+    # junta abreviações societárias PONTUADAS (F.C. → fc, U.D. → ud, A.B.C. → abc) ANTES
+    # de qualquer coisa. Bug 23/07: o punctuation-strip deixava "f" e "c" soltos e o "f"
+    # batia no guard de FEMININO (FLAG_TOKENS), então "Guayaquil City F.C." não fundia com
+    # "Guayaquil City". Aqui o "fc" resultante cai no STOP e some. Feminino REAL ("Corinthians
+    # F"/"Corinthians (F)", sem pontos entre letras) NÃO é tocado — segue guardado.
+    s = re.sub(r"\b([a-z])\.\s?([a-z])\.\s?([a-z])\.?", r"\1\2\3", s)
+    s = re.sub(r"\b([a-z])\.\s?([a-z])\.?", r"\1\2", s)
     # alias ANTES do strip de UF: "CAP PI" perderia o "PI" pro STATE e viraria "cap"
     pre = " ".join(re.sub(r"[^a-z0-9 ]", " ", s).split())
     if pre in ALIASES:

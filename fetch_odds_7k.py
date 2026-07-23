@@ -319,6 +319,12 @@ def main():
                     merc_t.setdefault(c2, {})[team] = arr
         if not merc and not merc_t: continue
         name = (e.get("EventName") or "").replace(" vs ", " - ")
+        # a API da 7k às vezes devolve o visitante DUPLICADO: "Viborg - OB Odense - OB Odense"
+        # → o board via 3 partes e não extraía home/away (jogo não fundia). Colapsa o último
+        # segmento repetido (23/07). Só age quando há ≥3 segmentos e os 2 últimos são iguais.
+        _segs = [s.strip() for s in name.split(" - ")]
+        if len(_segs) >= 3 and _segs[-1] and _segs[-1] == _segs[-2]:
+            name = " - ".join(_segs[:-1])
         rec = {"casa": "7k", "event_id": eid, "name": name, "league": e.get("LeagueName"),
                "start": e.get("StartEventDate"), "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"),
                "mercados": merc}
