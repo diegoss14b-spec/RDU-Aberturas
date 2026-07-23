@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-07-23T16:24:24Z",
- "ts_brt": "2026-07-23 13:24",
+ "ts_utc": "2026-07-23T16:57:15Z",
+ "ts_brt": "2026-07-23 13:57",
  "casas_ok": [
   "betano",
   "superbet",
@@ -17,14 +17,14 @@
  ],
  "n_ok": 6,
  "n_fail": 1,
- "total_events": 420,
+ "total_events": 408,
  "per_casa": {
   "betano": {
    "ok": true,
    "n_events": 60,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 29,
+    "Cartões": 28,
     "Chutes no gol": 13,
     "Desarmes": 2,
     "Escanteios": 46,
@@ -35,18 +35,18 @@
     "Tiros de meta": 2
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-07-23_1313.jsonl",
+   "pointer_file": "betano_2026-07-23_1346.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 147,
+   "n_events": 143,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 62,
+    "Cartões": 58,
     "Chutes no gol": 36,
     "Desarmes": 6,
-    "Escanteios": 147,
+    "Escanteios": 143,
     "Faltas": 18,
     "Finalizações": 57,
     "Impedimentos": 13,
@@ -54,23 +54,23 @@
     "Tiros de meta": 6
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-07-23_1313.jsonl",
+   "pointer_file": "superbet_2026-07-23_1346.jsonl",
    "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 64,
+   "n_events": 60,
    "n_markets": 6,
    "market_counts": {
-    "Cartões": 30,
+    "Cartões": 29,
     "Chutes no gol": 12,
-    "Escanteios": 64,
+    "Escanteios": 60,
     "Faltas": 9,
     "Finalizações": 12,
     "Impedimentos": 9
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-07-23_1313.jsonl",
+   "pointer_file": "estrelabet_2026-07-23_1346.jsonl",
    "error": null
   },
   "7k": {
@@ -84,7 +84,7 @@
     "Faltas": 15
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-07-23_1313.jsonl",
+   "pointer_file": "7k_2026-07-23_1346.jsonl",
    "error": null
   },
   "pinnacle": {
@@ -96,7 +96,7 @@
     "Escanteios": 32
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-07-23_1323.jsonl",
+   "pointer_file": "pinnacle_2026-07-23_1357.jsonl",
    "error": "promoção full bloqueada: mercado Cartões caiu >65%: 13 → 2 eventos"
   },
   "bet365": {
@@ -110,31 +110,31 @@
     "Finalizações": 1
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-07-23_1313.jsonl",
+   "pointer_file": "bet365_2026-07-23_1346.jsonl",
    "error": null
   },
   "betfast": {
    "ok": true,
-   "n_events": 40,
+   "n_events": 36,
    "n_markets": 6,
    "market_counts": {
-    "Cartões": 36,
+    "Cartões": 33,
     "Chutes no gol": 8,
-    "Escanteios": 40,
+    "Escanteios": 36,
     "Faltas": 7,
     "Finalizações": 7,
     "Impedimentos": 8
    },
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-07-23_1313.jsonl",
+   "pointer_file": "betfast_2026-07-23_1346.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 225,
+  "Cartões": 216,
   "Chutes no gol": 70,
   "Desarmes": 20,
-  "Escanteios": 406,
+  "Escanteios": 394,
   "Faltas": 56,
   "Finalizações": 90,
   "Impedimentos": 37,
@@ -144,36 +144,37 @@
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
-  "ok": false,
-  "ts_utc": "2026-07-23T16:15:21Z",
-  "ts_brt": "2026-07-23 13:15",
+  "ok": true,
+  "ts_utc": "2026-07-23T16:48:38Z",
+  "ts_brt": "2026-07-23 13:48",
   "n_events": 162,
   "n_fixtures": 162,
   "n_markets": 0,
   "min_events": 41,
-  "promoted": false,
+  "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_f79a713421e21afdfe18.json",
-  "pointer_at": "2026-07-23T12:23:13-03:00",
+  "pointer_file": "_snapshots/sofa_1ccf70faa7732b3461dd.json",
+  "pointer_at": "2026-07-23T13:48:38-03:00",
   "pointer_n": 162,
-  "pointer_age_h": 0.869,
-  "duration_sec": 79.6,
-  "error": "snapshot não saudável: n=162, mínimo=41; fallback preservado n=162; transporte req=45 proxy=45 direto=0 http=200:42 ultimo=- circuito=0 falhas=WC inativos=-",
-  "error_class": "Other",
+  "pointer_age_h": 0.0,
+  "duration_sec": 67.0,
+  "error": null,
+  "error_class": null,
   "transport": {
-   "requests": 45,
-   "proxy_attempts": 45,
+   "requests": 44,
+   "proxy_attempts": 44,
    "direct_attempts": 0,
    "statuses": {
-    "200": 42
+    "200": 43,
+    "404": 1
    },
    "last_error": null,
    "consecutive_failures": 0,
    "circuit_open": false,
-   "failed_tournaments": [
+   "failed_tournaments": [],
+   "inactive_tournaments": [
     "WC"
-   ],
-   "inactive_tournaments": []
+   ]
   }
  },
  "deploy_allowed": true,
