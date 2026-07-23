@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-07-23T06:29:28Z",
- "ts_brt": "2026-07-23 03:29",
+ "ts_utc": "2026-07-23T07:34:22Z",
+ "ts_brt": "2026-07-23 04:34",
  "casas_ok": [
   "betano",
   "superbet",
@@ -11,16 +11,16 @@
  "casas_fail": [
   {
    "casa": "pinnacle",
-   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 13 → 2 eventos"
+   "error": "exit=2"
   },
   {
    "casa": "betfast",
-   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 16 → 0 eventos; mercado Chutes no gol caiu >65%: 16 → 0 eventos; mercado Finalizações caiu >65%: 16 → 0 eventos; mercado Impedimentos caiu >65%: 14 → 0 eventos"
+   "error": "promoção full bloqueada: mercado Chutes no gol caiu >65%: 16 → 0 eventos; mercado Finalizações caiu >65%: 16 → 0 eventos; mercado Impedimentos caiu >65%: 14 → 0 eventos"
   }
  ],
  "n_ok": 5,
  "n_fail": 2,
- "total_events": 366,
+ "total_events": 367,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -38,7 +38,7 @@
     "Tiros de meta": 2
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-07-23_0318.jsonl",
+   "pointer_file": "betano_2026-07-23_0423.jsonl",
    "error": null
   },
   "superbet": {
@@ -54,7 +54,7 @@
     "Impedimentos": 12
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-07-23_0318.jsonl",
+   "pointer_file": "superbet_2026-07-23_0423.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -70,34 +70,31 @@
     "Impedimentos": 5
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-07-23_0318.jsonl",
+   "pointer_file": "estrelabet_2026-07-23_0423.jsonl",
    "error": null
   },
   "7k": {
    "ok": true,
-   "n_events": 89,
+   "n_events": 90,
    "n_markets": 4,
    "market_counts": {
     "Cartões": 22,
     "Desarmes": 2,
-    "Escanteios": 89,
+    "Escanteios": 90,
     "Faltas": 5
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-07-23_0318.jsonl",
+   "pointer_file": "7k_2026-07-23_0423.jsonl",
    "error": null
   },
   "pinnacle": {
    "ok": false,
-   "n_events": 24,
-   "n_markets": 2,
-   "market_counts": {
-    "Cartões": 2,
-    "Escanteios": 24
-   },
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-07-23_0328.jsonl",
-   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 13 → 2 eventos"
+   "pointer_file": null,
+   "error": null
   },
   "bet365": {
    "ok": true,
@@ -110,26 +107,27 @@
     "Finalizações": 1
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-07-23_0318.jsonl",
+   "pointer_file": "bet365_2026-07-23_0423.jsonl",
    "error": null
   },
   "betfast": {
    "ok": false,
-   "n_events": 21,
-   "n_markets": 1,
+   "n_events": 17,
+   "n_markets": 2,
    "market_counts": {
-    "Escanteios": 21
+    "Cartões": 9,
+    "Escanteios": 14
    },
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-07-23_0328.jsonl",
-   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 16 → 0 eventos; mercado Chutes no gol caiu >65%: 16 → 0 eventos; mercado Finalizações caiu >65%: 16 → 0 eventos; mercado Impedimentos caiu >65%: 14 → 0 eventos"
+   "pointer_file": "betfast_2026-07-23_0433.jsonl",
+   "error": "promoção full bloqueada: mercado Chutes no gol caiu >65%: 16 → 0 eventos; mercado Finalizações caiu >65%: 16 → 0 eventos; mercado Impedimentos caiu >65%: 14 → 0 eventos"
   }
  },
  "market_counts": {
   "Cartões": 122,
   "Chutes no gol": 52,
   "Desarmes": 4,
-  "Escanteios": 357,
+  "Escanteios": 358,
   "Faltas": 35,
   "Finalizações": 78,
   "Impedimentos": 24,
@@ -139,36 +137,34 @@
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
-  "ok": false,
-  "ts_utc": "2026-07-23T06:19:56Z",
-  "ts_brt": "2026-07-23 03:19",
-  "n_events": 155,
-  "n_fixtures": 155,
+  "ok": true,
+  "ts_utc": "2026-07-23T07:25:31Z",
+  "ts_brt": "2026-07-23 04:25",
+  "n_events": 162,
+  "n_fixtures": 162,
   "n_markets": 0,
-  "min_events": 42,
-  "promoted": false,
+  "min_events": 41,
+  "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_254caaa472418d8be4f0.json",
-  "pointer_at": "2026-07-22T15:19:41-03:00",
-  "pointer_n": 166,
-  "pointer_age_h": 12.004,
-  "duration_sec": 76.3,
-  "error": "snapshot não saudável: n=155, mínimo=42; fallback preservado n=166; transporte req=43 proxy=43 direto=0 http=200:41,404:2 ultimo=HTTP 404 via proxy circuito=0 falhas=LigaMX inativos=WC",
-  "error_class": "Other",
+  "pointer_file": "_snapshots/sofa_94c3f0ffe0f0a4346a1b.json",
+  "pointer_at": "2026-07-23T04:25:31-03:00",
+  "pointer_n": 162,
+  "pointer_age_h": 0.0,
+  "duration_sec": 61.8,
+  "error": null,
+  "error_class": null,
   "transport": {
-   "requests": 43,
-   "proxy_attempts": 43,
+   "requests": 44,
+   "proxy_attempts": 44,
    "direct_attempts": 0,
    "statuses": {
-    "200": 41,
-    "404": 2
+    "200": 43,
+    "404": 1
    },
-   "last_error": "HTTP 404 via proxy",
+   "last_error": null,
    "consecutive_failures": 0,
    "circuit_open": false,
-   "failed_tournaments": [
-    "LigaMX"
-   ],
+   "failed_tournaments": [],
    "inactive_tournaments": [
     "WC"
    ]
