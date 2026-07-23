@@ -1,36 +1,35 @@
 {
  "casa": "sofa",
  "kind": "fixture",
- "ok": true,
- "ts_utc": "2026-07-23T15:23:13Z",
- "ts_brt": "2026-07-23 12:23",
+ "ok": false,
+ "ts_utc": "2026-07-23T16:15:21Z",
+ "ts_brt": "2026-07-23 13:15",
  "n_events": 162,
  "n_fixtures": 162,
  "n_markets": 0,
  "min_events": 41,
- "promoted": true,
+ "promoted": false,
  "pointer_valid": true,
  "pointer_file": "_snapshots/sofa_f79a713421e21afdfe18.json",
  "pointer_at": "2026-07-23T12:23:13-03:00",
  "pointer_n": 162,
- "pointer_age_h": 0.0,
- "duration_sec": 56.3,
- "error": null,
- "error_class": null,
+ "pointer_age_h": 0.869,
+ "duration_sec": 79.6,
+ "error": "snapshot não saudável: n=162, mínimo=41; fallback preservado n=162; transporte req=45 proxy=45 direto=0 http=200:42 ultimo=- circuito=0 falhas=WC inativos=-",
+ "error_class": "Other",
  "transport": {
-  "requests": 44,
-  "proxy_attempts": 44,
+  "requests": 45,
+  "proxy_attempts": 45,
   "direct_attempts": 0,
   "statuses": {
-   "200": 43,
-   "404": 1
+   "200": 42
   },
   "last_error": null,
   "consecutive_failures": 0,
   "circuit_open": false,
-  "failed_tournaments": [],
-  "inactive_tournaments": [
+  "failed_tournaments": [
    "WC"
-  ]
+  ],
+  "inactive_tournaments": []
  }
 }
