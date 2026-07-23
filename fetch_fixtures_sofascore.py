@@ -29,7 +29,9 @@ TOURNAMENTS = [
     # 22/07 (caso Sporting): a Sul-Americana FALTAVA aqui — sem o fixture do
     # Cristal×Bragantino, o one_side casou o jogo no evento da MLS. Libertadores
     # e Liga MX entram pelo mesmo motivo (fingerprint §6 + fragmentação §7).
-    (384, "Libertadores"), (480, "Sudamericana"), (352, "LigaMX"),
+    (384, "Libertadores"), (480, "Sudamericana"), (11621, "LigaMX"),  # 23/07: 352 era id MORTO
+    # (404 na season, sem torneio ativo) → travava source_healthy e CONGELAVA todo o board de
+    # fixtures (12h em 22-23/07). 11621 = Apertura (season atual, resolve com ~90 eventos).
 ]
 DAYS_AHEAD = 7
 MAX_PAGES = 3
