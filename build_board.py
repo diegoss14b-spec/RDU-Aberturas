@@ -237,14 +237,21 @@ def sanitize_ou_ladder(linhas, margin_min=MARGIN_MIN, margin_max=MARGIN_CAP):
             continue
         margin = 1.0 / o + 1.0 / u - 1.0
         if margin < margin_min - 1e-9:
+            # margem NEGATIVA = par cruzado (over de uma linha × under de outra) que o
+            # scraper juntou errado; não é uma linha real que abriu → descarta.
             rejects.append({"linha": L, "reason": "margin_low", "margin": round(margin, 4)})
             continue
+        entry = {"linha": L, "over": o, "under": u,
+                 "margin": round(margin, 4),
+                 **{k: v for k, v in row.items() if k not in ("linha", "over", "under")}}
         if margin > margin_max + 1e-9:
-            rejects.append({"linha": L, "reason": "margin_high", "margin": round(margin, 4)})
-            continue
-        by_line[L] = {"linha": L, "over": o, "under": u,
-                      "margin": round(margin, 4),
-                      **{k: v for k, v in row.items() if k not in ("linha", "over", "under")}}
+            # margem ALTA = linha cara, mas REAL: a Mesa é "de aberturas" → MOSTRA a linha e
+            # acompanha o movimento (23/07: sumia da aba, ex. Faltas de qualificatórias EL na
+            # Superbet a ~12,5%). O gate de margem no cálculo de +EV (à parte, no build) já
+            # impede que ela vire flag de VALOR. Marca p/ o front poder sinalizar "margem alta".
+            entry["margem_alta"] = True
+            rejects.append({"linha": L, "reason": "margin_high_kept", "margin": round(margin, 4)})
+        by_line[L] = entry
     ordered = [by_line[L] for L in sorted(by_line)]
     # monotonia: over não-decrescente, under não-crescente (tolerância 1%)
     ok = []
