@@ -6,7 +6,7 @@
 /* Visual padronizado com o RDU Stats (20/07/2026): fonte do sistema, fundo
    #fafafa, cards brancos com borda #e5e7eb e radius 12px, roxo #6d28d9. */
 :root{
-  --bg:#fafafa;--panel:#f9fafb;--card:#ffffff;--ink:#1f2937;--dim:#6b7280;--faint:#9ca3af;--line:#e5e7eb;--line2:#f3f4f6;
+  --bg:#fafafa;--panel:#f9fafb;--card:#ffffff;--ink:#1f2937;--dim:#6b7280;--faint:#70767f;--line:#e5e7eb;--line2:#f3f4f6;
   --purple:#6d28d9;--purple-soft:#f5f3ff;--gold:#b45309;--gold-soft:#fffbeb;--green:#15803d;--green-soft:#f0fdf4;
   --red:#c2410c;--blue:#1d4ed8;
   --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
@@ -56,6 +56,10 @@ h1 .rd{color:var(--purple)}
 .mkt-b{display:none;padding:2px 9px 9px;background:var(--card)}
 .mkt.open .mkt-b{display:block}
 .lad{width:100%;border-collapse:collapse;font:12.5px var(--mono)}
+/* §20 (Lote D): escadas roláveis na horizontal — no celular não cortam casas */
+.lad-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+.lad-wrap .lad{width:auto;min-width:100%}
+.lad th,.lad td{white-space:nowrap}
 .lad th{font:600 9px var(--sans);color:var(--faint);text-transform:uppercase;letter-spacing:.4px;padding:6px 4px;text-align:center;border-bottom:1px solid var(--line)}
 .lad td{padding:6px 4px;text-align:center;border-bottom:1px solid var(--line2)}
 .lad td.ln{color:var(--ink);font-weight:700}
@@ -425,13 +429,14 @@ h1 .mdl-badge{font-size:9.5px}
 </script>
 <div class="wrap">
   <div class="hdr"><div class="mark">R</div><div><h1>Mesa de <span class="rd">Aberturas</span> <span id="model-badge"></span></h1><div class="tag">Rei do Under · odds ao vivo</div></div></div>
-  <div class="bar hist-nav" id="viewsel">
-    <span class="chip on" data-view="board" role="button" tabindex="0">Mesa de Aberturas</span>
-    <span class="chip val" data-view="valor" role="button" tabindex="0">🎯 Valor (+EV)</span>
-    <span class="chip" data-view="hist" role="button" tabindex="0">Histórico &amp; CLV</span>
-    <span class="chip" data-view="ops" role="button" tabindex="0">Operação</span>
-  </div>
-  <div id="view-board">
+  <nav class="bar hist-nav" id="viewsel" role="tablist" aria-label="Seções da Mesa">
+    <span class="chip on" data-view="board" role="tab" tabindex="0" aria-selected="true" aria-controls="view-board">Mesa de Aberturas</span>
+    <span class="chip val" data-view="valor" role="tab" tabindex="0" aria-selected="false" aria-controls="view-valor">🎯 Valor (+EV)</span>
+    <span class="chip" data-view="hist" role="tab" tabindex="0" aria-selected="false" aria-controls="view-hist">Histórico &amp; CLV</span>
+    <span class="chip" data-view="ops" role="tab" tabindex="0" aria-selected="false" aria-controls="view-ops">Operação</span>
+  </nav>
+  <main id="mesa-main">
+  <div id="view-board" role="tabpanel" aria-label="Mesa de Aberturas">
   <div id="boardage"></div>
   <div class="sub">Jogos com mercados de <b>Cartões · Faltas · Finalizações · Chutes no gol · Escanteios · Impedimentos · Laterais · Tiros de meta · Desarmes</b> abertos nas casas. Onde temos modelo, marcamos <b style="color:var(--green)">valor</b> — o foco é saber <b>o que dá pra analisar</b>.</div>
   <div class="disc">A mesa abre no mercado com <b>maior cobertura</b>. Escada de linhas (Mais/Menos) por casa. Odds de um instante — <b>podem ter movido</b>. 🎯 = valor (+EV) do modelo.</div>
@@ -440,9 +445,10 @@ h1 .mdl-badge{font-size:9.5px}
   <div class="meta" id="meta"></div>
   <div id="lista"></div>
   </div><!-- /view-board -->
-  <div id="view-valor" hidden></div>
-  <div id="view-hist" hidden><div id="hist-root"></div></div>
-  <div id="view-ops" hidden></div>
+  <div id="view-valor" role="tabpanel" aria-label="Valor (+EV)" hidden></div>
+  <div id="view-hist" role="tabpanel" aria-label="Histórico e CLV" hidden><div id="hist-root"></div></div>
+  <div id="view-ops" role="tabpanel" aria-label="Operação" hidden></div>
+  </main>
   <div class="foot">Rei do Under · Mesa de Aberturas</div>
 </div>
 <script src="data/board.js"></script>
@@ -480,25 +486,36 @@ h1 .mdl-badge{font-size:9.5px}
         };
         document.body.appendChild(s);
       }
-      // openclose é OPCIONAL: se falhar, a sub-aba Abre → Fecha some e o resto vive
-      function injectSoft(src, next) {
+      // §20 (Lote D): os 3 arquivos de DADOS são independentes — baixam EM PARALELO;
+      // a view (js/history.js) só entra depois que todos chegam. openclose é OPCIONAL:
+      // se falhar, a sub-aba Abre → Fecha some e o resto vive.
+      var pending = 3, failedHard = false;
+      function onData() {
+        pending--;
+        if (pending === 0 && !failedHard) {
+          inject("js/history.js", function () { histLoaded = true; histLoading = false; });
+        }
+      }
+      function injectPar(src, hard) {
         var s = document.createElement("script");
-        s.src = src; s.onload = next; s.onerror = next;
+        s.src = src;
+        s.onload = onData;
+        s.onerror = function () {
+          if (hard) {
+            failedHard = true; histLoading = false;
+            if (root) root.innerHTML = '<div class="empty"><div class="big">⚠️</div>Falha ao carregar o histórico.<br><span style="font-size:12px;color:var(--faint)">Recarregue a página e tente de novo.</span></div>';
+          } else { onData(); }  // openclose falhou → segue sem ela
+        };
         document.body.appendChild(s);
       }
-      // ordem: dados → dados → view (a view lê HIST/MOVES/OPENCLOSE no load e renderiza sozinha)
-      inject("data/history.js", function () {
-        inject("data/moves.js", function () {
-          injectSoft("data/openclose.js", function () {
-            inject("js/history.js", function () { histLoaded = true; histLoading = false; });
-          });
-        });
-      });
+      injectPar("data/history.js", true);
+      injectPar("data/moves.js", true);
+      injectPar("data/openclose.js", false);
     }
     sel.querySelectorAll(".chip").forEach(function (c) {
       function go() {
         var v = c.getAttribute("data-view");
-        sel.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x === c); });
+        sel.querySelectorAll(".chip").forEach(function (x) { x.classList.toggle("on", x === c); x.setAttribute("aria-selected", x === c ? "true" : "false"); });
         Object.keys(views).forEach(function (k) {
           if (views[k]) views[k].hidden = (k !== v);
         });

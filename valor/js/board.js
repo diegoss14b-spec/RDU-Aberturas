@@ -336,7 +336,8 @@
       return "<th>" + LOGO(c, "house-logo-sm") + " +</th><th>" + LOGO(c, "house-logo-sm") + " −</th>";
     }).join("") + "</tr>";
     var body = lines.map(function (L) { return lineRow(perCasa, L, vm, mercado); }).join("");
-    return '<table class="lad"><thead>' + head + "</thead><tbody>" + body + "</tbody></table>";
+    // §20 (Lote D): wrapper com rolagem horizontal — no celular a escada não corta casas
+    return '<div class="lad-wrap"><table class="lad"><thead>' + head + "</thead><tbody>" + body + "</tbody></table></div>";
   }
 
   /** Uma coluna: jogo | mandante | visitante */
@@ -572,10 +573,17 @@
     return el;
   }
 
-  function render() {
-    renderFiltros();
-    var vis = jogos.filter(passa).sort(sortFn);
-    var fr = freshness();
+  // §20 (Lote D): assinatura do conjunto visível — muda quando filtros, banda de frescor,
+  // ou o estado ao vivo de algum jogo (upcoming→started) mudam. O timer usa isso pra NÃO
+  // reconstruir a lista inteira a cada minuto (preserva linhas expandidas e evita reflow).
+  var lastSig = null;
+  function visSig(vis, fr) {
+    return [state.mercado, state.casa, state.soValor, state.mostrarTodos, state.ordem, fr.band, fr.stale ? 1 : 0]
+      .concat(vis.map(function (j) { return gameKey(j) + ":" + liveGameState(j); })).join("|");
+  }
+  // §20 (Lote D): chrome barato (banner de idade + meta/frescor + status de captura) — pode
+  // rodar no timer sem tocar na lista de jogos.
+  function renderChrome(vis, fr) {
     // P0.4 — banner de board velha (≥8h vermelho, ≥12h crítico)
     var ageEl = document.getElementById("boardage");
     if (ageEl) {
@@ -643,6 +651,13 @@
         capEl.style.display = "none";
       }
     }
+  }
+
+  function render() {
+    renderFiltros();
+    var vis = jogos.filter(passa).sort(sortFn);
+    var fr = freshness();
+    renderChrome(vis, fr);
 
     var lista = document.getElementById("lista");
     lista.innerHTML = "";
@@ -651,9 +666,11 @@
         esc(state.mercado === "todos" ? "mercados" : state.mercado) +
         (state.casa !== "todas" ? "</b> na <b>" + esc(state.casa) : "") +
         "</b> aberto agora.<br><span style=\"font-size:12px\">Troque os filtros nos chips acima ou volte após a próxima captura.</span></div>";
+      lastSig = visSig(vis, fr);
       return;
     }
     vis.forEach(function (j) { lista.appendChild(gameRow(j)); });
+    lastSig = visSig(vis, fr);
   }
 
   var sub = document.querySelector("#view-board .sub");
@@ -671,10 +688,19 @@
   window.setInterval(function () {
     var view = document.getElementById("view-board");
     if (!view || view.hidden) return;
-    var sx = window.scrollX || 0;
-    var sy = window.scrollY || 0;
-    render();
-    if (typeof window.scrollTo === "function") window.scrollTo(sx, sy);
+    // §20 (Lote D): não reconstruir a lista inteira a cada minuto. O chrome (idade/frescor)
+    // atualiza sempre (barato); a lista só é reconstruída quando o conjunto visível muda
+    // (algum jogo cruzou o kickoff, mudou a banda de frescor ou o filtro).
+    var vis = jogos.filter(passa).sort(sortFn);
+    var fr = freshness();
+    renderChrome(vis, fr);
+    var sig = visSig(vis, fr);
+    if (sig !== lastSig) {
+      var sx = window.scrollX || 0;
+      var sy = window.scrollY || 0;
+      render();
+      if (typeof window.scrollTo === "function") window.scrollTo(sx, sy);
+    }
   }, 60000);
 
   // P0.2 — badge honesto do modelo (candidate vs produção). Regra única, sem mentir:
