@@ -1,27 +1,27 @@
 {
- "ts_brt": "2026-07-24 16:20",
+ "ts_brt": "2026-07-24 16:50",
  "reasons": [
   "identidade impura sofa:16390346 — 2 partidas reais sob o mesmo id (dynamo moscow x krylia sovetov ×VS× dynamo moscow x ks samara); board não pode publicar odds misturadas"
  ],
  "now": {
   "n_games": 349,
-  "sofa_games": 96,
-  "sofa_pct": 27.507163323782233,
-  "value_games": 10,
+  "sofa_games": 99,
+  "sofa_pct": 28.36676217765043,
+  "value_games": 11,
   "value_sofa": 10,
-  "value_sofa_pct": 100.0,
+  "value_sofa_pct": 90.9090909090909,
   "houses": {
-   "Superbet": 176,
+   "Superbet": 170,
    "7k": 105,
    "Pinnacle": 93,
    "EstrelaBet": 44,
-   "Betfast": 19,
-   "Betano": 34,
+   "Betano": 36,
+   "Betfast": 17,
    "bet365": 43
   },
   "markets": {
    "Escanteios": 346,
-   "Cartões": 85,
+   "Cartões": 83,
    "Faltas": 18,
    "Chutes no gol": 17,
    "Finalizações": 12,
@@ -31,10 +31,10 @@
   },
   "house_markets": {
    "Superbet": {
-    "Escanteios": 313,
-    "Cartões": 92,
-    "Finalizações": 27,
+    "Escanteios": 301,
+    "Cartões": 86,
     "Chutes no gol": 42,
+    "Finalizações": 27,
     "Faltas": 21,
     "Impedimentos": 21,
     "Laterais": 14,
@@ -50,20 +50,20 @@
     "Escanteios": 279
    },
    "EstrelaBet": {
-    "Escanteios": 97,
     "Cartões": 27,
+    "Escanteios": 97,
     "Chutes no gol": 9,
     "Finalizações": 9
    },
-   "Betfast": {
-    "Escanteios": 57,
-    "Cartões": 30
-   },
    "Betano": {
-    "Finalizações": 6,
-    "Chutes no gol": 6,
-    "Escanteios": 34,
-    "Cartões": 27
+    "Cartões": 27,
+    "Escanteios": 36,
+    "Finalizações": 5,
+    "Chutes no gol": 5
+   },
+   "Betfast": {
+    "Cartões": 30,
+    "Escanteios": 51
    },
    "bet365": {
     "Escanteios": 51
@@ -146,55 +146,37 @@
  "sofa": {
   "casa": "sofa",
   "kind": "fixture",
-  "ok": false,
-  "ts_utc": "2026-07-24T18:59:44Z",
-  "ts_brt": "2026-07-24 15:59",
-  "n_events": 0,
-  "n_fixtures": 0,
+  "ok": true,
+  "ts_utc": "2026-07-24T19:39:44Z",
+  "ts_brt": "2026-07-24 16:39",
+  "n_events": 162,
+  "n_fixtures": 162,
   "n_markets": 0,
   "min_events": 41,
-  "promoted": false,
+  "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_40bb43bff97b94620deb.json",
-  "pointer_at": "2026-07-24T13:55:21-03:00",
-  "pointer_n": 161,
-  "pointer_age_h": 2.4214369508333333,
-  "duration_sec": 18.7,
-  "error": "snapshot não saudável: n=0, mínimo=41; fallback preservado n=161; transporte req=4 proxy=4 direto=0 http=nenhum ultimo=ProxyError via proxy; circuit open circuito=1 falhas=BR-A,BR-B,BR-CdB,WC,UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Eliteserien",
-  "error_class": "Other",
+  "pointer_file": "_snapshots/sofa_b282c8ea36e58ba41baf.json",
+  "pointer_at": "2026-07-24T16:39:44-03:00",
+  "pointer_n": 162,
+  "pointer_age_h": 0.18061064694444443,
+  "duration_sec": 72.5,
+  "error": null,
+  "error_class": null,
   "transport": {
-   "requests": 4,
-   "proxy_attempts": 4,
+   "requests": 44,
+   "proxy_attempts": 44,
    "direct_attempts": 0,
-   "statuses": {},
-   "last_error": "ProxyError via proxy; circuit open",
-   "consecutive_failures": 2,
-   "circuit_open": true,
-   "failed_tournaments": [
-    "BR-A",
-    "BR-B",
-    "BR-CdB",
-    "WC",
-    "UCL",
-    "UEL",
-    "EPL",
-    "LaLiga",
-    "SerieA",
-    "Bundesliga",
-    "Ligue1",
-    "MLS",
-    "Argentina",
-    "CSL",
-    "Allsvenskan",
-    "Uruguay",
-    "Ecuador",
-    "Russia",
-    "Eliteserien",
-    "Libertadores",
-    "Sudamericana",
-    "LigaMX"
-   ],
-   "inactive_tournaments": []
+   "statuses": {
+    "200": 43,
+    "404": 1
+   },
+   "last_error": null,
+   "consecutive_failures": 0,
+   "circuit_open": false,
+   "failed_tournaments": [],
+   "inactive_tournaments": [
+    "WC"
+   ]
   }
  },
  "model": {
