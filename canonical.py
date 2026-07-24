@@ -58,6 +58,83 @@ ALIASES = {
     "kuopian palloseura": "kups", "kuopio ps": "kups", "kups kuopio": "kups",
     "kuopion palloseura": "kups",
     "estrela vermelha": "crvena zvezda",  # tradução PT de Red Star Belgrade
+    # ------------------------------------------------------------------
+    # auditoria 23/07 — variantes cross-casa vistas AO VIVO nos snapshots
+    # full das 7 casas + board (alvo = forma da fixture Sofa quando havia).
+    # Caso do Diego: 7k grafa "Náutico Capibaribe", Sofa/EstrelaBet "Náutico".
+    "nautico capibaribe": "nautico",
+    # "Atlético GO" e "Atlético MG" viravam AMBOS "atletico" (STATE come a UF)
+    # — colisão real GO×MG no mesmo dia. Pre-alias pega antes do strip de UF.
+    "atletico go": "atletico goianiense",
+    "atletico mg": "atletico mineiro",
+    "goianiense": "atletico goianiense",       # Betfast: "AC Goianiense GO"
+    "america mex": "america",                  # EstrelaBet: "América (MÉX)" (Sofa: Club América → america)
+    "union de santa fe": "atletico union de santa fe",
+    "boca juniors arg": "boca juniors",
+    "bolivar la paz": "bolivar",
+    "botafogo fr": "botafogo",                 # Pinnacle: "Botafogo FR RJ"
+    "central cordoba sde": "central cordoba",  # Sofa grafa sem SdE (clube da Primera)
+    "chivas guadalajara": "guadalajara",
+    "copenhague": "copenhagen",
+    "csd defensa y justicia": "defensa y justicia",
+    "djurgarden": "djurgardens",
+    "do remo": "remo",                         # 7k: "Clube Do Remo" (clube cai no STOP)
+    "estudiantes la plata": "estudiantes de la plata",
+    "estudiantes rio cuarto": "estudiantes de rio cuarto",
+    "gimnasia la plata": "gimnasia y esgrima",             # Sofa: "Gimnasia y Esgrima" (La Plata)
+    "gimnasia y esgrima de la plata": "gimnasia y esgrima",
+    "gimnasia y esgrima la plata": "gimnasia y esgrima",
+    "gimnasia mendoza": "gimnasia y esgrima mendoza",
+    "gimnasia y esgrima de mendoza": "gimnasia y esgrima mendoza",
+    "grasshoppers": "grasshopper",
+    "sport huancayo": "huancayo",
+    "instituto cordoba": "instituto de cordoba",
+    "ks wieczysta krakow": "wieczysta krakow",
+    "los angeles galaxy": "la galaxy",
+    "lausanne": "lausanne sport",              # Stade Lausanne Ouchy não passa por aqui
+    "los chankas": "los chankas cyc",
+    "mjallby": "mjallby aif",
+    "mushua runa": "mushuc runa",              # typo da Betfast ("Mushua Runa SC")
+    "nacional uru": "nacional",
+    "new york rb": "new york red bulls",
+    "ob odense": "odense",
+    "orgryte": "orgryte is",
+    "river plate arg": "river plate",
+    "saint louis city": "st louis city",
+    "san lorenzo almagro": "san lorenzo",
+    "san lorenzo de almagro": "san lorenzo",
+    "sarmiento junin": "sarmiento",            # Sofa grafa só "Sarmiento" (Junín)
+    "sarmiento de junin": "sarmiento",
+    "servette genebra": "servette",
+    "shenzhen xinpengcheng": "shenzhen peng city",  # mesmo clube (Xinpengcheng = Peng City)
+    "talleres cordoba": "talleres",            # Sofa: "CA Talleres" (Córdoba)
+    "talleres de cordoba": "talleres",
+    "tigre arg": "tigre",
+    "uanl tigres": "tigres uanl",
+    # femininos: bet365 marca (W), Betano/site (F) — sem alias os flags F≠W
+    # BLOQUEIAM a unificação (mesmo jogo vira 2). Alvo = forma (F) do board.
+    "america mg w": "america mg f",
+    "cruzeiro w": "cruzeiro f",
+    "flamengo w": "flamengo f",
+    "fluminense w": "fluminense f",
+    "gremio w": "gremio f",
+    "gremio rs f": "gremio f",
+    "internacional w": "internacional f",
+    "itabirito w": "itabirito f",
+    "itabirito mg f": "itabirito f",
+    "santos w": "santos f",
+    "santos sp f": "santos f",
+    "sao paulo w": "sao paulo f",
+    "rio negro rr w": "atletico rio negro rr f",
+    "rio negro rr women": "atletico rio negro rr f",
+    # guardas de identidade (auditoria 23/07): sem eles o STATE come a UF e o
+    # clube homônimo cai no balde ERRADO ("Operário-MS"→operario→ferroviário;
+    # "Botafogo PB"→botafogo do RJ; "Fluminense PI"→fluminense). Identidade
+    # própria preserva a distinção — NÃO remover.
+    "operario ms": "operario ms",
+    "operario mt": "operario mt",
+    "botafogo pb": "botafogo pb",
+    "fluminense pi": "fluminense pi",
 }
 
 # limiares match Sofa
