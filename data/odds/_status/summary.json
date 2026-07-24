@@ -1,23 +1,26 @@
 {
- "ts_utc": "2026-07-24T22:49:18Z",
- "ts_brt": "2026-07-24 19:49",
+ "ts_utc": "2026-07-24T23:15:27Z",
+ "ts_brt": "2026-07-24 20:15",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
   "7k",
-  "bet365",
-  "betfast"
+  "bet365"
  ],
  "casas_fail": [
   {
    "casa": "pinnacle",
-   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 13 → 2 eventos"
+   "error": "exit=2"
+  },
+  {
+   "casa": "betfast",
+   "error": "promoção full bloqueada: mercado Escanteios caiu >65%: 23 → 7 eventos"
   }
  ],
- "n_ok": 6,
- "n_fail": 1,
- "total_events": 432,
+ "n_ok": 5,
+ "n_fail": 2,
+ "total_events": 417,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -35,17 +38,17 @@
     "Tiros de meta": 2
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-07-24_1938.jsonl",
+   "pointer_file": "betano_2026-07-24_2003.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 164,
+   "n_events": 161,
    "n_markets": 8,
    "market_counts": {
-    "Cartões": 28,
+    "Cartões": 27,
     "Chutes no gol": 11,
-    "Escanteios": 162,
+    "Escanteios": 159,
     "Faltas": 4,
     "Finalizações": 9,
     "Impedimentos": 4,
@@ -53,21 +56,21 @@
     "Tiros de meta": 4
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-07-24_1938.jsonl",
+   "pointer_file": "superbet_2026-07-24_2003.jsonl",
    "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 52,
+   "n_events": 51,
    "n_markets": 4,
    "market_counts": {
     "Cartões": 17,
     "Chutes no gol": 3,
-    "Escanteios": 52,
+    "Escanteios": 51,
     "Finalizações": 3
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-07-24_1938.jsonl",
+   "pointer_file": "estrelabet_2026-07-24_2003.jsonl",
    "error": null
   },
   "7k": {
@@ -81,50 +84,47 @@
     "Faltas": 11
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-07-24_1938.jsonl",
+   "pointer_file": "7k_2026-07-24_2003.jsonl",
    "error": null
   },
   "pinnacle": {
    "ok": false,
-   "n_events": 93,
-   "n_markets": 2,
-   "market_counts": {
-    "Cartões": 2,
-    "Escanteios": 91
-   },
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-07-24_1947.jsonl",
-   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 13 → 2 eventos"
+   "pointer_file": null,
+   "error": null
   },
   "bet365": {
    "ok": true,
-   "n_events": 44,
+   "n_events": 42,
    "n_markets": 1,
    "market_counts": {
-    "Escanteios": 44
+    "Escanteios": 42
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-07-24_1938.jsonl",
+   "pointer_file": "bet365_2026-07-24_2003.jsonl",
    "error": null
   },
   "betfast": {
-   "ok": true,
-   "n_events": 9,
+   "ok": false,
+   "n_events": 7,
    "n_markets": 2,
    "market_counts": {
     "Cartões": 6,
-    "Escanteios": 9
+    "Escanteios": 7
    },
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-07-24_1938.jsonl",
-   "error": null
+   "pointer_file": "betfast_2026-07-24_2014.jsonl",
+   "error": "promoção full bloqueada: mercado Escanteios caiu >65%: 23 → 7 eventos"
   }
  },
  "market_counts": {
-  "Cartões": 125,
+  "Cartões": 118,
   "Chutes no gol": 22,
   "Desarmes": 12,
-  "Escanteios": 425,
+  "Escanteios": 410,
   "Faltas": 17,
   "Finalizações": 20,
   "Impedimentos": 6,
@@ -135,19 +135,19 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-07-24T22:40:14Z",
-  "ts_brt": "2026-07-24 19:40",
+  "ts_utc": "2026-07-24T23:05:41Z",
+  "ts_brt": "2026-07-24 20:05",
   "n_events": 158,
   "n_fixtures": 158,
   "n_markets": 0,
   "min_events": 41,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_1038140139417f39937d.json",
-  "pointer_at": "2026-07-24T19:40:14-03:00",
+  "pointer_file": "_snapshots/sofa_d7a07e057100744a561b.json",
+  "pointer_at": "2026-07-24T20:05:41-03:00",
   "pointer_n": 158,
   "pointer_age_h": 0.0,
-  "duration_sec": 60.1,
+  "duration_sec": 62.3,
   "error": null,
   "error_class": null,
   "transport": {
