@@ -430,7 +430,8 @@ def main():
                      + load_normalized("EstrelaBet", "estrelabet") \
                      + load_normalized("Pinnacle", "pinnacle") \
                      + load_normalized("bet365", "bet365") \
-                     + load_normalized("Betfast", "betfast")
+                     + load_normalized("Betfast", "betfast") \
+                     + load_normalized("Sportingbet", "sportingbet")
     casas_ativas = sorted(set(e["casa"] for e in eventos))
     # SofaScore = base canônica de nomes/horários; casas encaixam por horário + fuzzy
     sofa_fx = load_sofa_fixtures()
@@ -709,7 +710,7 @@ def main():
           f" · skip 3-vias={n_skip_3way} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
     # transparência da captura (brief P0 §2.4): quem entrou e quem falhou nesta rodada
     # §11 — Betfast estava OMITIDA aqui (7 casas, não 6): passa a aparecer no painel/hist7
-    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365", "betfast": "Betfast"}
+    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365", "betfast": "Betfast", "sportingbet": "Sportingbet"}
     _stdir = ROOT / "data" / "odds" / "_status"
     if _stdir.exists():
         cap = {"casas_ok": [], "casas_fail": [], "casas_stale": []}

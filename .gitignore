@@ -9,3 +9,7 @@ __pycache__/
 *.bak_*
 proxy_config.json
 .env
+
+# _raw da captura de odds (histórico bruto pro projeto de chasing) — LOCAL only, nunca no repo.
+# Gerado só com ODDS_RAW=1; ~5 MB por rodada por casa.
+data/odds/_raw/

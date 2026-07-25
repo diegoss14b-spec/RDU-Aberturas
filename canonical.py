@@ -183,8 +183,24 @@ def n(s):
     return unidecode((s or "").lower())
 
 
+# código de PAÍS entre parênteses que a casa usa pra desambiguar homônimo entre países
+# ("CA Platense (ARG)" vs o Platense de Honduras). Lista EXPLÍCITA de propósito: uma regex
+# genérica de 3 letras comeria pedaço de nome legítimo. NÃO inclui marcador de gênero/reserva
+# — "(Feminino)", "(F)", "(W)", "(R)" seguem intactos, são o guard do flags_compatible.
+PAREN_COUNTRY = re.compile(
+    r"\((arg|bra|bre|uru|chi|chl|par|pry|per|bol|ecu|col|ven|mex|mx|usa|can|hon|crc|"
+    r"gua|pan|slv|nic|esp|por|ita|fra|ger|ale|eng|ing|ned|bel|sui|aut|pol|rus|tur|jpn|kor)\)"
+)
+
+
 def norm_team(name: str) -> str:
     s = n(name).strip()
+    # 24/07 (Sportingbet/Entain): tira o código de país entre parênteses ANTES do
+    # punctuation-strip — senão "(ARG)" virava o token solto "arg" e "CA Platense (ARG)"
+    # (=> "platense arg") não fundia com "Club Atlético Platense" (=> "atletico platense"),
+    # gerando card DUPLICADO na Mesa. O jogo já é casado por dia+kickoff, então o país é
+    # redundante pra identidade. Mesma família dos aliases "boca juniors arg"→"boca juniors".
+    s = PAREN_COUNTRY.sub(" ", s)
     # junta abreviações societárias PONTUADAS (F.C. → fc, U.D. → ud, A.B.C. → abc) ANTES
     # de qualquer coisa. Bug 23/07: o punctuation-strip deixava "f" e "c" soltos e o "f"
     # batia no guard de FEMININO (FLAG_TOKENS), então "Guayaquil City F.C." não fundia com
@@ -574,11 +590,42 @@ UNIFY_MIN = 90          # semelhança mínima do par (gscore) pra considerar mes
 UNIFY_KICK_TOL_MIN = int(os.environ.get("UNIFY_KICK_TOL_MIN", "75"))
 # marcadores de time B/feminino/reserva: se um lado tem e o outro não, NÃO junta
 FLAG_TOKENS = {"f", "fem", "w", "b", "ii", "r", "res", "sub", "jr",
-               "u17", "u19", "u20", "u21", "u23"}
+               "u17", "u19", "u20", "u21", "u23",
+               # 24/07: a Sportingbet escreve o gênero POR EXTENSO ("Cruzeiro (Feminino)")
+               # em vez do "(F)"/"(W)" das outras casas. Sem estes tokens o guard não via
+               # o marcador e "Cruzeiro (Feminino)" FUNDIA com o "Cruzeiro" masculino —
+               # jogo feminino e masculino no mesmo card. Bug pego antes de subir.
+               "feminino", "feminina", "femenino", "femenina", "women", "womens",
+               "masculino", "sub20", "sub17", "sub23", "reservas"}
+
+
+# Notações DIFERENTES do mesmo marcador precisam colapsar no MESMO símbolo, senão o
+# guard compara grafia em vez de significado: "Cruzeiro (Feminino)" (Sportingbet) e
+# "Cruzeiro (F)" (Betano) são o MESMO time e davam flags {feminino} vs {f} → não fundiam
+# → card duplicado do jogo feminino. Canonicalizado, os dois viram {f}. (24/07)
+FLAG_CANON = {
+    "feminino": "f", "feminina": "f", "femenino": "f", "femenina": "f",
+    "fem": "f", "w": "f", "women": "f", "womens": "f",
+    "res": "r", "reservas": "r", "ii": "b",
+    "sub20": "u20", "sub17": "u17", "sub23": "u23",
+    "masculino": None,          # marcador vazio: "X (Masculino)" == "X"
+}
+# LACUNA CONHECIDA (aceita): o canon iguala o SIGNIFICADO do marcador pro guard, mas a palavra
+# segue no nome, então o gscore ainda vê "racing reservas" × "racing r" como distintos. Só
+# importaria se alguma casa escrevesse "(Reservas)" por extenso — nenhuma escreve hoje
+# (a Sportingbet escreve gênero, e esse caso está coberto). Se aparecer, canonicalizar o token
+# DENTRO do nome também — mas aí revalidar os aliases "…w"→"…f", que dependem da grafia crua.
 
 
 def _flags(name):
-    return {t for t in (name or "").split() if t in FLAG_TOKENS}
+    out = set()
+    for t in (name or "").split():
+        if t not in FLAG_TOKENS:
+            continue
+        c = FLAG_CANON.get(t, t)
+        if c is not None:
+            out.add(c)
+    return out
 
 
 def _day_delta(a, b):
