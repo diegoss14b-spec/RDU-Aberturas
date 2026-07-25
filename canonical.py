@@ -90,6 +90,14 @@ ALIASES = {
     "sport huancayo": "huancayo",
     "instituto cordoba": "instituto de cordoba",
     "ks wieczysta krakow": "wieczysta krakow",
+    # 25/07: travou a Mesa por ~10h com "identidade impura sofa:16390346" — o gate viu
+    # "dynamo moscow x krylia sovetov" e "dynamo moscow x ks samara" como 2 partidas sob o
+    # mesmo id, mas é o MESMO jogo: Krylia Sovetov Samara, que uma casa abrevia "KS Samara".
+    # gscore cru = 26 (as duas grafias não têm token em comum), então só alias resolve.
+    "ks samara": "krylia sovetov",
+    "krylia sovetov samara": "krylia sovetov",
+    "krylya sovetov": "krylia sovetov",
+    "krylya sovetov samara": "krylia sovetov",
     "los angeles galaxy": "la galaxy",
     "lausanne": "lausanne sport",              # Stade Lausanne Ouchy não passa por aqui
     "los chankas": "los chankas cyc",
