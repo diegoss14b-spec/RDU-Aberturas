@@ -1,84 +1,66 @@
 {
- "ts_utc": "2026-07-27T00:19:40Z",
- "ts_brt": "2026-07-26 21:19",
+ "ts_utc": "2026-07-27T01:22:02Z",
+ "ts_brt": "2026-07-26 22:22",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
   "7k",
   "bet365",
-  "betfast",
-  "sportingbet"
+  "betfast"
  ],
  "casas_fail": [
   {
    "casa": "pinnacle",
    "error": "exit=2"
+  },
+  {
+   "casa": "sportingbet",
+   "error": "exit=2"
   }
  ],
- "n_ok": 7,
- "n_fail": 1,
- "total_events": 396,
+ "n_ok": 6,
+ "n_fail": 2,
+ "total_events": 3,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 60,
-   "n_markets": 6,
+   "n_events": 1,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 8,
-    "Chutes no gol": 4,
-    "Escanteios": 47,
-    "Faltas": 3,
-    "Finalizações": 4,
-    "Impedimentos": 3
+    "Escanteios": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-07-26_2109.jsonl",
+   "pointer_file": "betano_2026-07-26_2220.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 81,
-   "n_markets": 8,
+   "n_events": 1,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 26,
-    "Chutes no gol": 16,
-    "Escanteios": 80,
-    "Faltas": 7,
-    "Finalizações": 28,
-    "Impedimentos": 4,
-    "Laterais": 1,
-    "Tiros de meta": 1
+    "Escanteios": 1
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-07-26_2109.jsonl",
+   "pointer_file": "superbet_2026-07-26_2220.jsonl",
    "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 93,
-   "n_markets": 4,
-   "market_counts": {
-    "Cartões": 12,
-    "Chutes no gol": 2,
-    "Escanteios": 93,
-    "Finalizações": 2
-   },
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-07-26_2109.jsonl",
+   "pointer_file": null,
    "error": null
   },
   "7k": {
    "ok": true,
-   "n_events": 91,
-   "n_markets": 3,
-   "market_counts": {
-    "Cartões": 18,
-    "Escanteios": 91,
-    "Faltas": 3
-   },
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "7k_2026-07-26_2109.jsonl",
+   "pointer_file": null,
    "error": null
   },
   "pinnacle": {
@@ -92,67 +74,54 @@
   },
   "bet365": {
    "ok": true,
-   "n_events": 49,
-   "n_markets": 2,
+   "n_events": 1,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 7,
-    "Escanteios": 49
+    "Escanteios": 1
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-07-26_2109.jsonl",
+   "pointer_file": "bet365_2026-07-26_2220.jsonl",
    "error": null
   },
   "betfast": {
    "ok": true,
-   "n_events": 9,
-   "n_markets": 2,
-   "market_counts": {
-    "Cartões": 2,
-    "Escanteios": 9
-   },
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-07-26_2109.jsonl",
+   "pointer_file": null,
    "error": null
   },
   "sportingbet": {
-   "ok": true,
-   "n_events": 13,
-   "n_markets": 1,
-   "market_counts": {
-    "Escanteios": 13
-   },
+   "ok": false,
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-07-26_2110.jsonl",
+   "pointer_file": null,
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 73,
-  "Chutes no gol": 22,
-  "Escanteios": 382,
-  "Faltas": 13,
-  "Finalizações": 34,
-  "Impedimentos": 7,
-  "Laterais": 1,
-  "Tiros de meta": 1
+  "Escanteios": 3
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-07-27T00:11:27Z",
-  "ts_brt": "2026-07-26 21:11",
-  "n_events": 147,
-  "n_fixtures": 147,
+  "ts_utc": "2026-07-27T01:21:34Z",
+  "ts_brt": "2026-07-26 22:21",
+  "n_events": 148,
+  "n_fixtures": 148,
   "n_markets": 0,
   "min_events": 37,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_6aece57fd1243470ba93.json",
-  "pointer_at": "2026-07-26T21:11:27-03:00",
-  "pointer_n": 147,
+  "pointer_file": "_snapshots/sofa_ee53c7f084b53f9852d7.json",
+  "pointer_at": "2026-07-26T22:21:34-03:00",
+  "pointer_n": 148,
   "pointer_age_h": 0.0,
-  "duration_sec": 64.9,
+  "duration_sec": 63.6,
   "error": null,
   "error_class": null,
   "transport": {
@@ -174,5 +143,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "full"
+ "mode": "close"
 }
