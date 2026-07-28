@@ -111,6 +111,104 @@ def test_find_result_prefers_row_with_requested_stat():
     assert find_result([auto, manual], "2026-07-17", "time alpha", "time beta", "corners") is manual
 
 
+def test_find_result_matches_next_day_and_marks_offset():
+    """Feed em UTC × aposta em BRT: jogo noturno cai no dia seguinte (28/07: 84 jogos)."""
+    key = "betano|2026-07-17|time alpha|time beta|Escanteios|9.5|over"
+    item = record()
+    now = datetime(2026, 7, 19, 12, 0, tzinfo=BRT)
+    outcome, _, clv = settle_one(key, item, [result_row(date="2026-07-18", corners=11)], now)
+    assert outcome == "settled" and item["result"] == 11
+    assert item["settlement_date_offset"] == 1
+    assert clv["date_offset"] == 1
+
+
+def test_find_result_exact_day_wins_and_leaves_no_offset():
+    """A data exata tem prioridade absoluta — o vizinho só entra quando ela falta."""
+    exato = result_row(corners=11)
+    vizinho = result_row(date="2026-07-18", corners=99)
+    assert find_result([vizinho, exato], "2026-07-17", "time alpha", "time beta", "corners") is exato
+
+    key = "betano|2026-07-17|time alpha|time beta|Escanteios|9.5|over"
+    item = record()
+    item["settlement_date_offset"] = 1  # resíduo de uma liquidação anterior
+    settle_one(key, item, [vizinho, exato], datetime(2026, 7, 19, 12, 0, tzinfo=BRT))
+    assert item["result"] == 11
+    assert "settlement_date_offset" not in item
+
+
+def test_find_result_rejects_two_day_gap():
+    """A janela é de UM dia: dois dias já seria outro jogo."""
+    assert find_result([result_row(date="2026-07-19", corners=11)],
+                       "2026-07-17", "time alpha", "time beta", "corners") is None
+
+
+def test_find_result_refuses_sub21_against_professional():
+    """token_set_ratio dá 100 para superconjunto: 'x sub 21' não pode casar com 'x'."""
+    pro = result_row(date="2026-07-18", corners=11)
+    assert find_result([pro], "2026-07-17", "time alpha sub 21", "time beta sub 21",
+                       "corners") is None
+    assert find_result([pro], "2026-07-17", "time alpha u21", "time beta u21",
+                       "corners") is None
+    # e o jogo do sub-21, quando existe no feed, casa com ele mesmo
+    sub = result_row(date="2026-07-18", home="Time Alpha Sub 21", away="Time Beta Sub 21",
+                     corners=4)
+    sub["_h"], sub["_a"] = "time alpha sub 21", "time beta sub 21"
+    assert find_result([pro, sub], "2026-07-17", "time alpha sub 21", "time beta sub 21",
+                       "corners") is sub
+
+
+def test_find_result_tiebreak_is_deterministic():
+    """Feed duplica jogo por variante de nome; a escolha não pode depender da ordem."""
+    a = result_row(date="2026-07-18", home="AAA Time Alpha", corners=11)
+    b = result_row(date="2026-07-18", home="Time Alpha", corners=11)
+    escolha = find_result([a, b], "2026-07-17", "time alpha", "time beta", "corners")
+    assert escolha is a  # menor (date, home, away)
+    assert find_result([b, a], "2026-07-17", "time alpha", "time beta", "corners") is a
+
+
+def outros_jogos(date, n=20):
+    """Feed com n jogos naquele dia, nenhum deles o da aposta."""
+    rows = []
+    for i in range(n):
+        row = result_row(date=date, home=f"Casa {i}", away=f"Fora {i}", corners=9)
+        row["_h"], row["_a"] = f"casa {i}", f"fora {i}"
+        rows.append(row)
+    return rows
+
+
+def test_old_game_out_of_coverage_leaves_backlog_but_keeps_retry():
+    """Liga fora do universo do RDU: sai do pendente, mas NUNCA vira perda definitiva."""
+    key = "betano|2026-06-01|time alpha|time beta|Escanteios|9.5|over"
+    item = record()
+    item["kickoff"] = "2026-06-01T19:00:00-03:00"
+    now = datetime(2026, 7, 20, 12, 0, tzinfo=BRT)
+    outcome, changed, _ = settle_one(key, item, outros_jogos("2026-06-01"), now)
+    assert outcome == "sem_fonte" and changed is True
+    assert item["status"] == "unavailable"
+    assert item["settlement_reason"] == "no_result_source"
+    assert item["settlement_retryable"] is True
+
+    # se o feed ganhar o jogo, liquida na tentativa seguinte
+    tarde = result_row(date="2026-06-01", corners=11)
+    outcome, _, _ = settle_one(key, item, [tarde], now)
+    assert outcome == "settled" and item["result"] == 11
+
+
+def test_recent_game_or_uncovered_day_stays_pending():
+    """Atraso de publicação não pode ser confundido com liga sem fonte."""
+    key = "betano|2026-07-17|time alpha|time beta|Escanteios|9.5|over"
+    now = datetime(2026, 7, 20, 12, 0, tzinfo=BRT)
+    recente = record()
+    outcome, _, _ = settle_one(key, recente, outros_jogos("2026-07-17"), now)
+    assert outcome == "pending" and recente["settlement_reason"] == "game_not_in_results"
+
+    antigo = record()
+    antigo["kickoff"] = "2026-06-01T19:00:00-03:00"
+    key_antigo = "betano|2026-06-01|time alpha|time beta|Escanteios|9.5|over"
+    outcome, _, _ = settle_one(key_antigo, antigo, outros_jogos("2026-06-01", n=3), now)
+    assert outcome == "pending" and antigo["settlement_reason"] == "game_not_in_results"
+
+
 def test_backlog_observable_by_market_and_age():
     now = datetime(2026, 7, 20, 19, 0, tzinfo=BRT)
     key = "betano|2026-07-17|time alpha|time beta|Escanteios|9.5|over"

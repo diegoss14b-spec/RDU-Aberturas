@@ -3,7 +3,13 @@
 
 Resultados ausentes ou uma estatística ainda não publicada nunca viram um
 estado terminal: ficam em ``pending_result`` e são tentados novamente em toda
-execução. ``unavailable`` é reservado a mercados realmente sem mapeamento.
+execução.
+
+``unavailable`` tem dois usos, e só um é terminal:
+- ``unsupported_market`` — mercado sem mapeamento (``settlement_retryable`` False);
+- ``no_result_source`` — jogo velho de liga fora da cobertura do feed. Sai do
+  ``pending_result`` para o painel não mentir sobre o backlog acionável, mas
+  CONTINUA retryable (cadência semanal): se a fonte um dia cobrir, liquida sozinho.
 """
 from __future__ import annotations
 
@@ -33,7 +39,7 @@ except Exception:
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-from canonical import norm_team, parse_history_key  # noqa: E402
+from canonical import flags_compatible, norm_team, parse_history_key  # noqa: E402
 from history_merge import atomic_write_text, merge_records  # noqa: E402
 from history_quality import parse_iso_flex  # noqa: E402  (parser único §10)
 
@@ -57,6 +63,24 @@ FIELD = {
 RETRYABLE_STATUSES = {"closed", "pending_result"}
 PENDING_STATUS = "pending_result"
 RETRY_AUDIT_INTERVAL = timedelta(hours=6)
+# Jogo VELHO cuja data o feed já publicou em volume não está esperando publicação: é
+# liga fora do universo do RDU (Bulgária, Coreia, Finlândia, Islândia, reservas/sub-20)
+# — 34.660 apostas de 2.206 jogos em 28/07, 64% do backlog, que nunca vão liquidar e
+# inflam o "pendente" para sempre. Sai de ``pending_result`` para o painel mostrar o
+# backlog acionável de verdade, mas continua RETRYABLE: se o feed um dia cobrir a liga,
+# liquida sozinho. Só a cadência cai para semanal, porque cada auditoria reescreve (e
+# commita) um JSON de 83 MB. Nada é apagado — odd, CLV e histórico ficam intactos.
+SEM_FONTE_STATUS = "unavailable"
+SEM_FONTE_REASON = "no_result_source"
+SEM_FONTE_DIAS = 14        # folga enorme sobre o atraso real do feed (~1 ciclo, horas)
+SEM_FONTE_MIN_JOGOS = 20   # jogos do feed na janela = prova de que aquele dia saiu
+SEM_FONTE_INTERVAL = timedelta(days=7)
+# Tolerância de dia no casamento aposta×resultado. A aposta guarda
+# ``game_date = kickoff[:10]`` em BRT e o feed guarda a data do ``matches.json``,
+# que é a data UTC da Sofa: jogo noturno nas Américas cai no dia seguinte em UTC.
+# Medido em 28/07: 84 jogos / 11.994 apostas (22% do backlog) travados por 1 dia,
+# TODOS com deslocamento +1. Ver ``find_result`` para as travas de identidade.
+JANELA_DIAS = 1
 
 
 def nrm(value):
@@ -107,21 +131,90 @@ def load_results():
     return out
 
 
+def _dia(value):
+    """``'YYYY-MM-DD…'`` -> ``date``; ``None`` se não for data ISO."""
+    try:
+        return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def _janela_datas(date_str):
+    """Datas aceitas no casamento: a exata mais ±``JANELA_DIAS``.
+
+    Fail-closed: data que não parseia devolve só ela mesma (casamento exato, o
+    comportamento antigo) — nunca uma janela maior do que a pedida.
+    """
+    base = _dia(date_str)
+    if base is None:
+        return {date_str}
+    return {
+        (base + timedelta(days=off)).isoformat()
+        for off in range(-JANELA_DIAS, JANELA_DIAS + 1)
+    }
+
+
+def _offset_dias(row_date, game_date):
+    """Dias entre o registro do feed e a data da aposta (0 = casou na data exata)."""
+    feed, bet = _dia(row_date), _dia(game_date)
+    if feed is None or bet is None:
+        return None
+    return (feed - bet).days
+
+
 def find_result(results, date, home, away, field=None):
-    """Melhor jogo na data; com estatística disponível, manual precede auto."""
+    """Melhor jogo na janela de ±1 dia; data exata vence, depois estatística
+    disponível, e manual precede auto.
+
+    PORQUÊ da janela (28/07): a data da aposta é BRT e a do feed é UTC (§ JANELA_DIAS)
+    — exigir igualdade deixava 11.994 apostas de 84 jogos sem liquidar para sempre
+    (Internacional×Cruzeiro, São Paulo×Athletico, MLS inteira).
+
+    As travas de identidade continuam as MESMAS — par ORDENADO por mando e fuzzy ≥85
+    nos DOIS times — mais o guard de marcador (sub-XX/feminino/time B) que a prova de
+    28/07 mostrou faltar. Medido no feed inteiro (1.442 jogos): nenhum par de times — nem
+    por igualdade, nem por fuzzy ≥85 — aparece em dias consecutivos, ou seja, o
+    vizinho nunca é "outro jogo dos mesmos times". Das 2.412 janelas do backlog só 3
+    ficam com mais de um candidato, e nas 3 é o MESMO jogo duplicado por variante de
+    nome no feed ('Universidad Católica' × 'Universidad Católica (CHI)'), com as 9
+    estatísticas idênticas. Ainda assim o desempate final é por ``(date, home, away)``
+    do registro, para a escolha ser DETERMINÍSTICA e não depender da ordem do arquivo.
+    """
+    janela = _janela_datas(date)
     candidates = []
     for row in results:
-        if row.get("date") != date:
+        row_date = row.get("date")
+        if row_date not in janela:
+            continue
+        # Guard de sub-XX/feminino/time B: o token_set_ratio dá 100 quando um nome é
+        # SUPERCONJUNTO do outro, então 'cruz azul sub 21' × 'cruz azul' pontuava 100/100
+        # e a aposta do sub-21 liquidava com a estatística do jogo profissional — 12
+        # apostas em 5 confrontos na medição de 28/07 (Cruz Azul/Puebla, Toluca/Pumas,
+        # Pachuca/Querétaro). É o mesmo guard que a Mesa e o bot de chasing usam.
+        if not flags_compatible(home, away, row.get("_h") or "", row.get("_a") or ""):
             continue
         score = min(ratio(home, row.get("_h") or ""), ratio(away, row.get("_a") or ""))
         if score >= 85:
+            exact_day = row_date == date
             has_field = row.get(field) is not None if field else False
             is_manual = row.get("_source") == "manual"
-            candidates.append((has_field, is_manual, score, row))
+            candidates.append((exact_day, has_field, is_manual, score, row))
     if not candidates:
         return None
-    candidates.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
-    return candidates[0][3]
+    # Ordem crescente com as prioridades negadas: data exata > tem a stat > manual >
+    # score. O rabo (date, home, away) é só desempate determinístico.
+    candidates.sort(
+        key=lambda item: (
+            -int(item[0]),
+            -int(item[1]),
+            -int(item[2]),
+            -item[3],
+            str(item[4].get("date") or ""),
+            str(item[4].get("home") or ""),
+            str(item[4].get("away") or ""),
+        )
+    )
+    return candidates[0][4]
 
 
 def consolidate_key_documents(documents):
@@ -167,16 +260,38 @@ def _parse_dt(value):
     return parsed.astimezone(BRT) if parsed is not None else None
 
 
-def _mark_pending(record, reason, now):
+def cobertura_por_dia(results):
+    """Quantos jogos o feed publicou em cada data — prova de que o dia saiu."""
+    por_dia = Counter()
+    for row in results:
+        dia = row.get("date")
+        if dia:
+            por_dia[dia] += 1
+    return por_dia
+
+
+def _sem_fonte(game_date, cobertura, now):
+    """Jogo velho + dia bem coberto pelo feed = liga fora do universo do RDU.
+
+    Fail-closed nos dois lados: data ilegível ou dia pouco coberto continua em
+    ``pending_result`` (o caro é rotular de "sem fonte" um jogo que só atrasou).
+    """
+    dia = _dia(game_date)
+    if dia is None or (now.date() - dia).days < SEM_FONTE_DIAS:
+        return False
+    return sum(cobertura.get(d, 0) for d in _janela_datas(game_date)) >= SEM_FONTE_MIN_JOGOS
+
+
+def _mark_pending(record, reason, now, status=PENDING_STATUS, interval=RETRY_AUDIT_INTERVAL):
     changed = (
-        record.get("status") != PENDING_STATUS
+        record.get("status") != status
         or record.get("settlement_reason") != reason
         or record.get("settlement_retryable") is not True
     )
     last_attempt = _parse_dt(record.get("settlement_last_attempt"))
-    audit_due = last_attempt is None or now - last_attempt >= RETRY_AUDIT_INTERVAL
+    audit_due = last_attempt is None or now - last_attempt >= interval
     if changed or audit_due:
-        record["status"] = PENDING_STATUS
+        record["status"] = status
         record["result"] = None
         record["won"] = None
         record["settlement_reason"] = reason
@@ -187,8 +302,12 @@ def _mark_pending(record, reason, now):
     return False
 
 
-def settle_one(key, record, results, now):
-    """Tenta liquidar uma key. Retorna ``(outcome, changed, clv_row)``."""
+def settle_one(key, record, results, now, cobertura=None):
+    """Tenta liquidar uma key. Retorna ``(outcome, changed, clv_row)``.
+
+    ``cobertura`` é o mapa data->nº de jogos do feed (``cobertura_por_dia``); vem
+    pronto do ``main`` para não recontar 1.442 linhas em cada uma das 90 mil keys.
+    """
     meta = parse_history_key(key)
     market = meta.get("mercado")
     field = FIELD.get(market)
@@ -214,6 +333,12 @@ def settle_one(key, record, results, now):
     away = record.get("away_norm") or nrm(record.get("away_raw") or meta.get("an") or "")
     result_row = find_result(results, game_date, home, away, field=field)
     if result_row is None:
+        if cobertura is None:
+            cobertura = cobertura_por_dia(results)
+        if _sem_fonte(game_date, cobertura, now):
+            changed = _mark_pending(record, SEM_FONTE_REASON, now,
+                                    status=SEM_FONTE_STATUS, interval=SEM_FONTE_INTERVAL)
+            return "sem_fonte", changed, None
         changed = _mark_pending(record, "game_not_in_results", now)
         return "pending", changed, None
 
@@ -221,6 +346,17 @@ def settle_one(key, record, results, now):
     if result is None:
         changed = _mark_pending(record, f"stat_missing:{field}", now)
         return "pending", changed, None
+
+    # Origem do casamento, para a auditoria separar o que veio da tolerância de dia.
+    # Só grava quando HOUVE deslocamento — ausência do campo significa data exata.
+    # (o keys/*.json tem 83 MB e é commitado ~19x/dia; não vale inflar 30 mil
+    # registros para dizer "0"). O pop mantém idempotência se a key for re-liquidada
+    # com o feed já corrigido.
+    date_offset = _offset_dias(result_row.get("date"), game_date)
+    if date_offset:
+        record["settlement_date_offset"] = date_offset
+    else:
+        record.pop("settlement_date_offset", None)
 
     side = meta.get("lado") or "over"
     record["result"] = result
@@ -255,6 +391,8 @@ def settle_one(key, record, results, now):
         "won": record.get("won"),
         "kickoff": record.get("kickoff") or game_date,
         "sofa_id": record.get("sofa_id"),
+        # 0 = casou na data exata; ±1 = veio da janela BRT×UTC (§ JANELA_DIAS)
+        "date_offset": date_offset or 0,
     }
     return "settled", True, clv_row
 
@@ -290,6 +428,9 @@ def build_settlement_status(records, results, now):
     )
     backlog_age, backlog_reasons = Counter(), Counter()
     backlog_samples = []
+    # Quantas liquidações vieram da janela de ±1 dia (§ JANELA_DIAS) — se um dia a
+    # origem do feed passar a emitir data BRT, isso cai para 0 sozinho e a auditoria vê.
+    settled_offsets = Counter()
 
     for key, record in records:
         meta = parse_history_key(key)
@@ -299,6 +440,8 @@ def build_settlement_status(records, results, now):
         market_row = by_market[market]
         market_row["total"] += 1
         market_row["status"][status] += 1
+        if status == "settled":
+            settled_offsets[int(record.get("settlement_date_offset") or 0)] += 1
         if status == PENDING_STATUS:
             bucket, age_days = _age_bucket(record.get("kickoff"), now)
             reason = record.get("settlement_reason") or "unknown"
@@ -339,6 +482,7 @@ def build_settlement_status(records, results, now):
         "results_rows": len(results),
         "result_field_coverage": coverage,
         "totals_by_status": dict(total_status),
+        "settled_date_offsets": {str(off): n for off, n in sorted(settled_offsets.items())},
         "by_market": {
             market: plain_market(row) for market, row in sorted(by_market.items())
         },
@@ -378,6 +522,7 @@ def main():
     paths = [Path(name) for name in sorted(glob.glob(str(HIST / "keys" / "*.json")))]
     documents = [(path, json.loads(path.read_text(encoding="utf-8"))) for path in paths]
     merged, owners, duplicates = consolidate_key_documents(documents)
+    cobertura = cobertura_por_dia(results)
 
     for key, record in merged.items():
         current_status = record.get("status")
@@ -385,7 +530,9 @@ def main():
             current_status == "unavailable" and record.get("settlement_retryable") is not False
         )
         if retryable:
-            outcome, _record_changed, clv_row = settle_one(key, record, results, now)
+            outcome, _record_changed, clv_row = settle_one(
+                key, record, results, now, cobertura=cobertura
+            )
             outcomes[outcome] += 1
             if clv_row:
                 clv_rows.append(clv_row)
@@ -399,7 +546,8 @@ def main():
     atomic_write_text(RES_STATUS, json.dumps(status, ensure_ascii=False, indent=2))
     print(
         f"[settle] {outcomes['settled']:,} liquidadas · "
-        f"{outcomes['pending']:,} em retry · {outcomes['unavailable']:,} sem mapeamento"
+        f"{outcomes['pending']:,} em retry · {outcomes['unavailable']:,} sem mapeamento · "
+        f"{outcomes['sem_fonte']:,} fora da cobertura do feed (retry semanal)"
     )
     _age_unknown = (status.get("backlog") or {}).get("age_unknown", 0)
     if _age_unknown:
