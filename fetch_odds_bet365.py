@@ -182,6 +182,48 @@ def _collect(lines, odds_list):
         slot.setdefault(side, round(price, 2))
 
 
+# ------------------------------------------------- HANDICAP (2 vias, casa/fora)
+# Pedido do Diego (29/07): acompanhar a movimentação do handicap ASIÁTICO de
+# cartões da bet365. O mercado `asian_handicap_cards` existe em 100% dos jogos
+# que têm cartões na casa (medido 29/07: 11 de 11) e abre 33-36h antes do
+# kickoff — mais cedo que a Pinnacle, que só abre no dia (mediana 13,9h).
+#
+# ⚠ O formato NÃO é over/under: vem `header` '1' (mandante) / '2' (visitante) e
+# cada lado traz o PRÓPRIO handicap, espelhado ('+0.5' e '-0.5'). Pra ter uma
+# chave estável no banco de odds, a `linha` gravada é SEMPRE do ponto de vista
+# do MANDANTE — o lado '2' entra com o sinal invertido. Sem isso o mesmo
+# mercado viraria duas linhas diferentes e o gráfico mostraria duas séries
+# soltas em vez de um par.
+_HAND_NUM = re.compile(r"^[+-]?\d+(?:\.\d+)?$")
+
+
+def _hand_line(txt):
+    """'+0.5' → 0.5 · '-1.0' → -1.0 · '0.0' → 0.0. Quartada ('0.0,+0.5') = None."""
+    t = str(txt or "").strip()
+    if "," in t or not _HAND_NUM.match(t):
+        return None
+    return _num(t)
+
+
+def _collect_hand(lines, odds_list):
+    """Acumula handicap em lines[L] = {'casa','fora'}, L do ponto de vista do mandante."""
+    for o in odds_list or []:
+        header = str(o.get("header") or "").strip()
+        lado = "casa" if header == "1" else ("fora" if header == "2" else None)
+        if not lado:
+            continue
+        L = _hand_line(o.get("handicap") if o.get("handicap") is not None else o.get("name"))
+        price = _num(o.get("odds"))
+        if L is None or not price or price <= 1:
+            continue
+        if lado == "fora":
+            L = -L                      # espelha pro ponto de vista do mandante
+        # -0.0 e 0.0 são a MESMA linha (DNB). Sem isto viram duas chaves no
+        # banco e o par nunca fecha — o lado 'fora' de +0.0 vira -0.0.
+        L = L + 0.0 if L else 0.0
+        lines.setdefault(L, {}).setdefault(lado, round(price, 2))
+
+
 def _collect_team(per_team, odds_list, home, away):
     """Mercados por time: header '1'(casa)/'2'(fora) + handicap 'Over 5.5'."""
     for o in odds_list or []:
@@ -237,6 +279,14 @@ MATCH_MARKETS = {
     "asian_total_tackles": "Desarmes",
     "number_of_tackles_in_match": "Desarmes",
 }
+# mercado de HANDICAP (2 vias casa/fora) → canon próprio. Fica FORA do board de
+# propósito: o board e o modelo de valor são over/under de ponta a ponta, e o
+# handicap precisa de μ por TIME, que o modelo de cartões não publica (só o
+# total do jogo). Este canon só alimenta o banco de odds e o gráfico de
+# movimento — que é exatamente o que foi pedido.
+HAND_MARKETS = {
+    "asian_handicap_cards": "Handicap de Cartões",
+}
 # mercado → canon, por TIME (header '1'/'2' + handicap 'Over 11.5')
 TEAM_MARKETS = {
     "team_cards": "Cartões",
@@ -270,9 +320,16 @@ _HALF_LINE = re.compile(r"^\d+\.5$")   # linha O/U meio-inteira (2.5, 5.5, 20.5�
 # (21/07): são exatamente os mercados que "têm cara de total" mas são gols/faixa/
 # meio-tempo/timing/handicap/corrida. NENHUM contém offside/tackle/card/shot/foul —
 # então uma variante nova DESSES stats sempre cai FORA daqui e é logada.
+# ⚠ `handicap` SAIU desta lista em 29/07, e o motivo é um buraco real: a rede de
+# segurança existe pra nunca perder mercado de estatística por nomenclatura nova,
+# mas ela filtrava tudo que tivesse "handicap" no nome — então
+# `asian_handicap_cards`, o mercado que o Diego pediu, era descartado do PRÓPRIO
+# detector e nunca apareceu no jsonl de desconhecidos (o arquivo nem existia).
+# Tirar a palavra não gera ruído: `_looks_ou_total` exige headers Over E Under, e
+# handicap vem com header '1'/'2' — os de gols continuam não sendo logados.
 KNOWN_TOTAL_EXCL = re.compile(
     r"goal|corner|1st_half|2nd_half|half_time|_half\b|_minutes|_brackets|"
-    r"race|handicap|both_teams|_range$|range_|exact|odd_even|winning_margin|"
+    r"race|both_teams|_range$|range_|exact|odd_even|winning_margin|"
     r"correct_score|to_score|time_of", re.I)
 _unknown_seen = None   # set 'YYYY-MM-DD|market_key' já logados (dedup: 1x por key por dia)
 
@@ -299,7 +356,7 @@ def _detect_unknown_total(mk, mv, gid, jogo):
     """Loga um mercado com cara de O/U-de-total que NÃO é mapeado, NÃO é player e NÃO
     é ruído conhecido. Dedup por (dia, market_key). Barato, não muda o board."""
     global _unknown_seen
-    if mk in MATCH_MARKETS or mk in TEAM_MARKETS:
+    if mk in MATCH_MARKETS or mk in TEAM_MARKETS or mk in HAND_MARKETS:
         return
     if _is_player_market(mk):
         return
@@ -358,7 +415,7 @@ def parse_prematch(res, home, away, gid=None, jogo=None):
     """results[0] do /v3/bet365/prematch → (mercados, mercados_time).
     Varre seções-dicionário E a lista `others`; jogador nunca entra. Mercado não
     mapeado com cara de O/U-de-total vai pro detector (rede de segurança)."""
-    merc, merc_t_raw = {}, {}
+    merc, merc_t_raw, merc_h = {}, {}, {}
     for mk, mv in _iter_sp(res):
         if _is_player_market(mk):
             continue
@@ -368,6 +425,10 @@ def parse_prematch(res, home, away, gid=None, jogo=None):
         canon = MATCH_MARKETS.get(mk)
         if canon:
             _collect(merc.setdefault(canon, {}), odds)
+            continue
+        canon_h = HAND_MARKETS.get(mk)
+        if canon_h:
+            _collect_hand(merc_h.setdefault(canon_h, {}), odds)
             continue
         canon_t = TEAM_MARKETS.get(mk)
         if canon_t:
@@ -379,6 +440,13 @@ def parse_prematch(res, home, away, gid=None, jogo=None):
     for canon, lines in merc.items():
         arr = [{"linha": L, "over": v["over"], "under": v["under"]}
                for L, v in sorted(lines.items()) if "over" in v and "under" in v]
+        if arr:
+            out[canon] = arr
+    # handicap entra no MESMO dict `mercados` (o ingest lê por lado presente),
+    # mas só com o PAR completo — meia perna não é mercado e não dá pra de-vigar
+    for canon, lines in merc_h.items():
+        arr = [{"linha": L, "casa": v["casa"], "fora": v["fora"]}
+               for L, v in sorted(lines.items()) if "casa" in v and "fora" in v]
         if arr:
             out[canon] = arr
     merc_t = {}

@@ -358,7 +358,25 @@ def settle_one(key, record, results, now, cobertura=None):
     else:
         record.pop("settlement_date_offset", None)
 
+    # ⚠ FAIL-CLOSED DO LADO (29/07). A linha era `side = meta.get("lado") or "over"`
+    # e logo abaixo `won = over_won if side == "over" else not over_won` — ou seja,
+    # QUALQUER lado que não fosse "over" era liquidado como se fosse "under". Com a
+    # entrada do handicap de cartões (lados `casa`/`fora`, 29/07) isso liquidaria a
+    # perna do MANDANTE como "menos cartões no jogo": errado em silêncio, e o erro
+    # iria direto pro CLV. Hoje o handicap nem chega aqui (não está no FIELD e cai
+    # em `unsupported_market` lá em cima), mas isto é a trava pra quando alguém
+    # mapear o mercado sem lembrar que o desempate dele é OUTRO.
     side = meta.get("lado") or "over"
+    if side not in ("over", "under"):
+        changed = record.get("status") != "unavailable"
+        record["status"] = "unavailable"
+        record["result"] = None
+        record["won"] = None
+        record["settlement_reason"] = "unsupported_side:%s" % side
+        record["settlement_retryable"] = False
+        record["settlement_last_attempt"] = now.isoformat()
+        record["settlement_attempts"] = int(record.get("settlement_attempts") or 0) + 1
+        return "unavailable", changed, None
     record["result"] = result
     if abs(result - line) < 1e-9:
         record["won"] = None

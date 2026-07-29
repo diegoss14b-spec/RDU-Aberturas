@@ -26,6 +26,15 @@ from migrate_history_keys import unify_keys_dict
 OUT = ROOT / "valor" / "data" / "moves.js"
 BOARD_M = {"Cart\u00f5es", "Faltas", "Finaliza\u00e7\u00f5es", "Impedimentos", "Laterais", "Tiros de meta",
            "Escanteios", "Chutes no gol", "Desarmes"}
+# \u26a0 "Handicap de Cart\u00f5es" (bet365 + Pinnacle, captura desde 29/07) fica FORA
+# desta lista DE PROP\u00d3SITO, por enquanto. O explorador desenha o total impl\u00edcito
+# (\u03bc) a partir do par Mais/Menos \u2014 matem\u00e1tica que n\u00e3o existe pra um mercado de 2
+# vias com MANDO \u2014 e o `impliedSeries` do history.js descarta lado != over/under.
+# P\u00f4r aqui agora s\u00f3 engordaria o moves.js (10 MB, lazy) com s\u00e9rie que a tela n\u00e3o
+# alcan\u00e7a. E n\u00e3o custa nada esperar: este arquivo \u00e9 RECONSTRU\u00cdDO do zero a cada
+# run, lendo todos os ticks/*.jsonl \u2014 quando o gr\u00e1fico de handicap existir, basta
+# somar a chave aqui que o hist\u00f3rico inteiro aparece retroativo. O que N\u00c3O d\u00e1 pra
+# recuperar depois \u00e9 a captura, e essa j\u00e1 est\u00e1 ligada.
 
 
 def parsed(value):

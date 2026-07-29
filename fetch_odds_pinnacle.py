@@ -122,9 +122,9 @@ def _strip_unit_suffix(name, unit=None):
 
 
 def parse_markets(mkts, period=0):
-    """Extrai O/U jogo + team totals do period (0=FT).
-    -> (match_lines[{linha,over,under}], home_lines, away_lines)"""
-    match, home, away = {}, {}, {}
+    """Extrai O/U jogo + team totals + handicap do period (0=FT).
+    -> (match_lines[{linha,over,under}], home_lines, away_lines, hand_lines)"""
+    match, home, away, hand = {}, {}, {}, {}
     for m in mkts or []:
         if m.get("status") != "open":
             continue
@@ -135,7 +135,36 @@ def parse_markets(mkts, period=0):
         if per != period:
             continue
         typ = (m.get("type") or "").lower()
-        # só totais (ignora moneyline/spread de "mais cartões")
+        # HANDICAP (`spread`): entrou em 29/07 pra dar uma segunda casa ao gráfico
+        # de movimento do handicap de cartões. Vem no MESMO payload que já era
+        # baixado — custa 0 request. Como o resto do arquivo é over/under, sai
+        # por um caminho próprio e não encosta no `match`.
+        if typ == "spread":
+            over_ = under_ = None       # aqui: casa/fora
+            line_ = None
+            for p in m.get("prices") or []:
+                des = (p.get("designation") or "").lower()
+                dec = am_to_dec(p.get("price"))
+                if dec is None or dec <= 1 or des not in ("home", "away"):
+                    continue
+                try:
+                    pts = float(p["points"])
+                except (TypeError, ValueError, KeyError):
+                    continue
+                # linha SEMPRE do ponto de vista do mandante (igual bet365)
+                pts_home = pts if des == "home" else -pts
+                if line_ is None:
+                    line_ = pts_home + 0.0 if pts_home else 0.0
+                elif abs(line_ - pts_home) > 1e-9:
+                    continue            # perna de outra linha da escada
+                if des == "home":
+                    over_ = dec
+                else:
+                    under_ = dec
+            if line_ is not None and over_ and under_:
+                hand[line_] = {"linha": line_, "casa": over_, "fora": under_}
+            continue
+        # só totais (ignora moneyline de "mais cartões")
         if typ not in ("total", "team_total"):
             continue
         prices = m.get("prices") or []
@@ -175,7 +204,7 @@ def parse_markets(mkts, period=0):
     def _arr(d):
         return [d[L] for L in sorted(d)]
 
-    return _arr(match), _arr(home), _arr(away)
+    return _arr(match), _arr(home), _arr(away), _arr(hand)
 
 
 def main():
@@ -266,8 +295,8 @@ def main():
         time.sleep(random.uniform(0.12, 0.28))
         if not mkts:
             continue
-        match_lines, home_lines, away_lines = parse_markets(mkts, period=0)
-        if not match_lines and not home_lines and not away_lines:
+        match_lines, home_lines, away_lines, hand_lines = parse_markets(mkts, period=0)
+        if not match_lines and not home_lines and not away_lines and not hand_lines:
             continue
         n_fetch_ok += 1
 
@@ -298,6 +327,10 @@ def main():
         rec["units_seen"].append(units)
         if match_lines:
             rec["mercados"][canon] = match_lines
+        # handicap só de CARTÕES por ora — é o que foi pedido, e escanteios
+        # abriria uma família nova sem ninguém olhando pra ela
+        if hand_lines and canon == "Cartões":
+            rec["mercados"]["Handicap de Cartões"] = hand_lines
         if home_lines or away_lines:
             merc_t = rec.setdefault("mercados_time", {})
             by_team = merc_t.setdefault(canon, {})

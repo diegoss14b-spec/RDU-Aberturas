@@ -241,7 +241,13 @@ def main():
                     linha = l.get("linha")
                     if linha is None:
                         continue
-                    for lado, odd in (("over", l.get("over")), ("under", l.get("under"))):
+                    # over/under é o caso de sempre; casa/fora entrou em 29/07
+                    # com o handicap de cartões (2 vias com MANDO, não com
+                    # Mais/Menos). Os dois pares nunca coexistem na mesma linha
+                    # — o fetcher emite um OU o outro — então listar os 4 lados
+                    # aqui é seguro e evita um `if mercado ==` que apodrece.
+                    for lado, odd in (("over", l.get("over")), ("under", l.get("under")),
+                                      ("casa", l.get("casa")), ("fora", l.get("fora"))):
                         if not odd or odd <= 1.01 or odd > 50:
                             continue
                         n_obs += 1
