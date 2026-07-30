@@ -33,7 +33,17 @@ TOURNAMENTS = [
     # (404 na season, sem torneio ativo) → travava source_healthy e CONGELAVA todo o board de
     # fixtures (12h em 22-23/07). 11621 = Apertura (season atual, resolve com ~90 eventos).
 ]
-DAYS_AHEAD = 7
+# ⚠ 7 → 12 (30/07/2026): a janela de FIXTURES era mais curta que o horizonte do
+# BOARD, e isso derrubou o deploy da Mesa duas vezes seguidas às 13:43/13:45.
+# Cadeia provada nos logs do run 30562923368: a EstrelaBet abriu Escanteios de
+# Santos × Athletico-PR de 09/08 (10 dias à frente), o precificador flagou +EV
+# por casamento de NOME (não precisa de sofa_id) → jogo com `valor` e SEM
+# fixture → cobertura Sofa nos jogos com valor caiu a 60% < 70% → o gate
+# bloqueou o deploy (fail-closed correto; o defeito era a janela, não o gate).
+# Custo do aumento: ZERO requests — a busca por liga já traz ~30 eventos e a
+# janela é só um FILTRO sobre o que já veio. 12d cobre o hábito das casas de
+# abrir mercado de jogo grande até ~10 dias antes.
+DAYS_AHEAD = 12
 MAX_PAGES = 3
 REQUEST_TIMEOUT = 20
 STABLE_FILE = "sofa_latest_data.json"
