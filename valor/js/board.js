@@ -653,6 +653,61 @@
     }
   }
 
+  // ⚠ MERCADO QUE A CASA ABRE MAS A NOSSA FONTE NÃO ENTREGA (30/07/2026).
+  // O Diego viu "Nenhum jogo com Finalizações na bet365 aberto agora" e estranhou —
+  // com razão: a bet365 tinha o mercado aberto no site naquele instante
+  // (Corinthians × Athletico: "Partida - Chutes" 24,5 e "Chutes ao Gol" 7,5).
+  // Quem não tem é a BetsAPI: o /v3/bet365/prematch daquele jogo devolveu 95
+  // mercados e os ÚNICOS com "shot" no nome eram `player_shots` e
+  // `player_shots_on_target` (jogador, que a Mesa exclui por decisão de 21/07).
+  // Não é seção esquecida do parser — conferi as 11 chaves de topo, inclusive as 2
+  // que o _iter_sp ignora (`schedule`, `scorers`). E o contraste prova que é escopo
+  // da fonte: cartões e escanteios vêm completos, chutes/faltas/impedimentos não.
+  // Medido no board de 30/07 (244 jogos), nº de jogos com linha da bet365:
+  //   Cartões 2 · Escanteios 14 · Faltas 0 · Finalizações 0 · Chutes no gol 0 ·
+  //   Impedimentos 0 · Laterais 0 · Tiros de meta 0 · Desarmes 0
+  // Dizer "não tem jogo aberto" nesses 7 é AFIRMAR AUSÊNCIA DE MERCADO quando o que
+  // existe é ausência de DADO — a mesma lei do null que vale pros números do site.
+  // Enquanto a fonte não entrega, a saída honesta é mandar o usuário na casa.
+  var FONTE_SEM = {
+    "bet365": {
+      mercados: ["Faltas", "Finalizações", "Chutes no gol", "Impedimentos",
+                 "Laterais", "Tiros de meta", "Desarmes"],
+      // como achar na própria bet365: a busca dela acha o mercado e lista TODOS os
+      // jogos com ele aberto. ⚠ Faltas é a exceção — lá o mercado se chama
+      // "tiros livres" (informação do Diego, 30/07).
+      busca: {
+        "Faltas": "tiros livres", "Finalizações": "time chutes",
+        "Chutes no gol": "chutes a gol", "Impedimentos": "impedimentos",
+        "Laterais": "laterais", "Tiros de meta": "tiros de meta",
+        "Desarmes": "desarmes"
+      }
+    }
+  };
+
+  function vazioHTML() {
+    var mkt = state.mercado, casa = state.casa;
+    var reg = FONTE_SEM[casa];
+    if (reg && mkt !== "todos" && reg.mercados.indexOf(mkt) >= 0) {
+      var termo = reg.busca[mkt] || mkt.toLowerCase();
+      return '<div class="empty"><div class="big">🔎</div>' +
+        "A <b>" + esc(casa) + "</b> costuma ter <b>" + esc(mkt) + "</b> aberto — " +
+        "quem não entrega esse mercado é a <b>nossa fonte de odds</b> (BetsAPI), " +
+        "que dela só traz Cartões e Escanteios." +
+        '<br><span style="font-size:13px;display:inline-block;margin-top:8px">' +
+        "Pra ver na casa: pesquise <b>" + esc(termo) + "</b> na busca da " + esc(casa) +
+        " — ela lista todos os jogos com o mercado aberto." +
+        "</span><br><span style=\"font-size:12px;opacity:.75\">" +
+        "Isto não é falta de jogo: é limitação da fonte, e está registrada." +
+        "</span></div>";
+    }
+    return '<div class="empty"><div class="big">📭</div>Nenhum jogo com <b>' +
+      esc(mkt === "todos" ? "mercados" : mkt) +
+      (casa !== "todas" ? "</b> na <b>" + esc(casa) : "") +
+      "</b> aberto agora.<br><span style=\"font-size:12px\">" +
+      "Troque os filtros nos chips acima ou volte após a próxima captura.</span></div>";
+  }
+
   function render() {
     renderFiltros();
     var vis = jogos.filter(passa).sort(sortFn);
@@ -662,10 +717,7 @@
     var lista = document.getElementById("lista");
     lista.innerHTML = "";
     if (!vis.length) {
-      lista.innerHTML = '<div class="empty"><div class="big">📭</div>Nenhum jogo com <b>' +
-        esc(state.mercado === "todos" ? "mercados" : state.mercado) +
-        (state.casa !== "todas" ? "</b> na <b>" + esc(state.casa) : "") +
-        "</b> aberto agora.<br><span style=\"font-size:12px\">Troque os filtros nos chips acima ou volte após a próxima captura.</span></div>";
+      lista.innerHTML = vazioHTML();
       lastSig = visSig(vis, fr);
       return;
     }
