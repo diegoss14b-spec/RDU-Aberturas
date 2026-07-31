@@ -28,6 +28,7 @@ from canonical import (  # noqa: E402
     unify_gids,
 )
 from history_merge import atomic_write_text, merge_latest_state, merge_records  # noqa: E402
+from history_shard import load_month, save_month  # noqa: E402
 
 KEYS = ROOT / "data" / "odds_history" / "keys"
 TICKS = ROOT / "data" / "odds_history" / "ticks"
@@ -279,20 +280,25 @@ def unify_keys_dict(keys):
     return new, alias, stats
 
 
-def migrate_file(path: Path, fixtures):
-    original = path.read_text(encoding="utf-8")
-    keys = json.loads(original)
+def migrate_month(month: str, fixtures):
+    """Migra o MÊS inteiro de uma vez — nunca fatia a fatia.
+
+    ⚠️ O `unify_keys_dict` aqui dedupa o mesmo confronto grafado diferente ENTRE
+    CASAS. Desde que o documento do mês virou fatias (history_shard, 31/07), rodar
+    isso por ARQUIVO faria o dedup enxergar 1/5 do mês por vez e o resultado mudaria
+    conforme o corte das fatias — medido: 108.092 chaves migrando o mês inteiro
+    contra 107.982 migrando fatia a fatia. Por isso a unidade de migração é o mês,
+    e a gravação devolve as fatias por `save_month`.
+    """
+    keys = load_month(KEYS, month)
     new, stats = migrate_keys_dict(keys, fixtures)
-    # dedup de confrontos (mesmo jogo com grafias/dia diferentes entre casas)
     new, _alias, ustats = unify_keys_dict(new)
-    backup = path.with_suffix(path.suffix + ".bak_pre_migrate")
-    if backup.exists():
-        backup.unlink()
-    migrated = json.dumps(new, ensure_ascii=False)
-    if migrated != original:
-        atomic_write_text(path, migrated)
+    save_month(KEYS, month, new)
+    # backup legado do tempo do monólito: não é versionável e não pode sobrar
+    for bak in KEYS.glob(f"{month}*.bak_pre_migrate"):
+        bak.unlink()
     print(
-        f"[migrate] {path.name}: {len(keys)} -> {len(new)} keys · "
+        f"[migrate] {month}: {len(keys)} -> {len(new)} keys · "
         f"sofa={stats['sofa']} · leg={stats['legacy']} · "
         f"merges={stats['merges']} · main_merges={stats['main_line_merges']} · "
         f"dedup jogos={ustats['gid_merges']} (keys unidas={ustats['key_merges']})"
@@ -394,11 +400,12 @@ def main():
     if removed_backups:
         print(f"[migrate] removidos {removed_backups} backups legados não versionáveis")
     print(f"[migrate] fixtures sofa={len(fixtures)}")
-    files = sorted(KEYS.glob("*.json"))
-    if not files:
+    # os meses presentes, sejam monólito legado ({mes}.json) ou fatias ({mes}.pNNN.json)
+    meses = sorted({p.stem.split(".")[0] for p in KEYS.glob("*.json")})
+    if not meses:
         print("[migrate] nenhum keys/*.json")
-    for path in files:
-        migrate_file(path, fixtures)
+    for month in meses:
+        migrate_month(month, fixtures)
     for path in sorted(TICKS.glob("*.jsonl")):
         migrate_tick_file(path, fixtures)
 

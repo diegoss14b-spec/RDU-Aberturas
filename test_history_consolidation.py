@@ -11,7 +11,9 @@ from history_settle import (
     find_result,
     persist_consolidated_documents,
 )
-from migrate_history_keys import migrate_file, migrate_tick_file
+import migrate_history_keys
+from history_shard import load_month
+from migrate_history_keys import migrate_month, migrate_tick_file
 
 
 def fixture():
@@ -140,18 +142,19 @@ class HistoryConsolidationTests(unittest.TestCase):
             key_backup.write_text("legado", encoding="utf-8")
             tick_backup.write_text("legado", encoding="utf-8")
 
-            migrate_file(key_path, [fixture()])
+            migrate_history_keys.KEYS = root   # a migração é por MÊS (fatias)
+            migrate_month("2026-07", [fixture()])
             migrate_tick_file(tick_path, [fixture()])
-            first_key = key_path.read_text(encoding="utf-8")
+            first_key = json.dumps(load_month(root, "2026-07"), ensure_ascii=False)
             first_tick = tick_path.read_text(encoding="utf-8")
             self.assertFalse(key_backup.exists())
             self.assertFalse(tick_backup.exists())
             self.assertIn("sofa:999", first_key)
             self.assertIn("sofa:999", first_tick)
 
-            migrate_file(key_path, [fixture()])
+            migrate_month("2026-07", [fixture()])
             migrate_tick_file(tick_path, [fixture()])
-            self.assertEqual(first_key, key_path.read_text(encoding="utf-8"))
+            self.assertEqual(first_key, json.dumps(load_month(root, "2026-07"), ensure_ascii=False))
             self.assertEqual(first_tick, tick_path.read_text(encoding="utf-8"))
             self.assertFalse(list(root.glob("*.tmp")))
 

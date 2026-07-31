@@ -25,6 +25,7 @@ from history_quality import (
     compute_capture_quality, is_pre_kickoff, pick_main_line, parse_ts, ensure_aware, BRT,
 )
 from history_merge import atomic_write_text
+from history_shard import load_month, save_month
 from migrate_history_keys import migrate_keys_dict, migrate_tick_file, unify_keys_dict
 
 ODDS = ROOT / "data" / "odds"
@@ -195,9 +196,12 @@ def main():
     (HIST / "ticks").mkdir(parents=True, exist_ok=True)
     (HIST / "keys").mkdir(parents=True, exist_ok=True)
     month = now.strftime("%Y-%m")
-    kf = HIST / "keys" / f"{month}.json"
+    # O documento do mês é repartido por CASA desde 31/07 (ver history_shard): o
+    # arquivo único bateu nos 100 MB do GitHub e a Mesa parou de persistir. Em
+    # memória nada muda — carrega a UNIÃO na MESMA ordem, porque `unify_keys_dict`
+    # dedupa confronto e depende da ordem em que as chaves chegam.
     fixtures = load_sofa_fixtures()
-    keys = json.loads(kf.read_text(encoding="utf-8")) if kf.exists() else {}
+    keys = load_month(HIST / "keys", month)
     keys, merge_stats = migrate_keys_dict(keys, fixtures)
     # dedup de confrontos (mesmo jogo grafado diferente por casas / dia ±1)
     keys, _gid_alias, _ustats = unify_keys_dict(keys)
@@ -342,7 +346,9 @@ def main():
 
     keys["__main_lines__"] = main_store
     tick_f.close()
-    kf.write_text(json.dumps(keys, ensure_ascii=False), encoding="utf-8")
+    n_partes, n_rm, tam = save_month(HIST / "keys", month, keys)
+    maior = f"maior {max(tam):.1f} MB" if tam else "vazio"
+    print(f"[ingest] fatias: {len(tam)} ({n_partes} gravadas, {n_rm} removidas) · {maior}")
     save_house_map(hmap)
     print(
         f"[ingest] {n_obs:,} obs · {n_ticks:,} ticks ({n_line_moves} line_move) · "
