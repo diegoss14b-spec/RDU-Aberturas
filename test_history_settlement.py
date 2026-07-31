@@ -6,6 +6,7 @@ from history_merge import merge_records
 from history_settle import (
     BRT,
     PENDING_STATUS,
+    backfill_sofa_from_feed,
     build_settlement_status,
     find_result,
     settle_one,
@@ -219,6 +220,98 @@ def test_backlog_observable_by_market_and_age():
     assert summary["backlog"]["total"] == 1
     assert market["pending_age"]["3-7d"] == 1
     assert market["pending_reasons"]["stat_missing:corners"] == 1
+
+
+def test_cards_settle_carries_both_numbers():
+    """B2: `won` continua liquidando por cards=y+r; amarelos e vermelhos viajam
+    JUNTOS para a análise honesta das duas definições (modelo prevê amarelos)."""
+    key = "betano|2026-07-17|time alpha|time beta|Cartões|4.5|over"
+    item = record()
+    now = datetime(2026, 7, 18, 12, 0, tzinfo=BRT)
+    row = result_row(cards=5, yellow_cards=4, red_cards=1)
+    outcome, _, clv = settle_one(key, item, [row], now)
+    assert outcome == "settled" and item["result"] == 5 and item["won"] is True
+    assert item["result_yellows"] == 4 and item["result_reds"] == 1
+    assert clv["result_yellows"] == 4 and clv["result_reds"] == 1
+
+
+def test_cards_settle_null_safe_when_feed_lacks_split():
+    """Feed antigo (sem yellow_cards/red_cards): lei do null — nunca 0."""
+    key = "betano|2026-07-17|time alpha|time beta|Cartões|4.5|over"
+    item = record()
+    now = datetime(2026, 7, 18, 12, 0, tzinfo=BRT)
+    outcome, _, clv = settle_one(key, item, [result_row(cards=5)], now)
+    assert outcome == "settled" and item["result"] == 5
+    assert item["result_yellows"] is None and item["result_reds"] is None
+    assert clv["result_yellows"] is None and clv["result_reds"] is None
+    # e mercados que não são cartões nem carregam os campos
+    key2 = "betano|2026-07-17|time alpha|time beta|Escanteios|9.5|over"
+    item2 = record()
+    _, _, clv2 = settle_one(key2, item2, [result_row(corners=11)], now)
+    assert "result_yellows" not in item2 and "result_yellows" not in clv2
+
+
+def settled_orphan(mercado, linha, lado, result):
+    """Key liquidada SEM sofa_id (o alvo do backfill B1)."""
+    key = f"betano|2026-07-17|time alpha|time beta|{mercado}|{linha}|{lado}"
+    item = record("settled")
+    item["result"] = result
+    return key, item
+
+
+def test_backfill_accepts_only_with_result_corroboration():
+    """B1: nome PROPÕE, resultado ACEITA — e grava em campo separado do sofa_id."""
+    k1, r1 = settled_orphan("Cartões", 4.5, "over", 5)      # cards = y+r
+    k2, r2 = settled_orphan("Escanteios", 9.5, "over", 11)
+    feed = [result_row(sofa_id=777, cards=5, yellow_cards=4, red_cards=1, corners=11)]
+    n = backfill_sofa_from_feed({k1: r1, k2: r2}, feed)
+    assert n["jogos_recuperados"] == 1 and n["chaves_recuperadas"] == 2
+    for rec_ in (r1, r2):
+        assert rec_["sofa_id_settle"] == 777
+        assert rec_["settle_match_method"] == "feed_name_corroborated"
+        assert rec_["settle_match_n"] == 2
+        assert rec_.get("sofa_id") is None        # identidade forte intocada
+
+
+def test_backfill_accepts_cards_settled_as_yellows_only():
+    """Corroboração de cartões aceita as DUAS definições (== cards OU == yellows)."""
+    k1, r1 = settled_orphan("Cartões", 4.5, "over", 4)      # liquidado como amarelos
+    feed = [result_row(sofa_id=777, cards=5, yellow_cards=4, red_cards=1)]
+    n = backfill_sofa_from_feed({k1: r1}, feed)
+    assert n["jogos_recuperados"] == 1 and r1["sofa_id_settle"] == 777
+
+
+def test_backfill_rejects_result_divergence():
+    """UMA divergência reprova o jogo inteiro (0 toleradas — fase1b: 1 reprovado)."""
+    k1, r1 = settled_orphan("Cartões", 4.5, "over", 5)
+    k2, r2 = settled_orphan("Escanteios", 9.5, "over", 11)
+    feed = [result_row(sofa_id=777, cards=5, corners=9)]     # escanteios não bate
+    n = backfill_sofa_from_feed({k1: r1, k2: r2}, feed)
+    assert n["reprovado_pelo_resultado"] == 1
+    assert "sofa_id_settle" not in r1 and "sofa_id_settle" not in r2
+
+
+def test_backfill_requires_sofa_id_and_rejects_conflicting_rows():
+    k1, r1 = settled_orphan("Cartões", 4.5, "over", 5)
+    k2, r2 = settled_orphan("Escanteios", 9.5, "over", 11)
+    # feed ainda sem identidade (site não mandou sofa_id) → no-op silencioso
+    n = backfill_sofa_from_feed({k1: r1}, [result_row(cards=5)])
+    assert n["row_sem_sofa_id"] == 1 and "sofa_id_settle" not in r1
+    # variantes duplicadas do feed com sofa_id DIFERENTE → grupo rejeitado
+    dup_a = result_row(sofa_id=1, cards=5)
+    dup_b = result_row(sofa_id=2, corners=11)
+    n = backfill_sofa_from_feed({k1: r1, k2: r2}, [dup_a, dup_b])
+    assert n["rows_conflitantes"] == 1
+    assert "sofa_id_settle" not in r1 and "sofa_id_settle" not in r2
+
+
+def test_backfill_leaves_strong_identity_alone():
+    k1, r1 = settled_orphan("Cartões", 4.5, "over", 5)
+    r1["sofa_id"] = "999"
+    feed = [result_row(sofa_id=777, cards=5)]
+    n = backfill_sofa_from_feed({k1: r1}, feed)
+    assert n.get("jogos_recuperados", 0) == 0
+    assert "sofa_id_settle" not in r1 and r1["sofa_id"] == "999"
 
 
 def test_merge_preserves_open_close_result_and_counts():

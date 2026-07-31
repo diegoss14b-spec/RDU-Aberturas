@@ -117,6 +117,8 @@ def merge_records(a, b):
         for field in (
             "result", "won", "clv_pct", "beat_close", "settled_at",
             "settlement_reason", "settlement_source",
+            # B2 (31/07): os dois números de cartões viajam com a liquidação
+            "result_yellows", "result_reds",
         ):
             if field in winner:
                 out[field] = winner[field]

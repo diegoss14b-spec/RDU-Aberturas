@@ -32,6 +32,15 @@ TOURNAMENTS = [
     (384, "Libertadores"), (480, "Sudamericana"), (11621, "LigaMX"),  # 23/07: 352 era id MORTO
     # (404 na season, sem torneio ativo) → travava source_healthy e CONGELAVA todo o board de
     # fixtures (12h em 22-23/07). 11621 = Apertura (season atual, resolve com ~90 eventos).
+    # B5 do registro forward (31/07): ligas do MODELO com odds medidas no backtest de
+    # 30/07 e SEM fixture aqui — a key nascia sem sofa_id (267 dos 463 jogos liquidados
+    # órfãos eram "liga fora da base" de fixtures) e nem o ledger nem o casador tinham
+    # o que resolver. tids validados 1-a-1 em 31/07 via /seasons + /events/next/0
+    # (lição do id morto 352): todos com temporada ativa e eventos futuros. Custo ~2
+    # req/liga por captura full; liga em recesso cai no caminho INATIVO (não bloqueia).
+    (16736, "BOL"), (11653, "CHI"), (406, "PER"), (11539, "COL"),
+    (1238, "COL2"), (703, "ARG2"), (172, "CZE"), (152, "ROU"),
+    (39, "DEN"), (215, "SUI"), (13470, "CDA"), (11611, "MEXE"),
 ]
 # ⚠ 7 → 12 (30/07/2026): a janela de FIXTURES era mais curta que o horizonte do
 # BOARD, e isso derrubou o deploy da Mesa duas vezes seguidas às 13:43/13:45.

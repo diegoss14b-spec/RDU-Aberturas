@@ -57,7 +57,8 @@ reingest_on_new_base() {
   cp -a "$SAVE/fixtures/"*.json data/fixtures/ 2>/dev/null || true
   [ -d "$SAVE/fixtures/_snapshots" ] && mkdir -p data/fixtures/_snapshots && cp -a "$SAVE/fixtures/_snapshots/." data/fixtures/_snapshots/ 2>/dev/null || true
   python migrate_history_keys.py && python history_ingest.py && python history_close.py \
-    && python history_settle.py && python build_history.py && python build_moves.py || return 1
+    && python history_settle.py && python build_model_ledger.py \
+    && python build_history.py && python build_moves.py || return 1
   # §8 — openclose é crítico: se falhar na reconciliação, aborta (não republica meio-build)
   python build_openclose.py || return 1
   if [ "$MODE" = "full" ] && [ "$GATE" = "success" ]; then

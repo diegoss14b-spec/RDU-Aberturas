@@ -378,6 +378,14 @@ def settle_one(key, record, results, now, cobertura=None):
         record["settlement_attempts"] = int(record.get("settlement_attempts") or 0) + 1
         return "unavailable", changed, None
     record["result"] = result
+    # B2 (31/07): a Mesa liquida cartões como AMARELOS+VERMELHOS (o feed manda
+    # `cards` = y+r) e o modelo do site prevê AMARELOS — 95 chaves (2,4%) trocavam
+    # de vencedor conforme a definição no backtest de 30/07. `won` NÃO muda de
+    # semântica; os dois números viajam JUNTOS para a análise honesta dos dois
+    # lados (ledger/CLV). Lei do null: feed sem os campos → None, nunca 0.
+    if field == "cards":
+        record["result_yellows"] = _number(result_row.get("yellow_cards"))
+        record["result_reds"] = _number(result_row.get("red_cards"))
     if abs(result - line) < 1e-9:
         record["won"] = None
     else:
@@ -412,7 +420,114 @@ def settle_one(key, record, results, now, cobertura=None):
         # 0 = casou na data exata; ±1 = veio da janela BRT×UTC (§ JANELA_DIAS)
         "date_offset": date_offset or 0,
     }
+    if field == "cards":
+        clv_row["result_yellows"] = record.get("result_yellows")
+        clv_row["result_reds"] = record.get("result_reds")
     return "settled", True, clv_row
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# B1 (31/07) — backfill de identidade Sofa via feed de resultados.
+#
+# 463 jogos liquidados estavam SEM sofa_id no backtest de 30/07 (11.775 chaves
+# fora de qualquer análise modelo×odds). O recuperador da pesquisa
+# (fase1b_recuperacao.py, 193 aceitos / 1 reprovado) vira aqui parte do PIPELINE:
+# roda em todo settle, senão o buraco reabre todo dia.
+#
+# Identidade NÃO se decide por nome (gotcha 25 — homônimo/sub-20/reservas). O
+# nome só PROPÕE (o MESMO find_result do settle: fuzzy ≥85 nos dois lados +
+# flags_compatible + janela ±1d); quem ACEITA é a corroboração pelo RESULTADO:
+# o `result` com que a key foi liquidada tem que bater com a stat da row em
+# TODOS os mercados liquidados do jogo (cartões: == cards OU == yellow_cards),
+# com 0 divergências toleradas.
+#
+# O aceite grava `sofa_id_settle` + `settle_match_method` — campo SEPARADO de
+# `sofa_id` DE PROPÓSITO: não polui a identidade forte do ingest nem o gate de
+# pureza (canonical.sofa_purity lê v["sofa_id"]). Consumidores (ledger/backtest)
+# usam coalesce(sofa_id, sofa_id_settle) com proveniência em `id_origem`;
+# `settle_match_n` guarda quantos mercados corroboraram (dá pra exigir ≥2).
+# ─────────────────────────────────────────────────────────────────────────────
+MKT_MODELO = {"Cartões", "Faltas", "Finalizações", "Escanteios"}
+
+
+def backfill_sofa_from_feed(merged, results):
+    """Preenche ``sofa_id_settle`` nas keys liquidadas órfãs. Devolve contagens."""
+    groups = defaultdict(list)
+    for key, record in merged.items():
+        if key.startswith("__") or not isinstance(record, dict):
+            continue
+        meta = parse_history_key(key)
+        if meta.get("mercado") not in MKT_MODELO:
+            continue
+        if record.get("status") != "settled":
+            continue
+        if record.get("sofa_id") or meta.get("sofa_id") or record.get("sofa_id_settle"):
+            continue
+        game_date = (record.get("kickoff") or "")[:10] or meta.get("day") or ""
+        home = record.get("home_norm") or nrm(record.get("home_raw") or meta.get("hn") or "")
+        away = record.get("away_norm") or nrm(record.get("away_raw") or meta.get("an") or "")
+        if not game_date or not home or not away:
+            continue
+        groups[(game_date, home, away)].append((key, record, meta))
+
+    n = Counter()
+    for (game_date, home, away), items in groups.items():
+        # uma busca por MERCADO distinto (não por key): a row é a mesma pro jogo
+        fields = sorted({FIELD[meta["mercado"]] for _, _, meta in items})
+        rows = []
+        for field in fields:
+            row = find_result(results, game_date, home, away, field=field)
+            if row is not None and not any(r is row for r in rows):
+                rows.append(row)
+        if not rows:
+            n["sem_candidato_no_feed"] += 1
+            continue
+        # todas as buscas têm que apontar pro MESMO jogo, com sofa_id declarado
+        idents = {(r.get("date"), r.get("_h"), r.get("_a")) for r in rows}
+        sids = {str(r.get("sofa_id")) for r in rows if r.get("sofa_id") not in (None, "")}
+        if not sids:
+            n["row_sem_sofa_id"] += 1
+            continue
+        if len(idents) > 1 or len(sids) > 1:
+            n["rows_conflitantes"] += 1
+            continue
+        row = rows[0]
+        corroboradas, divergiu = 0, False
+        for key, record, meta in items:
+            field = FIELD[meta["mercado"]]
+            got = record.get("result")
+            if got is None:
+                continue
+            esperado = _number(row.get(field))
+            candidatos = [esperado]
+            if field == "cards":
+                candidatos.append(_number(row.get("yellow_cards")))
+            candidatos = [c for c in candidatos if c is not None]
+            if not candidatos:
+                continue
+            if any(abs(float(got) - c) < 1e-9 for c in candidatos):
+                corroboradas += 1
+            else:
+                divergiu = True
+        if divergiu:
+            n["reprovado_pelo_resultado"] += 1
+            continue
+        if corroboradas < 1:
+            n["sem_stat_para_corroborar"] += 1
+            continue
+        sid_raw = next(iter(sids))
+        try:
+            sid = int(sid_raw)
+        except ValueError:
+            n["sofa_id_ilegivel"] += 1
+            continue
+        for key, record, _meta in items:
+            record["sofa_id_settle"] = sid
+            record["settle_match_method"] = "feed_name_corroborated"
+            record["settle_match_n"] = corroboradas
+        n["jogos_recuperados"] += 1
+        n["chaves_recuperadas"] += len(items)
+    return n
 
 
 def _age_bucket(kickoff, now):
@@ -555,6 +670,9 @@ def main():
             if clv_row:
                 clv_rows.append(clv_row)
 
+    # B1: identidade tardia por corroboração de resultado, ANTES do persist —
+    # o sofa_id_settle entra no mesmo write atômico da liquidação desta rodada.
+    bf = backfill_sofa_from_feed(merged, results)
     changed_files = persist_consolidated_documents(documents, merged, owners)
     all_records = list(merged.items())
 
@@ -567,6 +685,13 @@ def main():
         f"{outcomes['pending']:,} em retry · {outcomes['unavailable']:,} sem mapeamento · "
         f"{outcomes['sem_fonte']:,} fora da cobertura do feed (retry semanal)"
     )
+    if bf:
+        print(
+            f"[settle] backfill sofa (B1): {bf.get('jogos_recuperados', 0):,} jogos / "
+            f"{bf.get('chaves_recuperadas', 0):,} chaves com sofa_id_settle · "
+            f"reprovados pelo resultado: {bf.get('reprovado_pelo_resultado', 0):,} · "
+            f"rows sem sofa_id no feed: {bf.get('row_sem_sofa_id', 0):,}"
+        )
     _age_unknown = (status.get("backlog") or {}).get("age_unknown", 0)
     if _age_unknown:
         print(f"[settle] ⚠ {_age_unknown:,} pendências com data NÃO parseável (age=unknown) — "

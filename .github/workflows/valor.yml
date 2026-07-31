@@ -205,6 +205,11 @@ jobs:
           python history_ingest.py
           python history_close.py
           python history_settle.py
+          # registro forward modelo×odds (31/07): carimba P(over) do bundle publicado
+          # nas keys dos 4 mercados e appenda liquidadas no ledger imutável. Roda em
+          # full E close (key vista pela 1ª vez num close pré-kickoff precisa do
+          # carimbo). Fail-closed: sem bundle = no-op, nunca derruba este step.
+          python build_model_ledger.py
           python build_history.py
           python build_moves.py
           # dataset abertura×fechamento (μ implícito) — CRÍTICO no full (§8): se falhar, a etapa
