@@ -248,9 +248,13 @@ def stamp_records(merged, fixidx, pricers, version, sha8, now):
         pre_ko = bool(ko_dt and now < ko_dt)
         if not pre_ko:
             # trava anti-vazamento: pós-kickoff, o bundle tem que ser de retreino
-            # anterior (ou do próprio dia) ao jogo
+            # ESTRITAMENTE anterior ao dia do jogo. `<=` era furado (ataque
+            # 31/07): o retreino da versão X inclui jogos jogados NO dia X
+            # (ex.: VERSION 2026-07-26, base "até 26/07") — com version ==
+            # game_day o jogo podia estar na própria base de treino. Pré-KO não
+            # tem esse problema (o jogo ainda não aconteceu quando carimbou).
             game_day = (str(kickoff)[:10] if kickoff else "") or (meta.get("day") or "")
-            if not game_day or not (version <= game_day):
+            if not game_day or not (version < game_day):
                 n["pos_ko_bloqueado_pela_versao"] += 1
                 continue
         pr = pricers.get(market)

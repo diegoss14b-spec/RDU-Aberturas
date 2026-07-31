@@ -77,7 +77,13 @@ def test_trava_anti_vazamento_pos_kickoff():
     n = stamp_records(merged, fixidx(), stub_pricers(), "2026-07-28", "x", NOW)
     assert n["pos_ko_bloqueado_pela_versao"] == 1
     assert "m_ts" not in merged[key]
-    # bundle anterior (ou do dia) ao jogo → carimba (caso B1: sofa_id_settle tardio)
+    # bundle do MESMO dia do jogo → bloqueado (ataque 31/07: o retreino da
+    # versão X inclui jogos do dia X — o jogo podia estar na base de treino)
+    merged = {key: rec(kickoff=passado)}
+    n = stamp_records(merged, fixidx(), stub_pricers(), "2026-07-20", "x", NOW)
+    assert n["pos_ko_bloqueado_pela_versao"] == 1
+    assert "m_ts" not in merged[key]
+    # bundle ESTRITAMENTE anterior ao jogo → carimba (caso B1: sofa_id tardio)
     merged = {key: rec(kickoff=passado)}
     n = stamp_records(merged, fixidx(), stub_pricers(), "2026-07-19", "x", NOW)
     assert n["carimbadas"] == 1 and merged[key]["m_pre_ko"] is False

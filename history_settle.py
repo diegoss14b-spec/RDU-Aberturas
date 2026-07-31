@@ -492,7 +492,13 @@ def backfill_sofa_from_feed(merged, results):
             n["rows_conflitantes"] += 1
             continue
         row = rows[0]
-        corroboradas, divergiu = 0, False
+        # Critério da pesquisa (fase1b): o result bate em TODOS os mercados
+        # liquidados. Mercado cujo result NÃO PODE ser conferido (a row aceita
+        # não tem a stat) não é neutro: a row que o liquidou TINHA a stat, logo
+        # provavelmente foi OUTRA row — grupo inteiro fica de fora (ataque
+        # 31/07: sem isso, uma key não-conferível herdava o sofa_id na carona
+        # da corroboração de outro mercado).
+        corroboradas, divergiu, inconferivel = 0, False, False
         for key, record, meta in items:
             field = FIELD[meta["mercado"]]
             got = record.get("result")
@@ -504,6 +510,7 @@ def backfill_sofa_from_feed(merged, results):
                 candidatos.append(_number(row.get("yellow_cards")))
             candidatos = [c for c in candidatos if c is not None]
             if not candidatos:
+                inconferivel = True
                 continue
             if any(abs(float(got) - c) < 1e-9 for c in candidatos):
                 corroboradas += 1
@@ -512,7 +519,7 @@ def backfill_sofa_from_feed(merged, results):
         if divergiu:
             n["reprovado_pelo_resultado"] += 1
             continue
-        if corroboradas < 1:
+        if inconferivel or corroboradas < 1:
             n["sem_stat_para_corroborar"] += 1
             continue
         sid_raw = next(iter(sids))
