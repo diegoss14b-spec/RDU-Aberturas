@@ -75,6 +75,27 @@ def _iso_delta_min(a, b):
         return None
 
 # tupla: (cartoes, faltas, finalizacoes, escanteios)
+# ⚠ Marcadores que tiram o RÓTULO do universo dos modelos ANTES das regras (31/07/2026,
+# caso Bryne×Strømsgodset): a Superbet abriu "Noruega - 1.Division" (2ª divisão), "norueg"
+# casou a regra NOR e — como os DOIS times caíram da Eliteserien em 2025 e existem no
+# bundle — o casamento por NOME passou e o modelo de 1ª divisão precificou jogo de 2ª
+# (flags de −EV real; o gate segurou por acaso, via cobertura Sofa). O casamento por nome
+# NÃO protege contra vizinho de divisão, copa nacional, feminino ou base: esses jogos têm
+# os MESMOS clubes do bundle. A barreira tem que ser pelo rótulo da liga.
+# Normalização: _n = lower+unidecode, então só formas sem acento aqui.
+LEAGUE_FORA = (
+    # feminino / base / reservas (mesmos nomes de clube do masculino profissional)
+    "femin", "frauen", "women", "ladies", "femenil", "femenin",
+    "sub-15", "sub-17", "sub-20", "sub 20", "sub-23", "u17", "u19", "u20", "u21", "u23",
+    "juvenil", "junior", "youth", "reserv",
+    # mata-mata nacional (times da 1ª divisão jogando fora do regime da liga)
+    "copa", "cup", "taca", "pokal", "beker", "trophy", "supercopa", "supercup",
+    # vizinhos de divisão com times rebaixados no bundle
+    "1. div", "1.div", "1st division", "obos",                 # Noruega 2ª
+    "hypermotion", "smartbank", "laliga 2", "la liga 2",       # Espanha 2ª
+    "segunda", "primera b", "primera federac", "rfef",         # ES/latam 2ª-3ª
+    "serie c", "serie d", "2. liga", "liga 3", "league one", "league two",
+)
 LEAGUE_RULES = [
     # "brasileir(ão)" = casas BR; "brazil serie a/b" = nomes em inglês da bet365/BetsAPI
     (lambda l: ("brasileir" in l or "brazil serie" in l) and ("serie b" in l or "série b" in l or "- b" in l), ("B", "BR-B", None, "BR-B")),
@@ -85,13 +106,20 @@ LEAGUE_RULES = [
     (lambda l: "bundesliga" in l and "2" not in l, ("BU", "BU", "BU", "BU")),
     (lambda l: "ligue 1" in l, ("L1", "L1", "L1", "L1")),
     # ligas exóticas: só escanteios (modelo v2 tem CSL/BOL/ECU/NOR)
-    (lambda l: "chin" in l or "super liga chinesa" in l or "csl" in l, (None, None, None, "CSL")),
+    # CSL exige "super": "chin" solto casava "China League One" (2ª divisão). Grafias
+    # reais medidas: "Chinese Super League", "China Super League", "China - Super League",
+    # "Super Liga Chinesa". Feminina ("China Women Super League") barra no LEAGUE_FORA.
+    (lambda l: ("chin" in l and "super" in l) or re.search(r"\bcsl\b", l), (None, None, None, "CSL")),
     (lambda l: "bolivi" in l or "boliviano" in l, (None, None, None, "BOL")),
-    (lambda l: "equador" in l or "ecuad" in l or "ligapro" in l, (None, None, None, "ECU")),
+    # "LigaPro Serie B" é o nome OFICIAL da 2ª divisão do Equador — guard local porque
+    # "serie b" não pode ir pro LEAGUE_FORA (mataria o BR-B, que é liga de modelo)
+    (lambda l: ("equador" in l or "ecuad" in l or "ligapro" in l) and "serie b" not in l, (None, None, None, "ECU")),
     (lambda l: "norueg" in l or "eliteserien" in l, (None, None, None, "NOR")),
 ]
 def classify_league(lg):
     l = _n(lg)
+    if any(m in l for m in LEAGUE_FORA):
+        return None
     for pred, c in LEAGUE_RULES:
         try:
             if pred(l): return {"cartoes": c[0], "faltas": c[1], "finalizacoes": c[2], "escanteios": c[3]}
@@ -568,6 +596,7 @@ def main():
     n_skip_ko = 0
     n_skip_stale = 0
     n_skip_3way = 0
+    n_skip_nosofa = 0
     now_brt = datetime.now(BRT)
     ladder_rej_all = []
     shadow_rows = []  # arquivo paralelo, nunca em BOARD.valor
@@ -598,9 +627,16 @@ def main():
                         if three_way(ln_):
                             n_skip_3way += 1
                             continue
-                        # produção
+                        # produção. ⚠ flag exige sofa_id (31/07): sem fixture não há como
+                        # liquidar (ledger/CLV órfãos) e era por aqui que jogo de liga
+                        # ERRADA (vizinho de divisão fora do universo de fixtures) chegava
+                        # ao BOARD.valor — o precificador casa por NOME, não por fixture.
+                        # Falha de fixture transitória degrada para "sem flag neste jogo",
+                        # nunca para "gate derruba a Mesa inteira de madrugada".
                         pr = PRICERS[model].price(lg, hid, aid, ln_["linha"])
-                        if pr and actionable_game and not casa_stale:
+                        if pr and actionable_game and not casa_stale and not j.get("sofa_id"):
+                            n_skip_nosofa += 1
+                        elif pr and actionable_game and not casa_stale:
                             dv = de_vig(ln_["over"], ln_["under"])
                             if dv and MARGIN_MIN - 1e-9 <= dv["margin"] <= MARGIN_CAP + 1e-9:
                                 pp = float(pr.get("p_push") or 0.0)
@@ -707,7 +743,10 @@ def main():
         },
     }
     print(f"[board] valor flags={n_valor} · skip kickoff/started={n_skip_ko} · skip stale casa={n_skip_stale}"
-          f" · skip 3-vias={n_skip_3way} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
+          f" · skip 3-vias={n_skip_3way} · skip sem sofa_id={n_skip_nosofa} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
+    if n_skip_nosofa:
+        # alto = fixture de liga de MODELO falhando (investigar); baixo = rótulo exótico barrado
+        print(f"[board] ⚠ {n_skip_nosofa} flags suprimidas por falta de sofa_id (não liquidáveis)")
     # transparência da captura (brief P0 §2.4): quem entrou e quem falhou nesta rodada
     # §11 — Betfast estava OMITIDA aqui (7 casas, não 6): passa a aparecer no painel/hist7
     _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365", "betfast": "Betfast", "sportingbet": "Sportingbet"}
