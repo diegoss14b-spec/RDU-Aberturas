@@ -95,35 +95,129 @@ LEAGUE_FORA = (
     "hypermotion", "smartbank", "laliga 2", "la liga 2",       # Espanha 2ª
     "segunda", "primera b", "primera federac", "rfef",         # ES/latam 2ª-3ª
     "serie c", "serie d", "2. liga", "liga 3", "league one", "league two",
+    # 2ª/3ª divisão norueguesa (02/08): "1. div" já estava, mas o board de hoje
+    # trazia "Noruega - 2.Division Gr.1/Gr.2" e "3.Division Gr.1/Gr.5" — 7 jogos
+    # entrando como Eliteserien, com times B e rebaixados que EXISTEM no bundle.
+    "2. div", "2.div", "3. div", "3.div", "2nd division", "3rd division",
+    "divisjon", "division 2", "division 3",
+    # feminino abreviado: "Brasil - Brasileiro - Série A (F)" da Superbet estava
+    # (e está, no origin) classificando como BR-B — "femin" não pega "(f)".
+    "(f)", " f)", "(fem",
 )
+# País declarado no rótulo — serve pra VETAR uma regra de OUTRO país.
+# Medido no board real de 02/08: a regra "premier league" pegava 27 jogos e só 12
+# eram a inglesa; entravam Cazaquistão (3), Ilhas Faroé (6), País de Gales (2),
+# Islândia, Ucrânia, Líbano e Canadá. "Áustria - Bundesliga" (3 jogos) era
+# precificada com o modelo ALEMÃO. É lista de VETO, não de reconhecimento:
+# rótulo sem país segue o fluxo normal — a identidade de verdade agora vem da
+# fixture da Sofa (FIXTURE_LABEL_COMP), e o flag de valor exige sofa_id, então
+# este caminho é secundário e um país novo que falte aqui não gera flag.
+PAIS_REGRA = {
+    "ENG": ("inglaterra", "england", "english"),
+    "ESP": ("espanha", "spain", "spanish"),
+    "ITA": ("italia", "italy", "italian"),
+    "GER": ("alemanha", "germany", "german", "deutsch"),
+    "FRA": ("franca", "france", "french"),
+}
+# países que publicam liga com nome COLIDENTE (Premier League / Bundesliga /
+# Ligue 1 / Liga Nacional). Presença de qualquer um veta as regras das big-5.
+PAIS_OUTRO = (
+    "faroe", "cazaquist", "kazakh", "gales", "wales", "welsh", "islandia",
+    "iceland", "ucrania", "ukrain", "libano", "leban", "canad", "guatemal",
+    "austria", "australia", "suica", "swiss", "escocia", "scot", "irlanda",
+    "ireland", "belarus", "bielo", "armenia", "azerbaij", "georgia", "moldav",
+    "malta", "chipre", "cyprus", "gibraltar", "kosovo", "bosnia", "montenegr",
+    "servia", "serbia", "eslovaq", "eslovenia", "croacia", "hungria", "bulgaria",
+    "romenia", "grecia", "turquia", "israel", "egito", "egypt", "india",
+    "singapura", "malasia", "hong kong", "zimbabue", "gana", "quenia",
+    "tunisia", "argelia", "marrocos", "senegal", "africa do sul",
+    "polonia", "poland", "russia", "russo", "chequia", "czech", "eslovaca",
+)
+
+
+def _pais_do_rotulo(l):
+    """(pais_declarado | None, tem_pais_estrangeiro) — l já normalizado."""
+    for code, toks in PAIS_REGRA.items():
+        if any(t in l for t in toks):
+            return code, False
+    return None, any(t in l for t in PAIS_OUTRO)
+
+
 LEAGUE_RULES = [
+    # 3º campo = país EXIGIDO pela regra (None = regra sem país, não checa).
+    # Se o rótulo declara outro país (ou qualquer PAIS_OUTRO), a regra NÃO dispara.
     # "brasileir(ão)" = casas BR; "brazil serie a/b" = nomes em inglês da bet365/BetsAPI
-    (lambda l: ("brasileir" in l or "brazil serie" in l) and ("serie b" in l or "série b" in l or "- b" in l), ("B", "BR-B", None, "BR-B")),
-    (lambda l: ("brasileir" in l or "brazil serie" in l) and "serie b" not in l, ("A", "BR-A", "BR", "BR-A")),
-    (lambda l: "premier league" in l or ("premier" in l and "ingl" in l), ("PL", "PL", "PL", "PL")),
-    (lambda l: "laliga" in l or "la liga" in l or ("primera" in l and "espan" in l), ("LL", "LL", "LL", "LL")),
-    (lambda l: "serie a" in l and ("ital" in l or "itali" in l), ("SA", "SA", "SA", "SA")),
-    (lambda l: "bundesliga" in l and "2" not in l, ("BU", "BU", "BU", "BU")),
-    (lambda l: "ligue 1" in l, ("L1", "L1", "L1", "L1")),
+    (lambda l: ("brasileir" in l or "brazil serie" in l) and ("serie b" in l or "série b" in l or "- b" in l), ("B", "BR-B", None, "BR-B"), None),
+    (lambda l: ("brasileir" in l or "brazil serie" in l) and "serie b" not in l, ("A", "BR-A", "BR", "BR-A"), None),
+    (lambda l: "premier league" in l or ("premier" in l and "ingl" in l), ("PL", "PL", "PL", "PL"), "ENG"),
+    # \bla liga\b (e não `in`): "GuatemaLA LIGA Nacional" casava por substring — 1 jogo
+    # no board de 02/08 precificado com o modelo espanhol.
+    (lambda l: "laliga" in l or re.search(r"\bla\s+liga\b", l) or ("primera" in l and "espan" in l), ("LL", "LL", "LL", "LL"), "ESP"),
+    (lambda l: "serie a" in l and ("ital" in l or "itali" in l), ("SA", "SA", "SA", "SA"), "ITA"),
+    (lambda l: "bundesliga" in l and "2" not in l, ("BU", "BU", "BU", "BU"), "GER"),
+    (lambda l: "ligue 1" in l, ("L1", "L1", "L1", "L1"), "FRA"),
     # ligas exóticas: só escanteios (modelo v2 tem CSL/BOL/ECU/NOR)
     # CSL exige "super": "chin" solto casava "China League One" (2ª divisão). Grafias
     # reais medidas: "Chinese Super League", "China Super League", "China - Super League",
     # "Super Liga Chinesa". Feminina ("China Women Super League") barra no LEAGUE_FORA.
-    (lambda l: ("chin" in l and "super" in l) or re.search(r"\bcsl\b", l), (None, None, None, "CSL")),
-    (lambda l: "bolivi" in l or "boliviano" in l, (None, None, None, "BOL")),
+    (lambda l: ("chin" in l and "super" in l) or re.search(r"\bcsl\b", l), (None, None, None, "CSL"), None),
+    (lambda l: "bolivi" in l or "boliviano" in l, (None, None, None, "BOL"), None),
     # "LigaPro Serie B" é o nome OFICIAL da 2ª divisão do Equador — guard local porque
     # "serie b" não pode ir pro LEAGUE_FORA (mataria o BR-B, que é liga de modelo)
-    (lambda l: ("equador" in l or "ecuad" in l or "ligapro" in l) and "serie b" not in l, (None, None, None, "ECU")),
-    (lambda l: "norueg" in l or "eliteserien" in l, (None, None, None, "NOR")),
+    (lambda l: ("equador" in l or "ecuad" in l or "ligapro" in l) and "serie b" not in l, (None, None, None, "ECU"), None),
+    (lambda l: "norueg" in l or "eliteserien" in l, (None, None, None, "NOR"), None),
 ]
+
+
+# rótulo canônico da fixture da Sofascore (TOURNAMENTS do fetch_fixtures_sofascore)
+# → código de liga do bundle dos modelos. É a IDENTIDADE CERTA: a fixture traz o
+# id do torneio e os ids REAIS dos dois times, então não há por que adivinhar liga
+# por texto livre da casa nem time por fuzzy de nome. Rótulo ausente daqui = sem
+# modelo (fail-closed) — é o caso de copa/continental (WC, UCL, UEL, BR-CdB,
+# Libertadores, Sudamericana), que não têm modelo mesmo.
+FIXTURE_LABEL_COMP = {
+    "BR-A": "BR-A", "BR-B": "BR-B", "EPL": "PL", "LaLiga": "LL", "SerieA": "SA",
+    "Bundesliga": "BU", "Ligue1": "L1", "MLS": "MLS", "Argentina": "ARG",
+    "ARG2": "ARG2", "CSL": "CHN", "Allsvenskan": "SWE", "Uruguay": "URU",
+    "Ecuador": "ECU", "Russia": "RUS", "Eliteserien": "NOR", "LigaMX": "MEX",
+    "MEXE": "MEXE", "BOL": "BOL", "CHI": "CHI", "PER": "PER", "COL": "COL",
+    "COL2": "COL2", "CZE": "CZE", "ROU": "ROU", "DEN": "DEN", "SUI": "SUI",
+    # ⚠ NÃO mapear "CDA": na Sofa o label CDA é a Canadian Premier League
+    # (tid 13470 em fetch_fixtures_sofascore.py), mas o comp "CDA" do bundle é a
+    # COPA ARGENTINA (35 clubes argentinos; 29 também no comp ARG). Colisão de
+    # sigla, não equivalência — mapear publicaria identidade falsa. O mesmo engano
+    # está no LABEL2COMP do build_model_ledger.py e vale corrigir lá também.
+}
+
+# mercados que PODEM usar o caminho da fixture. Cartões fica FORA por enquanto:
+# o modelo do site prevê AMARELOS e a Mesa liquida/compara CARTÕES (amarelos +
+# vermelhos) — está escrito em history_settle.py:381-385. Nas ligas que este
+# patch destrava a diferença é grande (vermelhos/jogo medidos no results_auto:
+# PER +0,50 · MEX +0,45 · CHI +0,44 · CZE +0,43 · COL +0,27, contra DEN 0,00 e
+# NOR +0,13 na Europa), e ela empurra o μ do modelo sistematicamente PARA BAIXO
+# do mercado: recalculando as 56 flags de cartões com μ += vermelhos/jogo da liga,
+# 16 caem abaixo do limiar e 10 viram EV NEGATIVO (ex.: Cienciano × Universitario,
+# Menos 4,5 @1,78, publicado +7,4% → −8,6% real). Sem reconciliar a definição, o
+# ganho de cobertura em cartões seria 38 apostas correlacionadas no mesmo sentido.
+# Liberar aqui SÓ depois de somar os vermelhos ao μ (ou provar que o mercado da
+# casa conta só amarelos). Faltas/Finalizações/Escanteios não têm essa divergência.
+FIXTURE_MERCADOS = {"faltas", "finalizacoes", "escanteios"}
+
+
 def classify_league(lg):
     l = _n(lg)
     if any(m in l for m in LEAGUE_FORA):
         return None
-    for pred, c in LEAGUE_RULES:
+    pais, estrangeiro = _pais_do_rotulo(l)
+    for pred, c, exige in LEAGUE_RULES:
         try:
-            if pred(l): return {"cartoes": c[0], "faltas": c[1], "finalizacoes": c[2], "escanteios": c[3]}
-        except Exception: pass
+            if not pred(l):
+                continue
+            if exige and (estrangeiro or (pais and pais != exige)):
+                continue          # rótulo é de OUTRO país — regra não vale
+            return {"cartoes": c[0], "faltas": c[1], "finalizacoes": c[2], "escanteios": c[3]}
+        except Exception:
+            pass
     return None
 
 # Betano: nome do mercado cru -> mercado canônico do board (só jogo inteiro)
@@ -508,6 +602,12 @@ def main():
                         "_league": fx.get("league") or e.get("league") or "",
                         "_hn": fx["_hn"], "_an": fx["_an"],
                         "_day": fx.get("day_brt") or day, "_ini": fx.get("inicio") or ini,
+                        # identidade EXATA da Sofa (02/08): label canônico do torneio
+                        # + ids REAIS dos times. É o que permite precificar as 28 ligas
+                        # do bundle sem depender do índice de nomes legado (7-11 ligas)
+                        # nem do fuzzy, que casava time B com o principal.
+                        "_fx_label": fx.get("label"),
+                        "_fx_hid": fx.get("home_id"), "_fx_aid": fx.get("away_id"),
                     }
                     by_sofa[fx["sofa_id"]] = j
                     jogos.append(j)
@@ -603,6 +703,8 @@ def main():
 
     for j in jogos:
         parts = j.pop("_parts"); league = j.pop("_league")
+        fx_label = j.pop("_fx_label", None)
+        fx_hid, fx_aid = j.pop("_fx_hid", None), j.pop("_fx_aid", None)
         for _k in ("_hn", "_an", "_day", "_ini"): j.pop(_k, None)   # limpa campos internos do dedup
         if j.get("_ladder_rej"):
             ladder_rej_all.extend(j.pop("_ladder_rej"))
@@ -615,12 +717,38 @@ def main():
         actionable_game = gs == "upcoming"
 
         codes = classify_league(league)
-        if codes and len(parts) == 2:
+        # IDENTIDADE PELA FIXTURE (02/08): quando o jogo casou com a Sofa, a liga e os
+        # dois ids vêm de lá — exatos. Isso destrava as 28 ligas do bundle (o índice de
+        # nomes legado só tem 7-11) e elimina o fuzzy, que casava time B com o principal.
+        # Medido no board de 02/08: dos 77 jogos com mercado de cartões, ZERO estavam nas
+        # ligas do índice legado (estão em ARG/DEN/PER/NOR/CZE/CHI/COL) — o caminho antigo
+        # precificava 0 e este precifica 38. Só vale com o candidate_pricer no comando: o
+        # value_pricers legado usa outro vocabulário de código de liga.
+        fx_comp = FIXTURE_LABEL_COMP.get(fx_label) if model_source == "candidate_pricer" else None
+        if not (fx_comp and fx_hid and fx_aid):
+            fx_comp = None
+        # o caminho da fixture PULA o classify_league, e com ele o LEAGUE_FORA
+        # (feminino/base/reservas/copa/2ª divisão). Hoje as fixtures só cobrem os
+        # torneios do TOURNAMENTS (todos masculino/1ª divisão), mas a barreira não
+        # pode depender disso: se o rótulo da CASA é de um recorte excluído, não
+        # preça — mesmo com fixture casada.
+        if fx_comp and any(m in _n(league) for m in LEAGUE_FORA):
+            fx_comp = None
+        if (codes or fx_comp) and len(parts) == 2:
             for canon, model in MODELO.items():
-                lg = codes.get(model)
-                if lg is None or canon not in j["mercados"]: continue
-                hid = match(model, lg, parts[0]); aid = match(model, lg, parts[1])
+                if canon not in j["mercados"]: continue
+                lg_legado = (codes or {}).get(model)
+                usa_fx = fx_comp is not None and model in FIXTURE_MERCADOS
+                lg, hid, aid = (fx_comp, fx_hid, fx_aid) if usa_fx else (None, None, None)
+                if lg is None:                       # fallback: rótulo da casa + nome fuzzy
+                    lg = lg_legado
+                    if lg is None: continue
+                    hid = match(model, lg, parts[0]); aid = match(model, lg, parts[1])
                 if not hid or not aid: continue
+                # o shadow roda a família OPOSTA, que tem outro vocabulário de código
+                # de liga — passar o código do bundle pro value_pricers legado (ou
+                # vice-versa) só devolveria None e esvaziaria o arquivo de comparação.
+                lg_shadow = lg_legado if model_source == "candidate_pricer" else (fx_comp or lg)
                 for casa, linhas in j["mercados"][canon].items():
                     casa_stale = casa in stale_set
                     for ln_ in linhas:
@@ -671,8 +799,8 @@ def main():
                             n_skip_stale += 1
 
                         # shadow paralelo (nunca em j["valor"] no caminho normal)
-                        if SHADOW_PRICERS and model in SHADOW_PRICERS:
-                            spr = SHADOW_PRICERS[model].price(lg, hid, aid, ln_["linha"])
+                        if SHADOW_PRICERS and model in SHADOW_PRICERS and lg_shadow:
+                            spr = SHADOW_PRICERS[model].price(lg_shadow, hid, aid, ln_["linha"])
                             if not spr or not actionable_game or casa_stale:
                                 continue
                             dv = de_vig(ln_["over"], ln_["under"])
