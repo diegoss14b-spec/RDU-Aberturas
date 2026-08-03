@@ -212,6 +212,11 @@ jobs:
           python build_model_ledger.py
           python build_history.py
           python build_moves.py
+          # caminho da LINHA principal por jogo/mercado/casa (view "Linhas", 03/08).
+          # Reconstrói dos ticks, então é idempotente e retroativo: some o arquivo,
+          # roda de novo e volta igual. NÃO é crítico — se falhar, a aba fica com o
+          # lines.js anterior e o resto do site publica normalmente.
+          python build_lines.py || echo "[aviso] build_lines falhou — mantém o anterior"
           # dataset abertura×fechamento (μ implícito) — CRÍTICO no full (§8): se falhar, a etapa
           # falha e o deploy é bloqueado (não pode publicar board fresco + openclose stale).
           python build_openclose.py

@@ -105,9 +105,22 @@ class CandidateMeanTests(unittest.TestCase):
             league = next((raw for raw, mapped in pricer.xwalk.items() if mapped == comp), comp)
             priced = pricer.price(league, home, away, 10.5)
             self.assertIsNotNone(priced)
+            # invariante que vale pros 4: o mu publicado É o que foi pra CDF
             self.assertAlmostEqual(priced["mu"], priced["mu_cal"])
-            expected = max(0.1, pricer.a + pricer.b * priced["mu_raw"])
-            self.assertAlmostEqual(priced["mu_cal"], expected)
+            afim = max(0.1, pricer.a + pricer.b * priced["mu_raw"])
+            if isinstance(pricer, CardsPricer):
+                # ⚠️ CARTÕES (02/08): o mercado liquida AMARELOS + VERMELHOS, então
+                # o mu publicado é o TOTAL — a afim é só o passo dos amarelos, e
+                # depois vem o degrau IFAB + a contribuição do vermelho. Este teste
+                # afirmava a afim pura pros 4 pricers e ficou VERMELHO no dia em que
+                # os cartões mudaram (medido: 4,4661 contra 5,1140), sem ninguém ver:
+                # o valor.yml não roda pytest. Continua sendo um teste de verdade —
+                # exige que o total saia da afim pela regra publicada, não de um
+                # caminho paralelo.
+                self.assertAlmostEqual(priced["mu_cal"], pricer._mu_total(comp, afim))
+                self.assertNotAlmostEqual(priced["mu_cal"], afim)   # a transformação existe
+            else:
+                self.assertAlmostEqual(priced["mu_cal"], afim)
             tested += 1
         self.assertGreater(tested, 0)
 

@@ -27,11 +27,20 @@ from history_quality import (
 from history_merge import atomic_write_text
 from history_shard import load_month, save_month
 from migrate_history_keys import migrate_keys_dict, migrate_tick_file, unify_keys_dict
+# uma régua só pro lado do time: a MESMA que o board usa pra montar times[mercado][home|away].
+# Duas implementações do "de quem é esta linha" divergiriam e o banco discordaria da tela.
+from build_board import _assign_side, _betano_team
 
 ODDS = ROOT / "data" / "odds"
 HIST = ROOT / "data" / "odds_history"
 HOUSE_MAP = HIST / "house_event_map.json"
-CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365", "betfast"]
+# ⚠️ 03/08 — "sportingbet" entrou aqui. Ela é capturada todo ciclo e o `build_board`
+# a lê (load_normalized("Sportingbet", ...)), mas esta lista nunca foi atualizada:
+# a casa aparecia na Mesa e 100% das linhas dela eram descartadas antes do banco —
+# sem histórico, sem abertura/fechamento, sem CLV. Nenhum commit jamais tirou o nome
+# daqui, então não foi decisão, foi esquecimento na hora de plugar a casa.
+CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365", "betfast",
+         "sportingbet"]
 
 # métodos fortes o bastante pra FIXAR a identidade no mapa por casa (event_id).
 # one_side/slot_unique re-resolvem a cada rodada — pin errado não pode ficar grudado.
@@ -60,19 +69,31 @@ def load_events(casa):
             if not ln.strip():
                 continue
             e = json.loads(ln)
+            merc_t = {}
             if casa == "betano":
-                mk = {}
+                mk, mk_t = {}, {}
                 for aba in ("cartoes", "estatisticas", "principais_ou", "escanteios"):
                     for m in (e.get("markets", {}).get(aba) or []):
+                        if not (m.get("over") and m.get("under") and m.get("line") is not None):
+                            continue
+                        row = {"linha": m["line"], "over": m["over"], "under": m["under"]}
                         canon = BETANO_MK.get(m.get("market"))
-                        if canon and m.get("over") and m.get("under") and m.get("line") is not None:
-                            mk.setdefault(canon, {})[m["line"]] = {
-                                "linha": m["line"], "over": m["over"], "under": m["under"]
-                            }
+                        if canon:
+                            mk.setdefault(canon, {})[m["line"]] = row
+                            continue
+                        # a Betano não tem campo `mercados_time`: o time vem DENTRO do
+                        # nome ('Athletico-PR Total de Cartões'). Mesmo parser do board.
+                        par = _betano_team(m.get("market") or "")
+                        if par and par[0]:
+                            c, team = par
+                            mk_t.setdefault(c, {}).setdefault(team, {})[m["line"]] = row
                 merc = {c: list(v.values()) for c, v in mk.items()}
+                merc_t = {c: {t: list(l.values()) for t, l in times.items() if l}
+                          for c, times in mk_t.items()}
             else:
                 merc = e.get("mercados") or {}
-            if not merc:
+                merc_t = e.get("mercados_time") or {}
+            if not merc and not merc_t:
                 continue
             name = e.get("name") or ""
             parts = [p.strip() for p in name.replace(" vs. ", " - ").replace(" vs ", " - ").split(" - ")]
@@ -80,7 +101,8 @@ def load_events(casa):
             away_raw = parts[1] if len(parts) > 1 else ""
             evs.append({
                 "name": name, "start": e.get("start"), "league": e.get("league") or "",
-                "mercados": merc, "home_raw": home_raw, "away_raw": away_raw,
+                "mercados": merc, "mercados_time": merc_t,
+                "home_raw": home_raw, "away_raw": away_raw,
                 "event_id": e.get("event_id"),
             })
         return evs
@@ -217,10 +239,18 @@ def main():
 
     # batch: (casa,gid,mercado) -> list of {linha,over,under}
     batch_ou = defaultdict(list)
+    # (casa,gid,mercado) -> chaves daquele mercado nesta rodada. O movimento de LINHA
+    # é um fato do MERCADO (a linha principal andou), não de uma chave — que é sempre
+    # uma linha fixa. Sem este índice o `n_line_moves` da chave não tinha quem o
+    # incrementasse e ficava 0 em 100% das chaves (38.879 medidas em 03/08), enquanto
+    # os ticks registravam os movimentos. Contador que mente é pior que contador que
+    # falta: quem lê a chave concluía "nenhuma linha se mexeu".
+    mkt_keys = defaultdict(set)
 
     hmap = prune_house_map(load_house_map(), now)
 
     n_ticks = n_new = n_obs = n_sofa = n_skip_post = n_line_moves = 0
+    n_time_ok = n_time_sem_lado = 0
     for casa in CASAS:
         for ev in load_events(casa):
             idt = resolve_identity(casa, ev, fixtures, hmap, now_iso)
@@ -233,7 +263,27 @@ def main():
             gid = _gid(idt, djogo, h, a)
             kick_iso = idt.get("kickoff_iso") or ""
 
-            for mercado, linhas in (ev["mercados"] or {}).items():
+            # MERCADOS POR TIME (03/08). Eram capturados pelas 8 casas, exibidos pelo
+            # board e IGNORADOS aqui — 4.304 linhas por rodada sem histórico, sem CLV,
+            # sem movimento de linha, sem backtest. O dado já vinha de graça.
+            # ⚠️ O time NÃO entra na chave pelo nome: cada casa grafa diferente
+            # ('Djurgarden IF' x 'Djurgardens IF') e a chave fragmentaria. Resolve-se
+            # o LADO (home/away) com o mesmo `_assign_side` que o board usa, e o
+            # mercado vira 'Escanteios@home'. Fail-closed: lado ambíguo é DESCARTADO,
+            # porque gravar no lado errado é pior que não gravar.
+            mercados_do_evento = dict(ev["mercados"] or {})
+            for canon, por_time in (ev.get("mercados_time") or {}).items():
+                if not isinstance(por_time, dict):
+                    continue
+                for time_nome, linhas_t in por_time.items():
+                    lado_t = _assign_side(time_nome, h, a)
+                    if lado_t not in ("home", "away") or not linhas_t:
+                        n_time_sem_lado += 1
+                        continue
+                    mercados_do_evento[f"{canon}@{lado_t}"] = linhas_t
+                    n_time_ok += 1
+
+            for mercado, linhas in mercados_do_evento.items():
                 # coleta O/U da partida p/ main line
                 for l in linhas:
                     if l.get("over") and l.get("under") and l.get("linha") is not None:
@@ -259,6 +309,7 @@ def main():
                             casa, djogo, h, a, mercado, linha, lado,
                             sofa_id=idt.get("sofa_id"),
                         )
+                        mkt_keys[(casa, gid, mercado)].add(key)
                         k = keys.get(key)
                         pre_ko = is_pre_kickoff(now, kick_iso) if kick_iso else True
                         is_new = k is None
@@ -326,6 +377,7 @@ def main():
                             n_ticks += 1
 
     # main line moves por (casa, gid, mercado)
+    n_line_open = 0
     for (casa, gid, mercado), ou_list in batch_ou.items():
         main = pick_main_line(ou_list)
         if main is None:
@@ -333,15 +385,35 @@ def main():
         mk = f"{casa}|{gid}|{mercado}"
         prev = main_store.get(mk) or {}
         prev_line = prev.get("line")
-        if prev_line is not None and abs(float(prev_line) - float(main)) >= 0.01:
+        sid = gid.replace("sofa:", "") if str(gid).startswith("sofa:") else None
+        if prev_line is None:
+            # 1ª vez que vemos a linha principal deste mercado. Sem este tick o
+            # movimento só era registrado a partir do 2º valor, e a linha de
+            # ABERTURA — que é metade da pergunta "abriu 25,5 e fechou 23,5" —
+            # não existia em lugar nenhum quando a linha nunca mais se mexia.
+            tick_f.write(json.dumps({
+                "ts": now_iso, "kind": "line_open",
+                "casa": casa, "mercado": mercado, "gid": gid,
+                "linha_to": main, "sofa_id": sid,
+            }, ensure_ascii=False) + "\n")
+            n_line_open += 1
+            n_ticks += 1
+        elif abs(float(prev_line) - float(main)) >= 0.01:
             tick_f.write(json.dumps({
                 "ts": now_iso, "kind": "line_move",
                 "casa": casa, "mercado": mercado, "gid": gid,
                 "linha_from": prev_line, "linha_to": main,
-                "sofa_id": gid.replace("sofa:", "") if str(gid).startswith("sofa:") else None,
+                "sofa_id": sid,
             }, ensure_ascii=False) + "\n")
             n_line_moves += 1
             n_ticks += 1
+            # o mercado andou → todas as chaves DELE herdam a contagem. Fica
+            # explícito na chave que a linha principal daquele mercado mudou N
+            # vezes (a chave em si é de uma linha fixa e nunca "anda").
+            for key in mkt_keys.get((casa, gid, mercado), ()):
+                rec = keys.get(key)
+                if isinstance(rec, dict):
+                    rec["n_line_moves"] = (rec.get("n_line_moves") or 0) + 1
         main_store[mk] = {"line": main, "ts": now_iso}
 
     keys["__main_lines__"] = main_store
@@ -351,8 +423,10 @@ def main():
     print(f"[ingest] fatias: {len(tam)} ({n_partes} gravadas, {n_rm} removidas) · {maior}")
     save_house_map(hmap)
     print(
-        f"[ingest] {n_obs:,} obs · {n_ticks:,} ticks ({n_line_moves} line_move) · "
+        f"[ingest] {n_obs:,} obs · {n_ticks:,} ticks "
+        f"({n_line_moves} line_move, {n_line_open} line_open) · "
         f"{n_new:,} keys novas · sofa_match={n_sofa} · skip_post_ko={n_skip_post} · "
+        f"por_time={n_time_ok} (lado indefinido: {n_time_sem_lado}) · "
         f"total keys mês={len(keys):,}"
     )
 

@@ -66,6 +66,25 @@ h1 .rd{color:var(--purple)}
 .lad td.o{color:var(--red)} .lad td.u{color:var(--blue)}
 .lad tr.val-row td{background:var(--green-soft)}
 .lad .vtag{font:700 8px var(--sans);color:#fff;background:var(--green);border-radius:4px;padding:1px 5px;margin-left:4px;vertical-align:middle}
+/* view Linhas — caminho da linha principal entre a abertura e o jogo */
+.ln-busca{width:100%;box-sizing:border-box;padding:9px 12px;margin-bottom:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);font:500 13px var(--sans)}
+.ln-busca:focus{outline:2px solid var(--purple);outline-offset:1px}
+.ln-sum{margin-top:9px;display:flex;flex-direction:column;gap:4px}
+.ln-sum-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font:500 12px var(--sans)}
+.ln-mk{min-width:96px;color:var(--faint);font-weight:600}
+.ln-vals{font:600 13px var(--mono);color:var(--ink)}
+.ln-up{color:var(--red);font-weight:700;font-size:11.5px}
+.ln-down{color:var(--blue);font-weight:700;font-size:11.5px}
+.ln-flat{color:var(--faint);font-size:11px}
+.ln-cap{font:600 9px var(--disp);letter-spacing:.4px;text-transform:uppercase;color:var(--faint);background:var(--line2);border-radius:5px;padding:2px 6px}
+.ln-tab td{text-align:left}
+.ln-path{white-space:normal!important;line-height:2}
+.ln-step{display:inline-flex;flex-direction:column;align-items:center;padding:3px 7px;border:1px solid var(--line);border-radius:8px;background:var(--panel);margin:2px 0}
+.ln-step b{font:700 13px var(--mono);color:var(--ink)}
+.ln-t{font:500 9.5px var(--sans);color:var(--faint)}
+.ln-o{font:500 9.5px var(--mono);color:var(--dim)}
+.ln-arr{color:var(--faint);margin:0 5px;font-size:11px}
+@media (max-width:600px){.ln-mk{min-width:auto}.ln-sum-row{gap:6px}}
 /* main line + alternativas (legado) */
 .main-line{margin-top:11px;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--panel)}
 .main-line-h{display:flex;align-items:center;gap:8px;padding:8px 11px;border-bottom:1px solid var(--line);background:var(--purple-soft)}
@@ -433,6 +452,7 @@ h1 .mdl-badge{font-size:9.5px}
     <span class="chip on" data-view="board" role="tab" tabindex="0" aria-selected="true" aria-controls="view-board">Mesa de Aberturas</span>
     <span class="chip val" data-view="valor" role="tab" tabindex="0" aria-selected="false" aria-controls="view-valor">🎯 Valor (+EV)</span>
     <span class="chip" data-view="hist" role="tab" tabindex="0" aria-selected="false" aria-controls="view-hist">Histórico &amp; CLV</span>
+    <span class="chip" data-view="lines" role="tab" tabindex="0" aria-selected="false" aria-controls="view-lines">Linhas</span>
     <span class="chip" data-view="ops" role="tab" tabindex="0" aria-selected="false" aria-controls="view-ops">Operação</span>
   </nav>
   <main id="mesa-main">
@@ -447,6 +467,7 @@ h1 .mdl-badge{font-size:9.5px}
   </div><!-- /view-board -->
   <div id="view-valor" role="tabpanel" aria-label="Valor (+EV)" hidden></div>
   <div id="view-hist" role="tabpanel" aria-label="Histórico e CLV" hidden><div id="hist-root"></div></div>
+  <div id="view-lines" role="tabpanel" aria-label="Histórico de linhas" hidden></div>
   <div id="view-ops" role="tabpanel" aria-label="Operação" hidden></div>
   </main>
   <div class="foot">Rei do Under · Mesa de Aberturas</div>
@@ -468,8 +489,36 @@ h1 .mdl-badge{font-size:9.5px}
       board: document.getElementById("view-board"),
       valor: document.getElementById("view-valor"),
       hist: document.getElementById("view-hist"),
+      lines: document.getElementById("view-lines"),
       ops: document.getElementById("view-ops")
     };
+    // Linhas: data/lines.js (~1,7 MB) + js/lines.js também ficam fora do first paint.
+    var lnLoaded = false, lnLoading = false;
+    function loadLines() {
+      if (lnLoaded || lnLoading) return;
+      lnLoading = true;
+      var root = document.getElementById("view-lines");
+      if (root) root.innerHTML = '<div class="empty"><div class="big">⏳</div>Carregando histórico de linhas…</div>';
+      function falhou() {
+        lnLoading = false;
+        if (root) root.innerHTML = '<div class="empty"><div class="big">⚠️</div>Falha ao carregar o histórico de linhas.<br>'
+          + '<span style="font-size:12px;color:var(--faint)">Recarregue a página e tente de novo.</span></div>';
+      }
+      var d = document.createElement("script");
+      d.src = "data/lines.js";
+      d.onerror = falhou;
+      d.onload = function () {
+        var v = document.createElement("script");
+        v.src = "js/lines.js";
+        v.onerror = falhou;
+        v.onload = function () {
+          lnLoaded = true; lnLoading = false;
+          if (window.renderLines) window.renderLines();
+        };
+        document.body.appendChild(v);
+      };
+      document.body.appendChild(d);
+    }
     // P1.3 — history.js + moves.js (~5MB) fora do first paint; carregam ao abrir Histórico.
     var histLoaded = false, histLoading = false;
     function loadHist() {
@@ -520,6 +569,7 @@ h1 .mdl-badge{font-size:9.5px}
           if (views[k]) views[k].hidden = (k !== v);
         });
         if (v === "hist") loadHist();
+        if (v === "lines") { loadLines(); if (window.renderLines) window.renderLines(); }
         if (v === "valor" && window.renderValor) window.renderValor();
         if (v === "ops" && window.renderOps) window.renderOps();
         window.scrollTo(0, 0);

@@ -116,6 +116,19 @@ def migrate_keys_dict(keys, fixtures):
             new[old_key] = rec
             continue
 
+        # ⚠️ PURGA das chaves de handicap COLAPSADAS (03/08). Entre 29/07 e 03/08 o
+        # `history_key` dobrava `casa` E `fora` no mesmo "under": as duas pernas
+        # OPOSTAS do handicap de cartões dividiam a chave, e o ingest gravava uma
+        # sobre a outra no mesmo ciclo. Medido em 77 chaves: 93% das observações
+        # viravam price_move (mediana), contra 0% nos mercados normais. open/close/
+        # min/max delas não significam nada — não dá pra "consertar" um registro que
+        # é a mistura de duas apostas, só descartar. As novas nascem com lado
+        # `casa`/`fora` e não colidem. Idempotente: depois da 1ª passada não há mais
+        # o que remover.
+        if mercado == "Handicap de Cartões" and lado in ("over", "under"):
+            stats["handicap_colapsado"] = stats.get("handicap_colapsado", 0) + 1
+            continue
+
         if meta.get("format") == "sofa":
             rec["sofa_id"] = meta.get("sofa_id")
             new_key = old_key
