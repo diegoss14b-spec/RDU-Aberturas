@@ -201,7 +201,12 @@ FIXTURE_LABEL_COMP = {
 # ganho de cobertura em cartões seria 38 apostas correlacionadas no mesmo sentido.
 # Liberar aqui SÓ depois de somar os vermelhos ao μ (ou provar que o mercado da
 # casa conta só amarelos). Faltas/Finalizações/Escanteios não têm essa divergência.
-FIXTURE_MERCADOS = {"faltas", "finalizacoes", "escanteios"}
+# mercados que PODEM usar o caminho da fixture. CARTÕES entra condicionalmente:
+# só quando o bundle traz os blocos `reds`+`regime` (o pacote que converte μ de
+# AMARELOS — o que o modelo prevê — em μ de CARTÕES, que é o que a casa paga, e
+# corrige o degrau IFAB de 01/07). Sem os blocos o CardsPricer fica ok=False e
+# não precificaria nada; a checagem aqui evita prometer o que ele não entrega.
+FIXTURE_MERCADOS_BASE = {"faltas", "finalizacoes", "escanteios"}
 
 
 def classify_league(lg):
@@ -463,6 +468,14 @@ def main():
             cp, sp, fp, xp = CardsPricer(), ShotsPricer(), FoulsPricer(), CornersPricer()
             model_status, model_source = "production", "value_pricers"
     PRICERS = {"cartoes": cp, "finalizacoes": sp, "faltas": fp, "escanteios": xp}
+    # cartões só entram no caminho da fixture com o pacote reds+regime no bundle
+    FIXTURE_MERCADOS = set(FIXTURE_MERCADOS_BASE)
+    if getattr(cp, "reds", None) and getattr(cp, "regime", None) and getattr(cp, "ok", False):
+        FIXTURE_MERCADOS.add("cartoes")
+        print("[board] cartões: pacote reds+regime presente (w_global=%s · r_global=%s) — destravado"
+              % (cp.reds.get("w_global"), cp.regime.get("r_global")))
+    else:
+        print("[board] cartões: SEM pacote reds+regime no bundle — segue travado no caminho da fixture")
 
     # Baseline dual-run: a OUTRA família roda em paralelo pro arquivo de comparação
     # (nunca grava em j["valor"])
@@ -860,6 +873,18 @@ def main():
             "status": model_status,
             "source": model_source,
             "markets": list(MODELO.keys()),
+            # CARTÕES: rastro do pacote (μ de amarelos → μ de cartões + degrau IFAB).
+            # ⚠ quem lê o board tem que saber que as flags de cartões são, em boa
+            # parte, UMA aposta de regime repetida: o mercado ainda preça o nível
+            # pré-01/07 e a nossa medição pós-degrau é de poucas dezenas de jogos
+            # por liga. Publicar o r/λ aplicados deixa isso auditável na tela.
+            "cards_regime": ({"w_global": (cp.reds or {}).get("w_global"),
+                              "r_global": (cp.regime or {}).get("r_global"),
+                              "corte": (cp.regime or {}).get("corte"),
+                              "n_jogos_pos": (cp.regime or {}).get("n_jogos_pos"),
+                              "ligas_com_offset": len((cp.regime or {}).get("r_liga") or {})}
+                             if getattr(cp, "reds", None) and getattr(cp, "regime", None)
+                             else None),
         },
         "pricing": {
             "ev_formula": "p_win*odd + p_push - 1",
