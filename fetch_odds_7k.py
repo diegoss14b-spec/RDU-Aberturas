@@ -24,7 +24,7 @@ try:
 except Exception: pass
 import requests
 from capture_common import br_proxies, playwright_proxy, odds_window, in_window
-PROX = br_proxies()   # nuvem: proxy BR (geo-block bet.br); local: None
+PROX = br_proxies("7k")   # PROXY_OFF=7k roda direto (ver capture_common)
 
 ROOT = Path(__file__).resolve().parent
 OUTDIR = ROOT / "data" / "odds"; OUTDIR.mkdir(parents=True, exist_ok=True)

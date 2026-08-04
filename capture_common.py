@@ -18,8 +18,27 @@ ROOT = Path(__file__).resolve().parent
 STATUS_DIR = ROOT / "data" / "odds" / "_status"
 BRT = timezone(timedelta(hours=-3))
 
-def br_proxies():
-    """Proxy residencial BR (Decodo) p/ furar geo-block na nuvem. None se sem env (= local/direto)."""
+def br_proxies(casa=""):
+    """Proxy residencial BR (Decodo) p/ furar geo-block na nuvem. None se sem env (= local/direto).
+
+    ⚠ `PROXY_OFF` (04/08): lista separada por vírgula de casas que devem rodar
+    DIRETO, sem proxy. Existe pra medir, uma casa por vez, quem realmente
+    precisa do Decodo — sem editar código e sem redeploy: muda a env no
+    workflow, espera um ciclo, e lê `n_events`/`ok` em data/odds/_status.
+    Reverter = tirar o nome da lista.
+
+    Por que medir em vez de decidir no olho: os dois motivos do proxy são
+    DIFERENTES e um teste não cobre o outro.
+      • betano/7k  -> geo-block (.bet.br devolve 403 pra IP estrangeiro)
+      • estrelabet -> rate-limit de IP de DATACENTER (Altenar corta por volta
+        do 5º detalhe; ver nota de 11/07 no fetch_odds_estrelabet)
+    Uma requisição isolada dando 200 de fora do Brasil refuta o primeiro e NÃO
+    diz nada sobre o segundo — o fetcher dispara ~50 requisições em paralelo.
+    Só a captura inteira, rodando de IP de datacenter (= a nuvem), decide.
+    """
+    off = {x.strip().lower() for x in (os.environ.get("PROXY_OFF") or "").split(",") if x.strip()}
+    if casa and casa.strip().lower() in off:
+        return None
     user = os.environ.get("DECODO_USER"); pw = os.environ.get("DECODO_PASS")
     if not user or not pw:
         return None

@@ -191,6 +191,12 @@ jobs:
         env:
           DECODO_USER: ${{ secrets.DECODO_USER }}
           DECODO_PASS: ${{ secrets.DECODO_PASS }}
+          # ⚠ PROXY_OFF (04/08): casas que rodam DIRETO, sem Decodo. É VARIÁVEL de
+          # repositório (não secret) de propósito — dá pra editar pela interface do
+          # GitHub e medir uma casa por ciclo, sem commit e sem redeploy. Vazio = tudo
+          # pelo proxy, exatamente como antes. Reverter = apagar o nome da lista.
+          # Ler o resultado em data/odds/_status/{casa}.json → n_events e ok.
+          PROXY_OFF: ${{ vars.PROXY_OFF }}
           BETSAPI_TOKEN: ${{ secrets.BETSAPI_TOKEN }}   # bet365 via BetsAPI (repo público — só via secret)
           ODDS_WINDOW_H: ${{ env.MODE == 'close' && '2.5' || '' }}
         run: python run_capture.py

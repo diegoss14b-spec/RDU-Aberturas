@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 try:
     from capture_common import br_proxies, odds_window, in_window
-    PROX = br_proxies()          # nuvem: Decodo BR via env; local: None (direto, já é BR)
+    PROX = br_proxies("sportingbet")          # nuvem: Decodo BR via env; local: None (direto, já é BR)
 except Exception:
     PROX = None
     def odds_window(): return None

@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 try:
     from capture_common import br_proxies, odds_window, in_window
-    PROX = br_proxies()          # nuvem: Decodo BR via env; local: None (direto)
+    PROX = br_proxies("estrelabet")   # PROXY_OFF=estrelabet roda direto (ver capture_common)
 except Exception:
     PROX = None
     def odds_window(): return None       # sem capture_common: modo close desliga, janela cheia

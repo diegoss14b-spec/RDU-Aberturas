@@ -29,7 +29,7 @@ MAX_EVENTS = 60
 MIN_EVENTS = 15                     # menos que isso = captura ruim (exit 2)
 from capture_common import br_proxies, finish, odds_window, in_window
 MIN_EFF = MIN_EVENTS                # modo close (ODDS_WINDOW_H) reduz — ver main()
-PROX = br_proxies()                 # nuvem: proxy BR (geo-block); local: None/direto
+PROX = br_proxies("betano")                 # nuvem: proxy BR (geo-block); local: None/direto
 
 def log(m):
     line = f"[{datetime.now(BRT).strftime('%Y-%m-%d %H:%M')}] {m}"
