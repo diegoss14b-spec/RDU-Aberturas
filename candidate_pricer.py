@@ -138,7 +138,11 @@ class CardsPricer(_Pricer):
             mult = math.exp(t.get("b0", 0.0)
                             + t.get("b_espy", 0.0) * math.log(mu_cal / ybar))
             mult = max(lo, min(hi, mult))
-        return max(0.1, r * mu_cal + w * lam * rho * mult)
+        # ⚠️ 03/08 — o r virou RESIDUAL medido no TOTAL (obs_T/pred_T no OOF pós-degrau;
+        # ver cards_regime_blocks.regime_residual no repo do site). Escalar só os
+        # amarelos deixava a camada de vermelhos no nível pré-degrau (eles caíram −23%
+        # a/a): o total certo é r·(amarelos + vermelhos), não r·amarelos + vermelhos.
+        return max(0.1, r * (mu_cal + w * lam * rho * mult))
 
     def price(self, lg, home_id, away_id, line):
         if not self.ok or home_id is None or away_id is None:
