@@ -793,12 +793,31 @@ def unify_gids(games):
     return alias
 
 
+# lados aceitos na chave. over/under é o par Mais/Menos de sempre; casa/fora é o
+# par com MANDO, do handicap asiático de cartões (29/07). Qualquer coisa fora
+# desta lista continua caindo em "under", que é o comportamento histórico.
+LADOS_CANON = {"over": "over", "mais": "over", "under": "under", "menos": "under",
+               "casa": "casa", "home": "casa", "fora": "fora", "away": "fora"}
+
+
 def history_key(casa, day, hn, an, mercado, linha, lado, sofa_id=None):
     """Chave canônica do banco de odds.
     Com sofa: casa|sofa:{id}|mercado|linha|lado
     Sem:     casa|day|hn|an|mercado|linha|lado
+    ⚠️ 03/08 — a linha era `lado = "over" if lado in ("over","mais") else "under"`,
+    que dobrava `casa` E `fora` no MESMO "under". Com o handicap de cartões (2 vias
+    com mando, capturado desde 29/07) as duas pernas OPOSTAS do mesmo jogo caíam na
+    mesma chave: o ingest gravava a odd do mandante e sobrescrevia com a do visitante
+    no mesmo ciclo. Sintoma medido em 77 chaves: 93% das observações viravam
+    "price_move" (mediana), contra 0% nos mercados normais — a chave alternava entre
+    duas apostas diferentes. open/close/min/max dessas chaves não significavam nada.
+
+    ⚠️ 04/08 — este trecho JÁ FOI REVERTIDO uma vez, sem querer, pelo commit
+    2b8739cf: um patch gerado com `git diff origin/main` a partir de uma árvore
+    local 291 commits atrás carrega a REMOÇÃO de tudo que o origin tem a mais.
+    Nunca sincronizar arquivo por cópia da árvore local — só delta cirúrgico.
     """
-    lado = "over" if str(lado).lower() in ("over", "mais") else "under"
+    lado = LADOS_CANON.get(str(lado).lower(), "under")
     if sofa_id:
         return f"{casa}|sofa:{sofa_id}|{mercado}|{linha}|{lado}"
     return f"{casa}|{day}|{hn}|{an}|{mercado}|{linha}|{lado}"
