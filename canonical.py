@@ -143,6 +143,65 @@ ALIASES = {
     "operario mt": "operario mt",
     "botafogo pb": "botafogo pb",
     "fluminense pi": "fluminense pi",
+    # ---- rodada de descoberta do bot de chasing (25/07). Cada um foi refutado
+    # por um verificador independente e confirmado contra o índice real da
+    # Pinnacle + fonte externa; nenhum muda a normalização de outro time do
+    # sistema (colateral medido em 1.953 nomes distintos).
+    "bohemians praga": "bohemians 1905",        # Betano · Tcheca 1. Liga
+    "bayern de munique": "bayern munich",       # Sportingbet · Bundesliga/amistosos
+    "jeonbuk hyundai": "jeonbuk motors",        # Sportingbet · K League 1
+    "tiszakecske": "tiszakecskei lc",           # Sportingbet · Hungria NB II
+    "usmp": "universidad de san martin",        # Betano · Peru Liga 2
+    # ------------------------------------------------------------------
+    # SELEÇÕES: inglês (Pinnacle) → português (Betano/Sportingbet). 04/08/2026.
+    #
+    # ⚠ POR QUE: a Pinnacle publica seleção em INGLÊS e as casas-alvo em
+    # PORTUGUÊS. Tirar acento (que o norm_team já faz) resolve 'Tanzânia'↔
+    # 'Tanzania', mas NÃO resolve nome traduzido — e aí o par nunca fecha.
+    # Medido ao vivo em 04/08 com o jogo existindo NOS DOIS lados:
+    #   'Ilhas Filipinas x Tailândia'   ↔ 'Philippines x Thailand'    gscore 54
+    #   'Tanzânia x Costa do Marfim'    ↔ 'Tanzania x Ivory Coast'    gscore 54
+    #   'Burquina Faso x África do Sul' ↔ 'Burkina Faso x South Africa' gscore 72
+    # Todos abaixo do corte de 88 do resolve_gid → 0 comparativo, 0 chasing,
+    # em competição de seleção inteira (AFF ASEAN e CAN feminina rodando agora).
+    #
+    # Canônico é o PORTUGUÊS, seguindo as 4 entradas que já existiam aqui
+    # ('france'→'franca', 'spain'→'espanha', 'england'→'inglaterra',
+    # 'morocco'→'marrocos'). Só entram nomes de PAÍS inteiros e sem
+    # ambiguidade com clube; 'Iran'/'Irã' ficou de fora de propósito (a forma
+    # PT tem 3 letras e não vale o risco de colisão por um jogo raro).
+    "philippines": "filipinas", "ilhas filipinas": "filipinas",
+    "thailand": "tailandia", "ivory coast": "costa do marfim",
+    "cote d ivoire": "costa do marfim", "south africa": "africa do sul",
+    "burkina faso": "burquina faso", "myanmar": "mianmar",
+    "germany": "alemanha", "netherlands": "holanda", "holland": "holanda",
+    "belgium": "belgica", "switzerland": "suica", "sweden": "suecia",
+    "denmark": "dinamarca", "norway": "noruega", "finland": "finlandia",
+    "poland": "polonia", "czech republic": "republica tcheca",
+    "czechia": "republica tcheca", "croatia": "croacia", "serbia": "servia",
+    "greece": "grecia", "turkey": "turquia", "turkiye": "turquia",
+    "ukraine": "ucrania", "hungary": "hungria", "romania": "romenia",
+    "ireland": "irlanda", "republic of ireland": "irlanda",
+    "scotland": "escocia", "wales": "pais de gales",
+    "northern ireland": "irlanda do norte", "iceland": "islandia",
+    "italy": "italia", "japan": "japao", "south korea": "coreia do sul",
+    "korea republic": "coreia do sul", "north korea": "coreia do norte",
+    "saudi arabia": "arabia saudita", "qatar": "catar",
+    "united arab emirates": "emirados arabes unidos",
+    "egypt": "egito", "ghana": "gana", "cameroon": "camaroes",
+    "algeria": "argelia", "kenya": "quenia", "zimbabwe": "zimbabue",
+    "mozambique": "mocambique", "cape verde": "cabo verde",
+    "united states": "estados unidos", "usa": "estados unidos",
+    "ecuador": "equador", "paraguay": "paraguai", "uruguay": "uruguai",
+    "brazil": "brasil", "new zealand": "nova zelandia", "vietnam": "vietna",
+    "malaysia": "malasia", "singapore": "singapura", "cambodia": "camboja",
+    "iraq": "iraque", "jordan": "jordania", "lebanon": "libano",
+    "syria": "siria", "uzbekistan": "uzbequistao", "kazakhstan": "cazaquistao",
+    "azerbaijan": "azerbaijao", "belarus": "bielorrussia",
+    "lithuania": "lituania", "latvia": "letonia", "slovakia": "eslovaquia",
+    "slovenia": "eslovenia", "north macedonia": "macedonia do norte",
+    "bosnia and herzegovina": "bosnia e herzegovina", "moldova": "moldavia",
+    "cyprus": "chipre", "luxembourg": "luxemburgo",
 }
 
 # limiares match Sofa
@@ -734,27 +793,12 @@ def unify_gids(games):
     return alias
 
 
-# lados aceitos na chave. over/under é o par Mais/Menos de sempre; casa/fora é o
-# par com MANDO, do handicap asiático de cartões (29/07). Qualquer coisa fora
-# desta lista continua caindo em "under", que é o comportamento histórico.
-LADOS_CANON = {"over": "over", "mais": "over", "under": "under", "menos": "under",
-               "casa": "casa", "home": "casa", "fora": "fora", "away": "fora"}
-
-
 def history_key(casa, day, hn, an, mercado, linha, lado, sofa_id=None):
     """Chave canônica do banco de odds.
     Com sofa: casa|sofa:{id}|mercado|linha|lado
     Sem:     casa|day|hn|an|mercado|linha|lado
-
-    ⚠️ 03/08 — a linha era `lado = "over" if lado in ("over","mais") else "under"`,
-    que dobrava `casa` E `fora` no MESMO "under". Com o handicap de cartões (2 vias
-    com mando, capturado desde 29/07) as duas pernas OPOSTAS do mesmo jogo caíam na
-    mesma chave: o ingest gravava a odd do mandante e sobrescrevia com a do visitante
-    no mesmo ciclo. Sintoma medido em 77 chaves: 93% das observações viravam
-    "price_move" (mediana), contra 0% nos mercados normais — a chave alternava entre
-    duas apostas diferentes. open/close/min/max dessas chaves não significavam nada.
     """
-    lado = LADOS_CANON.get(str(lado).lower(), "under")
+    lado = "over" if str(lado).lower() in ("over", "mais") else "under"
     if sofa_id:
         return f"{casa}|sofa:{sofa_id}|{mercado}|{linha}|{lado}"
     return f"{casa}|{day}|{hn}|{an}|{mercado}|{linha}|{lado}"
