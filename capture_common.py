@@ -216,8 +216,26 @@ def is_close_mode():
     return odds_window() is not None
 
 
-def _market_promotion_reasons(new_counts, old_counts):
-    """Detecta colapso por mercado antes de substituir o último full saudável."""
+def _market_promotion_reasons(new_counts, old_counts, oportunidade=None):
+    """Detecta colapso por mercado antes de substituir o último full saudável.
+
+    ⚠ `oportunidade` (04/08) = quantos jogos ELEGÍVEIS existiam nesta rodada
+    para aquele mercado, por casa. Sem ele o gate compara contagem absoluta e
+    confunde duas coisas opostas:
+
+        "a fonte não tinha de onde tirar"   ×   "a nossa captura quebrou"
+
+    Medido na Pinnacle em 04/08: ela abre escanteio/cartão só PERTO do jogo —
+    31% dos jogos que começam em 6-24h têm escanteio aberto, e 0% dos que
+    começam além de 24h (0 de 630). Numa segunda de manhã, com o grosso da
+    rodada a 3+ dias, "14 → 0 cartões" é o esperado, não defeito. Do jeito
+    antigo o gate bloqueava a Mesa toda segunda, todo intervalo de seleções e
+    toda virada de temporada.
+
+    A guarda NÃO afrouxa no caso que importa: se havia jogo elegível de sobra e
+    mesmo assim veio zero, continua bloqueando — que é o sintoma de captura
+    quebrada. O perdão só vale quando a oportunidade também sumiu.
+    """
     ratio = float(os.environ.get("PROMOTE_MARKET_MIN_RATIO", "0.35"))
     base_min = int(os.environ.get("PROMOTE_MARKET_BASE_MIN", "8"))
     reasons = []
@@ -225,6 +243,9 @@ def _market_promotion_reasons(new_counts, old_counts):
         before = int(before or 0)
         after = int((new_counts or {}).get(market) or 0)
         if before >= base_min and after < before * ratio:
+            opp = (oportunidade or {}).get(market)
+            if opp is not None and int(opp) < base_min:
+                continue        # não havia de onde tirar: queda esperada
             reasons.append(
                 f"mercado {market} caiu >{(1-ratio)*100:.0f}%: {before} → {after} eventos"
             )
@@ -255,7 +276,8 @@ def _cleanup_snapshot_versions(directory, pattern, keep):
         pass
 
 
-def write_odds_latest(casa, file_name, n, at=None, *, promote_full=None, min_events=1):
+def write_odds_latest(casa, file_name, n, at=None, *, promote_full=None, min_events=1,
+                      oportunidade=None):
     """Publica ponteiros somente depois de validar o snapshot completo.
 
     O inventário ``latest_full`` aponta para um arquivo imutável em ``_snapshots``.
@@ -297,7 +319,8 @@ def write_odds_latest(casa, file_name, n, at=None, *, promote_full=None, min_eve
     promotion_reasons = []
     if promote_full and prev_src:
         old_market_counts = snapshot_market_counts(prev_src, casa=casa)
-        promotion_reasons = _market_promotion_reasons(new_market_counts, old_market_counts)
+        promotion_reasons = _market_promotion_reasons(new_market_counts, old_market_counts,
+                                                      oportunidade)
         if promotion_reasons:
             promote_full = False
             payload["promotion_blocked"] = promotion_reasons

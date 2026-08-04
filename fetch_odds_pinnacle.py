@@ -291,10 +291,26 @@ def main():
     out_path = OUTDIR / f"pinnacle_{stamp}.jsonl"
     from capture_common import write_odds_latest
 
+    # ⚠ OPORTUNIDADE (04/08) = o que a FONTE publicou, não o que nós capturamos.
+    #
+    # A 1ª versão disto contava "jogos nas próximas 24h" e não servia: hoje há
+    # 120 jogos na janela e ZERO cartão, e mesmo assim não é defeito nosso — a
+    # Pinnacle simplesmente não abriu Bookings em nenhum deles (medido: 0 filhos
+    # units=Bookings em 751 jogos; ela abre o special perto do jogo e só em
+    # parte das ligas). Contar jogo respondia a pergunta errada.
+    #
+    # A pergunta certa é: A FONTE OFERECEU? Os filhos por units já dizem isso,
+    # e é dado que o próprio parser acabou de ler. Assim o gate separa exato:
+    #   fonte não publicou (n=0)  -> queda esperada, promove
+    #   fonte publicou e nós não pegamos -> captura quebrada, bloqueia
+    _oportunidade = {"Escanteios": n_corners, "Cartões": n_books}
+    print(f"[pinnacle] a fonte publicou: {n_corners} escanteios · {n_books} cartões")
+
     def write_latest(n, promote=False):
         write_odds_latest(
             "pinnacle", out_path.name, n,
             at=now.isoformat(timespec="seconds"), promote_full=promote, min_events=MIN_EFF,
+            oportunidade=_oportunidade,
         )
 
     # parent_id → rec acumulado (Corners + Bookings no mesmo jogo)

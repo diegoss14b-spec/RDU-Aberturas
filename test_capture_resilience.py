@@ -164,3 +164,31 @@ class CaptureResilienceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_gate_perdoa_queda_sem_oportunidade():
+    """Mercado que some porque NÃO HAVIA jogo na janela não é colapso.
+
+    ⚠️ 04/08: a oportunidade é O QUE A FONTE PUBLICOU, não quantos jogos
+    existiam. Medido: 751 jogos abertos na Pinnacle e ZERO filhos
+    units=Bookings — ela abre o special perto do jogo e só em parte das ligas.
+    Contar jogo respondia a pergunta errada (a 1ª versão deste conserto ainda
+    bloqueava). Sem esse sinal o gate lia "14 → 0 cartões" como captura
+    quebrada e barrava a Mesa TODA segunda de manhã, todo intervalo de
+    seleções e toda virada de temporada.
+    """
+    from capture_common import _market_promotion_reasons as g
+    assert not g({"Cartões": 0}, {"Cartões": 14}, {"Cartões": 0})
+    assert not g({"Cartões": 0}, {"Cartões": 14}, {"Cartões": 3})
+
+
+def test_gate_NAO_perdoa_quando_havia_oportunidade():
+    """A guarda não pode afrouxar no caso que ela existe pra pegar.
+
+    Se havia jogo elegível de sobra e mesmo assim veio zero, isso é captura
+    quebrada e TEM que bloquear. Sem info de oportunidade, mantém o
+    comportamento antigo (bloqueia) — default seguro.
+    """
+    from capture_common import _market_promotion_reasons as g
+    assert g({"Cartões": 0}, {"Cartões": 14}, {"Cartões": 40})   # fonte publicou 40, pegamos 0
+    assert g({"Cartões": 0}, {"Cartões": 14}, None)
