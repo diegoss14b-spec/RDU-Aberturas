@@ -43,6 +43,15 @@ BRT = timezone(timedelta(hours=-3))
 BASE = "https://guest.api.arcadia.pinnacle.com/0.1"
 SPORT = 29  # Soccer
 H = {
+    # ⚠ 04/08: SEM esta chave o /matchups/{id}/markets/straight devolve 401 —
+    # e era por isso que a Pinnacle da Mesa vinha 0 evento havia ~63h, em
+    # silêncio. O /sports/29/matchups é público e respondia normal, então a
+    # lista chegava cheia (4.240) e TODO detalhe voltava vazio. Medido no mesmo
+    # matchup, mesma máquina, mesmo instante: sem a chave 401 em 5 de 5, com a
+    # chave HTTP 200 e 13-18 mercados em 5 de 5. É a mesma chave pública do
+    # guest que o bot de chasing usa desde 25/07 (chasing/pinn.py) — a
+    # descoberta nunca tinha atravessado pra cá.
+    "x-api-key": "CmX2KcMrXuFmNg6YFbmTxE0y9CIrOi0R",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0",
     "Accept": "application/json",
     "Accept-Language": "en-US,en;q=0.9",
@@ -74,15 +83,37 @@ def am_to_dec(p):
     return None
 
 
-def get(path, tries=3):
-    url = BASE + path if path.startswith("/") else path
+def _n_barras():
+    """Nº de barras no path, ancorado no MINUTO + PID (mesmo esquema do
+    chasing/pinn.py, gotcha 28).
+
+    A guest API fica atrás de CDN com max-age=905 que NÃO é purgado quando a
+    odd muda: a URL normal serve preço de até 15 MIN atrás. Barra dupla (ou N)
+    é chave de cache nova → sempre origem. Ancorar no minuto (e não num
+    contador) evita voltar a bater numa URL que o próprio processo cacheou
+    dentro do TTL; somar o PID separa processos rodando no mesmo minuto.
+    """
+    return 2 + int(((time.time() // 60) + (os.getpid() % 17)) % 40)
+
+
+def get(path, tries=3, fresh=True):
+    """GET no guest. `fresh` fura o CDN pela contagem de barras.
+
+    ⚠ 204 NÃO é "vazio": é a rota/param sendo REJEITADA. Devolver [] aqui fazia
+    o chamador tratar rejeição como "este jogo não tem escanteio" e seguir em
+    frente — exatamente o molde de falha que a auditoria de 04/08 apontou como
+    o mais comum destes dois sistemas ("vazio significa duas coisas e o código
+    escolhe a otimista"). Agora devolve None, que o chamador distingue.
+    """
+    p = path.lstrip("/")
     for a in range(tries):
+        url = BASE + ("/" * (_n_barras() + a) if fresh else "/") + p
         try:
             r = requests.get(url, headers=H, timeout=30)
             if r.status_code == 200 and r.text and r.text[:1] in "[{":
                 return r.json()
             if r.status_code == 204:
-                return []
+                return None
             if r.status_code in (401, 403, 429):
                 time.sleep(1.5 * (a + 1))
                 continue
