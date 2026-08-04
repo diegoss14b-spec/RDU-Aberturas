@@ -61,6 +61,37 @@ def test_history_key_lado_normalizes():
     assert k2.endswith("|under")
 
 
+def test_history_key_lados_com_mando_nao_colidem():
+    """As duas pernas do handicap de cartões TÊM que gerar chaves diferentes.
+
+    ⚠️ Este teste existe porque o conserto foi REVERTIDO sem querer em 04/08
+    (commit 2b8739cf) e NENHUM dos 169 testes acusou — a suíte inteira passou
+    com o código quebrado. Sem LADOS_CANON, 'casa' e 'fora' caem ambos em
+    'under': as duas pernas OPOSTAS do mesmo jogo colidem na mesma chave, o
+    ingest sobrescreve uma com a outra no mesmo ciclo e a migração apaga a
+    chave depois, em loop e sem log.
+    """
+    casa = history_key("bet365", "2026-08-04", "mirassol", "remo",
+                       "Handicap de Cartões", 0.5, "casa")
+    fora = history_key("bet365", "2026-08-04", "mirassol", "remo",
+                       "Handicap de Cartões", 0.5, "fora")
+    assert casa != fora, "pernas casa/fora colidiram na mesma chave"
+    assert casa.endswith("|casa") and fora.endswith("|fora")
+    # e o sinônimo em inglês tem que cair no mesmo lado canônico
+    assert history_key("bet365", "d", "h", "a", "M", 0.5, "home").endswith("|casa")
+    assert history_key("bet365", "d", "h", "a", "M", 0.5, "away").endswith("|fora")
+
+
+def test_history_key_lado_desconhecido_vira_under():
+    """Comportamento histórico preservado: lado fora da lista cai em 'under'.
+
+    Guarda contra o conserto ser feito 'ao contrário' (ex.: passar o lado cru
+    adiante), o que criaria chave nova pra cada grafia que a casa inventar.
+    """
+    assert history_key("x", "d", "h", "a", "M", 1.5, "banana").endswith("|under")
+    assert history_key("x", "d", "h", "a", "M", 1.5, "").endswith("|under")
+
+
 def test_gscore_order_swap():
     # confrontos com ordem trocada ainda casam
     s = gscore("ceara", "athletic club mg", "athletic club mg", "ceara")
@@ -136,6 +167,8 @@ def main():
         test_aliases_basic,
         test_history_key_sofa_and_legacy,
         test_history_key_lado_normalizes,
+        test_history_key_lados_com_mando_nao_colidem,
+        test_history_key_lado_desconhecido_vira_under,
         test_gscore_order_swap,
         test_match_to_sofa_pair,
         test_match_to_sofa_one_side,

@@ -177,6 +177,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      # ⚠ PORTÃO DE TESTES (04/08). Antes deste passo o repo tinha 169 testes
+      # escritos e o workflow não rodava NENHUM — foi assim que o conserto do
+      # LADOS_CANON (03/08) pôde ser desfeito por acidente em 04/08 e ninguém
+      # notou até uma auditoria olhar. Custa 0,8s e roda ANTES da captura de
+      # propósito: commit ruim falha em segundos, não depois de 10min de rede.
+      # BLOQUEANTE (sem continue-on-error): teste vermelho não vira snapshot
+      # nem deploy.
+      - name: Testes (bloqueia o ciclo se algum falhar)
+        run: python -m pytest test_*.py -q
+
       # Playwright só no full (7k pega JWTs via HTTP puro; browser é só fallback raro)
       - name: Instalar Playwright (fallback do 7k)
         if: env.MODE == 'full'
