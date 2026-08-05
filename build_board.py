@@ -187,6 +187,34 @@ FIXTURE_LABEL_COMP = {
     # COPA ARGENTINA (35 clubes argentinos; 29 também no comp ARG). Colisão de
     # sigla, não equivalência — mapear publicaria identidade falsa. O mesmo engano
     # está no LABEL2COMP do build_model_ledger.py e vale corrigir lá também.
+    #
+    # ── 05/08/2026: as 29 ligas novas do fetcher. SEM esta linha o trabalho de
+    # buscar o fixture não vale nada — o jogo ganha sofa_id e mesmo assim fica
+    # sem preço, porque é DAQUI que sai o comp do bundle. Metade feita seria
+    # exatamente o tipo de passo que "roda sem erro" e não produz efeito.
+    #
+    # ⚠ Cada rótulo abaixo foi conferido contra a competição REAL do tid (nome +
+    # país + temporada ativa), justamente pra não repetir a colisão do CDA acima:
+    # sigla igual não é competição igual. A verificação pegou dois enganos meus
+    # (Grécia U19 no lugar da principal; Sérvia numa entidade de 3 temporadas).
+    #
+    # ⚠ "ECL" (Conference League) NÃO entra, e é decisão consciente. Ela é o 2º
+    # maior bloco sem casamento hoje (27 jogos) e o bundle EXISTE (147 times),
+    # mas mapeá-la contradiria a exclusão deliberada de UCL/UEL logo acima —
+    # e a justificativa escrita ali ("não têm modelo mesmo") ficou DESATUALIZADA:
+    # os bundles de 2026-08-04 trazem CL 141, EL 141 e ECL 147 times.
+    # Ou seja, a premissa da exclusão mudou e ninguém revisitou a decisão.
+    # Virar isso sozinho seria trocar uma regra pensada por uma leitura minha de
+    # listagem de arquivo. O torneio ENTRA no fetcher (o fixture dá identidade
+    # correta e evita o casamento no evento errado, que é o caso Sporting de
+    # 22/07); o PREÇO fica pendente de decisão do Diego, junto com UCL/UEL.
+    "EFLC": "EFLC", "NED": "NED", "GER2": "GER2",
+    "SCO": "SCO", "ENG2": "ENG2", "BEL": "BEL", "POR": "POR",
+    "ITA2": "ITA2", "JPN": "JPN", "AUT": "AUT", "POL": "POL",
+    "TUR": "TUR", "GRE": "GRE", "SAU": "SAU", "UKR": "UKR",
+    "CRO": "CRO", "SRB": "SRB", "BUL": "BUL", "VEN": "VEN",
+    "PAR": "PAR", "AUS": "AUS", "ESP2": "ESP2", "FRA2": "FRA2",
+    "CDF": "CDF", "CDI": "CDI", "CDR": "CDR", "DFB": "DFB", "FAC": "FAC",
 }
 
 # mercados que PODEM usar o caminho da fixture. Cartões fica FORA por enquanto:

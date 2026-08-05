@@ -41,6 +41,34 @@ TOURNAMENTS = [
     (16736, "BOL"), (11653, "CHI"), (406, "PER"), (11539, "COL"),
     (1238, "COL2"), (703, "ARG2"), (172, "CZE"), (152, "ROU"),
     (39, "DEN"), (215, "SUI"), (13470, "CDA"), (11611, "MEXE"),
+    # ── 05/08/2026: as 29 ligas que o MODELO precifica e que não tinham fixture.
+    # MEDIDO no board de 05/08 01:51 antes de mexer: 307 jogos, 80 com sofa_id
+    # (26,1%). Dos 227 sem casamento, 198 (87%) não tinham NENHUM dos dois times
+    # nos fixtures — ou seja, liga não buscada, não falha de fuzzy. Destes, 119
+    # são de ligas que os bundles sabem precificar; o resto é Mongólia, Índia,
+    # China League 2, Champions FEMININA e amistoso — casar não geraria flag.
+    # Sem sofa_id não há preço do candidate_pricer, e sem preço não há flag: a
+    # taxa de casamento é o teto do produto.
+    #
+    # ⚠ CADA tid FOI VALIDADO 1-A-1 (/unique-tournament + /seasons +
+    # events/next/0) — é a lição do tid 352, id MORTO que travou o
+    # `source_healthy` e CONGELOU o board por 12h em 22-23/07. A validação pegou
+    # DOIS enganos meus na busca automática: "Super League" da Grécia trouxe a
+    # U19 (11414) em vez da principal, e a Sérvia trouxe uma entidade de 3
+    # temporadas (20855) em vez da Mozzart Bet Superliga — que o próprio
+    # CLAUDE.md já registrava como 210. Busca por nome erra; conferir o nome, o
+    # país e a temporada ativa é o que não erra.
+    #
+    # As 6 copas nacionais entram com 0 jogos futuros hoje (recesso de agosto):
+    # CDF/CDR/FAC. Isso é esperado e cai no caminho INATIVO do fetcher, que é
+    # warning e não falha — quando a copa abrir, os fixtures aparecem sozinhos.
+    (21, "EFLC"), (17015, "ECL"), (37, "NED"), (44, "GER2"),
+    (36, "SCO"), (18, "ENG2"), (38, "BEL"), (238, "POR"),
+    (53, "ITA2"), (196, "JPN"), (45, "AUT"), (202, "POL"),
+    (52, "TUR"), (185, "GRE"), (955, "SAU"), (218, "UKR"),
+    (170, "CRO"), (210, "SRB"), (247, "BUL"), (231, "VEN"),
+    (11541, "PAR"), (136, "AUS"), (54, "ESP2"), (182, "FRA2"),
+    (335, "CDF"), (328, "CDI"), (329, "CDR"), (217, "DFB"), (19, "FAC"),
 ]
 # ⚠ 7 → 12 (30/07/2026): a janela de FIXTURES era mais curta que o horizonte do
 # BOARD, e isso derrubou o deploy da Mesa duas vezes seguidas às 13:43/13:45.
@@ -52,6 +80,7 @@ TOURNAMENTS = [
 # Custo do aumento: ZERO requests — a busca por liga já traz ~30 eventos e a
 # janela é só um FILTRO sobre o que já veio. 12d cobre o hábito das casas de
 # abrir mercado de jogo grande até ~10 dias antes.
+FALHAS_ATE_ABRIR = 4   # falhas de transporte SEGUIDAS que abrem o disjuntor
 DAYS_AHEAD = 12
 MAX_PAGES = 3
 REQUEST_TIMEOUT = 20
@@ -154,7 +183,15 @@ def get(url, tries=2):
             if attempt + 1 < tries:
                 time.sleep(0.8 * (attempt + 1))
     _GET_DIAG["consecutive_failures"] += 1
-    if _GET_DIAG["consecutive_failures"] >= 2:
+    # ⚠ 2 → 4 em 05/08, junto com a expansão de 36 → 65 torneios. O disjuntor
+    # existe pra parar de martelar quando a FONTE caiu — e esse caso já é
+    # tratado na hora, sem contador, pelos status 401/403/407 acima ("estamos
+    # bloqueados"). Este contador aqui pega falha de TRANSPORTE (timeout, 5xx),
+    # que é por natureza esporádica e independente entre torneios. Com o dobro
+    # de torneios, a chance de duas transitórias caírem em sequência dobra, e
+    # abrir o circuito zera a rodada INTEIRA de fixtures — perder 65 ligas por
+    # dois timeouts é trocar um problema pequeno por um grande.
+    if _GET_DIAG["consecutive_failures"] >= FALHAS_ATE_ABRIR:
         _GET_DIAG["circuit_open"] = True
         _GET_DIAG["last_error"] = f"{_GET_DIAG.get('last_error') or 'transport failure'}; circuit open"
     return None
