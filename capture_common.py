@@ -45,7 +45,15 @@ def br_proxies(casa=""):
     ep = os.environ.get("DECODO_ENDPOINT", "gate.decodo.com:7000")
     u = f"user-{user}-country-br"
     url = f"http://{u}:{pw}@{ep}"
+    if casa:
+        _PROXY_USADO.add(casa.strip().lower())
     return {"http": url, "https": url}
+
+
+# casas que REALMENTE receberam proxy nesta execução. Ver a nota do campo
+# `proxy_br` em write_odds_latest — o valor antigo era `bool(DECODO_USER)`,
+# que responde "existe credencial", não "esta casa passou pelo Brasil".
+_PROXY_USADO = set()
 
 def playwright_proxy():
     """Config de proxy pro Playwright (7k). None se sem env."""
@@ -469,7 +477,14 @@ def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, samp
         "error_class": classify_error(err_s) if err_s else None,
         "mode": "close" if is_close_mode() else "full",
         "sample_events": (sample or [])[:3],
-        "proxy_br": bool(os.environ.get("DECODO_USER")),
+        # ⚠ 05/08: era `bool(os.environ.get("DECODO_USER"))` — respondia "existe
+        # credencial no ambiente", e o painel exibia isso como "BR" para TODAS as
+        # casas, inclusive as 4 que nunca chamam br_proxies (pinnacle, bet365,
+        # superbet, betfast). A Pinnacle passou o dia inteiro em zero mostrando
+        # "BR" na tela enquanto saía direto pelo IP do datacenter da Azure — o
+        # campo que deveria denunciar o problema estava afirmando o contrário.
+        # Agora diz o que de fato aconteceu com ESTA casa nesta execução.
+        "proxy_br": str(casa).strip().lower() in _PROXY_USADO,
         "pointer_valid": bool(pointer_src) if n_events > 0 else n_events == 0,
         "pointer_file": (pointer_meta or {}).get("file"),
         "pointer_at": (pointer_meta or {}).get("at"),

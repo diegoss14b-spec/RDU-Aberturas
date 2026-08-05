@@ -96,6 +96,32 @@ def _n_barras():
     return 2 + int(((time.time() // 60) + (os.getpid() % 17)) % 40)
 
 
+def _pxy():
+    """Proxy residencial BR — a Pinnacle era a ÚNICA casa da Mesa sem ele (05/08).
+
+    ⚠ MEDIDO, não suposto. O `x-api-key` de 04/08 destravou o endpoint de
+    DETALHE, mas a LISTA continuava voltando vazia na nuvem e eu declarei a
+    Pinnacle consertada medindo só na minha máquina. O log do runner diz:
+
+        [pinnacle] matchups: 0
+        [pinnacle] sem matchups (API guest vazia/bloqueada)
+
+    contra 4.671 matchups rodando o MESMO código, mesma chave e mesma URL, aqui.
+    Única variável: o IP de saída (runner = Azure westcentralus). Pelo Decodo BR
+    a resposta volta idêntica à direta — 4.671 dos dois lados.
+
+    Lição: "consertei" verificado no ambiente errado não é conserto. A Pinnacle
+    é a BALIZADORA da Mesa; com ela em zero, o justo sai de casa mole.
+
+    Respeita PROXY_OFF: `PROXY_OFF=pinnacle` volta pro direto sem editar código.
+    """
+    try:
+        from capture_common import br_proxies
+        return br_proxies("pinnacle")
+    except Exception:
+        return None
+
+
 def get(path, tries=3, fresh=True):
     """GET no guest. `fresh` fura o CDN pela contagem de barras.
 
@@ -106,10 +132,11 @@ def get(path, tries=3, fresh=True):
     escolhe a otimista"). Agora devolve None, que o chamador distingue.
     """
     p = path.lstrip("/")
+    px = _pxy()
     for a in range(tries):
         url = BASE + ("/" * (_n_barras() + a) if fresh else "/") + p
         try:
-            r = requests.get(url, headers=H, timeout=30)
+            r = requests.get(url, headers=H, timeout=30, proxies=px)
             if r.status_code == 200 and r.text and r.text[:1] in "[{":
                 return r.json()
             if r.status_code == 204:
