@@ -123,15 +123,38 @@ class FixtureHealthTest(unittest.TestCase):
         self.assertEqual({"403": 1}, diag["statuses"])
         self.assertEqual(0, diag["direct_attempts"])
 
-    def test_sofa_circuit_opens_after_two_exhausted_calls(self):
+    def test_sofa_circuit_opens_no_limite_configurado(self):
+        """Abre em FALHAS_ATE_ABRIR falhas seguidas — e NÃO abre antes.
+
+        ⚠ 05/08: o limite subiu de 2 para 4 junto com a expansão de 36 → 63
+        torneios. O teste era escrito com o número 2 cravado; agora lê a
+        constante, senão qualquer ajuste do limite reprova código correto e o
+        conserto vira "mudar o teste até passar".
+        A segunda metade é o CONTROLE NEGATIVO e é a parte que importa: uma
+        falha a menos que o limite NÃO pode abrir o circuito — abrir cedo demais
+        zera a rodada inteira de fixtures por um timeout isolado.
+        """
+        n = ff.FALHAS_ATE_ABRIR
+        # ⚠ ler a constante testa o MECANISMO ("abre em n, não em n-1") e se
+        # adapta a qualquer valor — inclusive a um valor ruim. Sozinho, isso é
+        # teste que não pode falhar. A faixa abaixo é o que de fato trava o
+        # valor: 1-2 volta a zerar a rodada por um timeout isolado (o motivo da
+        # mudança de 05/08), e acima de 8 o circuito vira decoração e o fetcher
+        # martela uma fonte caída.
+        self.assertGreaterEqual(n, 3, "limite baixo demais: 1 timeout zera a rodada")
+        self.assertLessEqual(n, 8, "limite alto demais: o circuito nunca abre")
         ff._reset_get_diag()
         with patch.multiple(ff, PROX=None):
             with patch.object(ff, "_transport_get", side_effect=TimeoutError) as request:
-                self.assertIsNone(ff.get("https://api.sofascore.com/a", tries=1))
-                self.assertIsNone(ff.get("https://api.sofascore.com/b", tries=1))
+                for i in range(n - 1):
+                    self.assertIsNone(ff.get("https://api.sofascore.com/%d" % i, tries=1))
+                self.assertFalse(ff._GET_DIAG["circuit_open"],
+                                 "abriu com %d falhas; o limite é %d" % (n - 1, n))
+                self.assertIsNone(ff.get("https://api.sofascore.com/x", tries=1))
                 self.assertTrue(ff._GET_DIAG["circuit_open"])
-                self.assertIsNone(ff.get("https://api.sofascore.com/c", tries=1))
-        self.assertEqual(2, request.call_count)
+                # com o circuito aberto, nenhuma chamada nova toca a rede
+                self.assertIsNone(ff.get("https://api.sofascore.com/y", tries=1))
+        self.assertEqual(n, request.call_count)
 
     def test_sofa_tournament_stops_when_page_covers_window(self):
         ff._reset_get_diag()
@@ -151,11 +174,26 @@ class FixtureHealthTest(unittest.TestCase):
         request.assert_called_once()
 
     def test_sofa_tournament_ids_match_expected_leagues(self):
+        """Os dois ids que já foram confundidos ficam presos no rótulo CERTO.
+
+        ⚠ 05/08: a asserção era global (`136 not in ids.values()`) e passou a
+        reprovar código correto quando a Austrália entrou — porque **136 É a
+        A-League Men**, e o que o teste de 17/07 queria dizer era "Argentina não
+        é 136", não "ninguém pode usar 136". Conferido na fonte:
+            136 = A-League Men (Australia)   648 = NCAA Men (USA College)
+            649 = Chinese Super League       155 = Liga Profesional (Argentina)
+        Guarda escrita como proibição global envelhece mal: ela proíbe o id, e o
+        que era pra proibir é a ASSOCIAÇÃO errada. Agora testa o par.
+        """
         ids = {label: utid for utid, label in ff.TOURNAMENTS}
         self.assertEqual(155, ids["Argentina"])
         self.assertEqual(649, ids["CSL"])
+        self.assertNotEqual(136, ids["Argentina"])
+        self.assertNotEqual(648, ids["CSL"])
+        # 648 é NCAA universitário: não pertence a NENHUMA liga nossa
         self.assertNotIn(648, ids.values())
-        self.assertNotIn(136, ids.values())
+        if 136 in ids.values():
+            self.assertEqual(136, ids.get("AUS"), "136 só pode ser a A-League")
 
     def test_ops_parses_iso_and_legacy_brt(self):
         self.assertIsNotNone(parse_ts_brt("2026-07-17 03:10"))

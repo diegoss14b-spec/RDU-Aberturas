@@ -89,6 +89,17 @@ LABEL2COMP = {
     "BOL": "BOL", "CHI": "CHI", "PER": "PER", "COL": "COL", "COL2": "COL2",
     "ARG2": "ARG2", "CZE": "CZE", "ROU": "ROU", "DEN": "DEN", "SUI": "SUI",
     "CDA": "CDA", "MEXE": "MEXE",
+    # ── 05/08: as 29 ligas que entraram nas fixtures. O teste
+    # `test_label2comp_cobre_todas_as_fixtures` reprovou o commit anterior por
+    # esta falta exata — é o guard contra o meio-feito, e ele funcionou:
+    # torneio buscado sem comp aqui cai em `label_fora_do_mapa` e some do ledger,
+    # ou seja, o jogo entraria no board e ficaria fora do estudo de CLV.
+    "EFLC": "EFLC", "ECL": "ECL", "NED": "NED", "GER2": "GER2", "SCO": "SCO",
+    "ENG2": "ENG2", "BEL": "BEL", "POR": "POR", "ITA2": "ITA2", "JPN": "JPN",
+    "AUT": "AUT", "POL": "POL", "TUR": "TUR", "GRE": "GRE", "SAU": "SAU",
+    "UKR": "UKR", "CRO": "CRO", "SRB": "SRB", "BUL": "BUL", "VEN": "VEN",
+    "PAR": "PAR", "AUS": "AUS", "ESP2": "ESP2", "FRA2": "FRA2",
+    "CDF": "CDF", "CDI": "CDI", "CDR": "CDR", "DFB": "DFB", "FAC": "FAC",
 }
 
 # B3 — semântica de liquidação da CASA em linha inteira (medida, não presumida).
