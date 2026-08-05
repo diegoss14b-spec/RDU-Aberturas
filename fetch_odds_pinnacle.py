@@ -97,23 +97,32 @@ def _n_barras():
 
 
 def _pxy():
-    """Proxy residencial BR — a Pinnacle era a ÚNICA casa da Mesa sem ele (05/08).
+    """Alavanca de proxy pra Pinnacle. DESLIGADA por padrão via PROXY_OFF.
 
-    ⚠ MEDIDO, não suposto. O `x-api-key` de 04/08 destravou o endpoint de
-    DETALHE, mas a LISTA continuava voltando vazia na nuvem e eu declarei a
-    Pinnacle consertada medindo só na minha máquina. O log do runner diz:
+    ⚠ HIPÓTESE REFUTADA — leia antes de ligar isto achando que resolve.
+    Em 05/08 a Pinnacle ficou >24h devolvendo ZERO na nuvem enquanto o MESMO
+    código, chave e URL davam 4.671 matchups na máquina do Diego:
 
         [pinnacle] matchups: 0
         [pinnacle] sem matchups (API guest vazia/bloqueada)
 
-    contra 4.671 matchups rodando o MESMO código, mesma chave e mesma URL, aqui.
-    Única variável: o IP de saída (runner = Azure westcentralus). Pelo Decodo BR
-    a resposta volta idêntica à direta — 4.671 dos dois lados.
+    Concluí que era bloqueio do IP de datacenter (runner = Azure westcentralus)
+    e roteei pelo Decodo BR. O run SEGUINTE, ainda SEM esta mudança (sha
+    5ab78376), trouxe `matchups: 4671` da mesma nuvem — ou seja, a API responde
+    ao runner e o zero era TRANSITÓRIO, não geográfico. A explicação estava
+    errada; o sintoma era real.
 
-    Lição: "consertei" verificado no ambiente errado não é conserto. A Pinnacle
-    é a BALIZADORA da Mesa; com ela em zero, o justo sai de casa mole.
+    Por isso o proxy fica DESLIGADO (PROXY_OFF inclui `pinnacle`): mudança sem
+    causa provada não entra em produção, e proxy custa cota do Decodo que o
+    Diego quer economizar. O código fica porque vira EXPERIMENTO CONTROLADO —
+    se a Pinnacle voltar a zerar, basta tirar `pinnacle` da lista e comparar.
+    A confiabilidade dela em 7 dias era 50,9% (57/112), a pior junto da Betfast,
+    então a pergunta continua aberta.
 
-    Respeita PROXY_OFF: `PROXY_OFF=pinnacle` volta pro direto sem editar código.
+    O que se sustenta desta investigação, e é o que importa: a Pinnacle é a
+    BALIZADORA da Mesa, ficou o dia todo em zero, e o painel mostrava "BR" pra
+    ela porque `proxy_br` era `bool(DECODO_USER)` — o campo que deveria
+    denunciar afirmava o contrário. Isso foi corrigido de verdade.
     """
     try:
         from capture_common import br_proxies
