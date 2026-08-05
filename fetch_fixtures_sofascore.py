@@ -56,7 +56,14 @@ DAYS_AHEAD = 12
 MAX_PAGES = 3
 REQUEST_TIMEOUT = 20
 STABLE_FILE = "sofa_latest_data.json"
-PROX = br_proxies()
+# ⚠ o NOME da fonte é obrigatório: `br_proxies()` sem argumento ignora o
+# PROXY_OFF, então o interruptor que existe pra medir quem realmente precisa do
+# Decodo nunca conseguia desligar o proxy do SofaScore — a única fonte que é API
+# pública e faz só ~44 requisições por rodada, ou seja, a candidata mais óbvia a
+# rodar direto. Achado da auditoria Kimi (05/08); era o último chamador sem nome.
+# Com o nome, `PROXY_OFF=sofa` passa a funcionar, e o campo `proxy_br` do status
+# passa a dizer a verdade sobre esta fonte também.
+PROX = br_proxies("sofa")
 
 try:
     from curl_cffi import requests as _HTTP_CLIENT

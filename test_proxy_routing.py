@@ -116,5 +116,56 @@ class PinnacleUsaProxyTest(unittest.TestCase):
         self.assertIsNone(g.call_args.kwargs.get("proxies"))
 
 
+def _chamadas_sem_nome(caminho):
+    """Chamadas a br_proxies() sem argumento, lidas da ÁRVORE SINTÁTICA.
+
+    ⚠ ERREI ISTO DUAS VEZES EM UMA HORA (05/08) tentando casar texto: a 1ª
+    versão do teste do cloudflared e a 1ª deste casaram com a PRÓPRIA explicação
+    escrita no código — o comentário citava `br_proxies()` pra explicar o
+    defeito, e depois a docstring do capture_common citou de novo. Filtrar `#`
+    não bastou porque docstring não é comentário.
+    Ler o AST resolve a classe inteira: prosa não vira nó de chamada.
+    """
+    import ast
+    try:
+        arv = ast.parse(open(caminho, encoding="utf-8").read())
+    except SyntaxError:
+        return []
+    achados = []
+    for no in ast.walk(arv):
+        if not isinstance(no, ast.Call):
+            continue
+        f = no.func
+        nome = getattr(f, "id", None) or getattr(f, "attr", None)
+        if nome == "br_proxies" and not no.args and not no.keywords:
+            achados.append(no.lineno)
+    return achados
+
+
+class SofaRespeitaProxyOffTest(unittest.TestCase):
+    """CONTROLE NEGATIVO do interruptor na fonte mais barata de desligar.
+
+    `br_proxies()` sem argumento ignora PROXY_OFF em silêncio — o SofaScore
+    ficou assim até 05/08. É API pública com ~44 requisições por rodada, ou
+    seja, a primeira candidata a sair do Decodo; e era justamente a única que o
+    interruptor não alcançava. Achado da auditoria Kimi.
+    """
+
+    def setUp(self):
+        cc._PROXY_USADO.clear()
+
+    def test_nenhum_chamador_omite_o_nome_da_fonte(self):
+        import glob
+        maus = {f: _chamadas_sem_nome(f) for f in glob.glob("fetch_*.py")}
+        maus = {f: l for f, l in maus.items() if l}
+        self.assertEqual(maus, {},
+                         "br_proxies() sem nome: PROXY_OFF nao alcanca essas fontes")
+
+    def test_proxy_off_sofa_desliga(self):
+        with patch.dict(os.environ, dict(CREDS, PROXY_OFF="sofa"), clear=False):
+            self.assertIsNone(cc.br_proxies("sofa"))
+        self.assertNotIn("sofa", cc._PROXY_USADO)
+
+
 if __name__ == "__main__":
     unittest.main()
