@@ -198,16 +198,31 @@ FIXTURE_LABEL_COMP = {
     # sigla igual não é competição igual. A verificação pegou dois enganos meus
     # (Grécia U19 no lugar da principal; Sérvia numa entidade de 3 temporadas).
     #
-    # ⚠ "ECL" (Conference League) NÃO entra, e é decisão consciente. Ela é o 2º
-    # maior bloco sem casamento hoje (27 jogos) e o bundle EXISTE (147 times),
-    # mas mapeá-la contradiria a exclusão deliberada de UCL/UEL logo acima —
-    # e a justificativa escrita ali ("não têm modelo mesmo") ficou DESATUALIZADA:
-    # os bundles de 2026-08-04 trazem CL 141, EL 141 e ECL 147 times.
-    # Ou seja, a premissa da exclusão mudou e ninguém revisitou a decisão.
-    # Virar isso sozinho seria trocar uma regra pensada por uma leitura minha de
-    # listagem de arquivo. O torneio ENTRA no fetcher (o fixture dá identidade
-    # correta e evita o casamento no evento errado, que é o caso Sporting de
-    # 22/07); o PREÇO fica pendente de decisão do Diego, junto com UCL/UEL.
+    # ⚠ "ECL" (Conference League) NÃO entra — DECIDIDO pelo Diego em 05/08, com
+    # medição, e não é pra revisitar sem dado novo.
+    #
+    # O caso parecia forte: 2º maior bloco sem casamento no board (27 jogos) e o
+    # bundle EXISTE (147 times). E a justificativa escrita na exclusão de
+    # UCL/UEL logo acima ("não têm modelo mesmo") está mesmo DESATUALIZADA — os
+    # bundles de 2026-08-04 trazem CL 141, EL 141 e ECL 147 times.
+    #
+    # O que decidiu foi a COBERTURA DE STATS da base, medida em 05/08:
+    #     ECL  49,8%  ← metade dos jogos sem estatística
+    #     CL   75,3%   ·  EL 75,5%
+    #     LIB 100,0%   ·  SUD 100,0%
+    #     ligas domésticas (PL/LL/SA/BU/L1/BR-A) ~100%
+    # Precificar a Conference é construir preço sobre meia base. E a captura de
+    # lacunas da mesma data confirmou que o buraco NÃO é recuperável: dos 541
+    # core-nulls que a Sofa devolveu sem stat nenhuma, 384 eram ECL e 108 CL —
+    # 91% dos vazios. A fonte não tem.
+    #
+    # Ironia registrada porque importa pra próxima decisão: LIB e SUD têm 100%
+    # de cobertura e estão excluídas, enquanto a ECL a 50% era a candidata. Se
+    # um dia quiserem continental precificada, o caminho honesto é LIB/SUD.
+    #
+    # O torneio SEGUE no fetcher: o fixture dá identidade correta e evita o
+    # casamento no evento errado (caso Sporting de 22/07). É só o PREÇO que fica
+    # de fora.
     "EFLC": "EFLC", "NED": "NED", "GER2": "GER2",
     "SCO": "SCO", "ENG2": "ENG2", "BEL": "BEL", "POR": "POR",
     "ITA2": "ITA2", "JPN": "JPN", "AUT": "AUT", "POL": "POL",
