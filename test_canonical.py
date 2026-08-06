@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 from canonical import (
     norm_team, history_key, parse_history_key, match_to_sofa, resolve_fixture,
-    gscore, ALIASES,
+    gscore, ALIASES, unify_gids,
 )
 
 
@@ -187,5 +187,57 @@ def main():
     return 0 if failed == 0 else 1
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+
+
+# ---------------------------------------------------------------------------
+# O mesmo jogo em linhas separadas porque as casas escrevem o clube de 3 jeitos.
+#
+# Caso real (06/08/2026): FK Jablonec x RFS as 13:00 saia como 3 jogos no board —
+# "Rigas Futbola Skola" (Betano/Betfast/EstrelaBet), "Riga FS" (Superbet) e "RFS"
+# (Sportingbet, a unica com sofa_id). O `ratio` do unify_gids e token_set_ratio CRU,
+# entao os ALIASES nao o alcancavam: os pares davam 46, 18 e 40 contra o piso de 90.
+# Consequencia: a Mesa nao comparava as casas entre si — que e a razao de ela existir —
+# e 2 das 3 linhas ficavam sem previsao do modelo por nao terem o id da Sofa.
+# ---------------------------------------------------------------------------
+_KO_JABLONEC = 1754496000  # 2026-08-06 13:00 -03
+
+
+def _jogos_jablonec():
+    return {
+        "betano":   {"day": "2026-08-06", "hn": "FK Jablonec",
+                     "an": "Rigas Futbola Skola", "n": 3, "sofa": None, "kick_ts": _KO_JABLONEC},
+        "superbet": {"day": "2026-08-06", "hn": "Jablonec",
+                     "an": "Riga FS", "n": 1, "sofa": None, "kick_ts": _KO_JABLONEC},
+        "sporting": {"day": "2026-08-06", "hn": "FK Jablonec",
+                     "an": "RFS", "n": 1, "sofa": 16585831, "kick_ts": _KO_JABLONEC},
+    }
+
+
+def test_unify_tres_grafias_do_mesmo_clube():
+    j = _jogos_jablonec()
+    m = unify_gids(j)
+    raizes = {m.get(g, g) for g in j}
+    assert len(raizes) == 1, "as 3 linhas do mesmo jogo tem que virar uma so"
+
+
+def test_unify_raiz_e_a_linha_com_sofa_id():
+    """Senao o grupo unificado fica sem previsao do modelo."""
+    m = unify_gids(_jogos_jablonec())
+    assert m.get("betano") == "sporting"
+    assert m.get("superbet") == "sporting"
+
+
+def test_alias_rfs_nao_cola_riga_fc():
+    """Riga FC NAO e o RFS — o alias nao pode fundir os dois."""
+    assert norm_team("RFS") == "rfs"
+    assert norm_team("Rigas Futbola Skola") == "rfs"
+    assert norm_team("Riga FS") == "rfs"
+    assert norm_team("Riga FC") != "rfs"
+
+
+def test_unify_normalizado_nao_atropela_guarda_de_kickoff():
+    """A normalizacao nao pode colar partidas distintas do mesmo time."""
+    j = _jogos_jablonec()
+    j["superbet"]["kick_ts"] = _KO_JABLONEC + 6 * 3600   # 6h depois: outra partida
+    m = unify_gids(j)
+    assert m.get("superbet", "superbet") != m.get("sporting", "sporting")

@@ -40,6 +40,16 @@ ALIASES = {
     "vasco": "vasco da gama", "athletico": "athletico paranaense",
     "gremio novorizontino": "novorizontino", "operario": "operario ferroviario",
     "operario pr": "operario ferroviario", "crb": "crb al", "crb al": "crb al",
+    # Rīgas Futbola Skola (LET) — as casas escrevem de 3 jeitos e o board quebrava o
+    # MESMO jogo em 3 linhas (05/08/2026): FK Jablonec x RFS, 06/08 13:00, saía como
+    # "Rigas Futbola Skola" (Betano/Betfast/EstrelaBet), "Riga FS" (Superbet) e "RFS"
+    # (Sportingbet, a única com sofa_id). Efeito: a Mesa não conseguia comparar as
+    # casas entre si — que é exatamente pra isso que ela existe — e 2 das 3 linhas
+    # ficavam sem previsão do modelo por não terem o id da Sofa.
+    # Alvo = "rfs" porque é assim que a SOFASCORE escreve, e é ela que ancora o
+    # casamento. Conferida a colisão contra as 869 equipes do snapshot de fixtures:
+    # só existe um clube que normaliza pra "rfs", e o "Riga FC" fica separado.
+    "riga fs": "rfs", "rigas futbola skola": "rfs", "rigas fs": "rfs",
     "france": "franca", "spain": "espanha", "england": "inglaterra",
     "argentina": "argentina", "morocco": "marrocos", "marrocos": "marrocos",
     "america mineiro": "america mg", "america mg": "america mg",
@@ -762,8 +772,23 @@ def unify_gids(games):
                 ka, kb = ga.get("kick_ts"), gb.get("kick_ts")
                 if ka and kb and abs(float(ka) - float(kb)) > UNIFY_KICK_TOL_MIN * 60:
                     continue  # kickoffs reais longe demais: partidas distintas
-                straight = min(ratio(ga["hn"], gb["hn"]), ratio(ga["an"], gb["an"]))
-                crossed = min(ratio(ga["hn"], gb["an"]), ratio(ga["an"], gb["hn"]))
+                # ⚠️ COMPARA O NOME NORMALIZADO, NÃO O CRU (05/08/2026).
+                # `ratio` é `token_set_ratio` puro e NÃO passa pelo `norm_team` — logo os
+                # ALIASES não o alcançavam, e o board quebrava o mesmo jogo em linhas
+                # separadas quando as casas usam nomes muito diferentes para o mesmo
+                # clube. Caso que motivou: FK Jablonec × RFS, 06/08 13:00, em 3 linhas —
+                # "Rigas Futbola Skola" (Betano/Betfast/EstrelaBet), "Riga FS" (Superbet)
+                # e "RFS" (Sportingbet, a única com sofa_id). Cru, o par dava 46, 18 e 40
+                # contra o piso de 90. Efeito: a Mesa não comparava as casas entre si, e
+                # 2 das 3 linhas ficavam sem previsão por não terem o id da Sofa.
+                # A normalização fica AQUI e não no `ratio`, de propósito: o `ratio` também
+                # alimenta `gscore` e o casamento de lados, e mexer nele mudaria o
+                # comportamento de tudo. Medido sobre os 190 jogos do board de 06/08:
+                # com o `ratio` cru unificam 0 grupos; com o normalizado, exatamente 1 —
+                # o Jablonec. Nenhum outro jogo é tocado.
+                _r = lambda a, b: ratio(norm_team(a or ""), norm_team(b or ""))
+                straight = min(_r(ga["hn"], gb["hn"]), _r(ga["an"], gb["an"]))
+                crossed = min(_r(ga["hn"], gb["an"]), _r(ga["an"], gb["hn"]))
                 s = max(straight, crossed)
                 if s < UNIFY_MIN:
                     continue
