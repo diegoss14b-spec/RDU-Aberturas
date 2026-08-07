@@ -695,9 +695,20 @@ FLAG_CANON = {
 
 
 def _flags(name):
+    # ⚠️ TOKEN DE UMA LETRA SÓ CONTA NO FIM DO NOME (06/08/2026). Feminino/B/reserva
+    # de verdade é SUFIXO — "Corinthians F", "Atlético B", "Cabo Verde (F)" (o norm
+    # tira os parênteses e o f termina o nome). Um single-letter no MEIO é parte do
+    # nome: "Yokohama F Marinos" tinha o F virando marcador de feminino, caía no
+    # flags_mismatch contra o fixture da Sofa ("Yokohama F. Marinos", cujo ponto
+    # cola o F em "fmarinos") e o board publicava o MESMO jogo em duas linhas — a
+    # da Betfast órfã, sem sofa_id e sem previsão. Tokens multi-letra (fem, res,
+    # sub, jr, ii…) seguem valendo em qualquer posição.
     out = set()
-    for t in (name or "").split():
+    toks = (name or "").split()
+    for i, t in enumerate(toks):
         if t not in FLAG_TOKENS:
+            continue
+        if len(t) == 1 and i != len(toks) - 1:
             continue
         c = FLAG_CANON.get(t, t)
         if c is not None:

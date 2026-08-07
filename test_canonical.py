@@ -241,3 +241,21 @@ def test_unify_normalizado_nao_atropela_guarda_de_kickoff():
     j["superbet"]["kick_ts"] = _KO_JABLONEC + 6 * 3600   # 6h depois: outra partida
     m = unify_gids(j)
     assert m.get("superbet", "superbet") != m.get("sporting", "sporting")
+
+
+def test_flag_de_uma_letra_so_no_fim_do_nome():
+    """'Yokohama F Marinos' NAO e time feminino — o F e parte do nome.
+
+    Caso real (06/08/2026): o board publicava o mesmo jogo em 2 linhas porque o F
+    solto virava marcador de feminino e caia no flags_mismatch contra o fixture da
+    Sofa ('Yokohama F. Marinos', cujo ponto cola o F em 'fmarinos'). Single-letter
+    de FLAG_TOKENS so conta como marcador quando e o ULTIMO token; sufixo real
+    ('Corinthians F', 'Atletico B', 'Cabo Verde (F)') continua guardado.
+    """
+    from canonical import _flags, flags_compatible
+    assert _flags(norm_team("Yokohama F Marinos")) == set()
+    assert _flags(norm_team("Corinthians F")) == {"f"}
+    assert _flags(norm_team("Cabo Verde (F)")) == {"f"}
+    assert _flags(norm_team("Atletico B")) == {"b"}
+    assert flags_compatible(norm_team("Yokohama F Marinos"), "x",
+                            norm_team("Yokohama F. Marinos"), "x")
