@@ -1,64 +1,80 @@
 {
- "ts_utc": "2026-08-07T12:28:47Z",
- "ts_brt": "2026-08-07 09:28",
+ "ts_utc": "2026-08-07T13:35:42Z",
+ "ts_brt": "2026-08-07 10:35",
  "casas_ok": [
   "betano",
   "superbet",
+  "estrelabet",
   "bet365",
-  "betfast"
+  "sportingbet"
  ],
  "casas_fail": [
   {
-   "casa": "estrelabet",
-   "error": "exit=2"
-  },
-  {
    "casa": "7k",
-   "error": "BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please ru"
+   "error": "exit=2"
   },
   {
    "casa": "pinnacle",
    "error": "exit=2"
   },
   {
-   "casa": "sportingbet",
-   "error": "exit=2"
+   "casa": "betfast",
+   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 23 → 1 eventos; mercado Chutes no gol caiu >65%: 15 → 0 eventos; mercado Faltas caiu >65%: 15 → 0 eventos; mercado Finalizações caiu >65%: 15 → 0 eventos; mercado Impedimentos caiu >65%: 14 → 0 eventos; mercado Laterais caiu >65%: 14 → 0 eventos; m"
   }
  ],
- "n_ok": 4,
- "n_fail": 4,
- "total_events": 21,
+ "n_ok": 5,
+ "n_fail": 3,
+ "total_events": 461,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 12,
-   "n_markets": 1,
+   "n_events": 60,
+   "n_markets": 6,
    "market_counts": {
-    "Escanteios": 3
+    "Cartões": 15,
+    "Chutes no gol": 10,
+    "Escanteios": 38,
+    "Faltas": 2,
+    "Finalizações": 10,
+    "Impedimentos": 2
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-07_0925.jsonl",
+   "pointer_file": "betano_2026-08-07_1024.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 3,
-   "n_markets": 2,
+   "n_events": 180,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 1,
-    "Escanteios": 3
+    "Cartões": 37,
+    "Chutes no gol": 15,
+    "Desarmes": 2,
+    "Escanteios": 178,
+    "Faltas": 5,
+    "Finalizações": 14,
+    "Impedimentos": 5,
+    "Laterais": 5,
+    "Tiros de meta": 5
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-07_0925.jsonl",
+   "pointer_file": "superbet_2026-08-07_1024.jsonl",
    "error": null
   },
   "estrelabet": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 82,
+   "n_markets": 6,
+   "market_counts": {
+    "Cartões": 41,
+    "Chutes no gol": 54,
+    "Escanteios": 81,
+    "Faltas": 17,
+    "Finalizações": 54,
+    "Impedimentos": 23
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "estrelabet_2026-08-07_1024.jsonl",
    "error": null
   },
   "7k": {
@@ -68,7 +84,7 @@
    "market_counts": {},
    "pointer_valid": true,
    "pointer_file": null,
-   "error": "BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please ru"
+   "error": null
   },
   "pinnacle": {
    "ok": false,
@@ -81,57 +97,70 @@
   },
   "bet365": {
    "ok": true,
-   "n_events": 5,
-   "n_markets": 1,
+   "n_events": 42,
+   "n_markets": 3,
    "market_counts": {
-    "Escanteios": 5
+    "Cartões": 2,
+    "Escanteios": 42,
+    "Finalizações": 1
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-07_0925.jsonl",
+   "pointer_file": "bet365_2026-08-07_1024.jsonl",
    "error": null
   },
   "betfast": {
-   "ok": true,
-   "n_events": 1,
-   "n_markets": 1,
+   "ok": false,
+   "n_events": 12,
+   "n_markets": 2,
    "market_counts": {
-    "Escanteios": 1
+    "Cartões": 1,
+    "Escanteios": 12
    },
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-08-07_0925.jsonl",
-   "error": null
+   "pointer_file": "betfast_2026-08-07_1034.jsonl",
+   "error": "promoção full bloqueada: mercado Cartões caiu >65%: 23 → 1 eventos; mercado Chutes no gol caiu >65%: 15 → 0 eventos; mercado Faltas caiu >65%: 15 → 0 eventos; mercado Finalizações caiu >65%: 15 → 0 eventos; mercado Impedimentos caiu >65%: 14 → 0 eventos; mercado Laterais caiu >65%: 14 → 0 eventos; m"
   },
   "sportingbet": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 97,
+   "n_markets": 2,
+   "market_counts": {
+    "Cartões": 1,
+    "Escanteios": 97
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "sportingbet_2026-08-07_1024.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 1,
-  "Escanteios": 12
+  "Cartões": 96,
+  "Chutes no gol": 79,
+  "Desarmes": 2,
+  "Escanteios": 436,
+  "Faltas": 24,
+  "Finalizações": 79,
+  "Impedimentos": 30,
+  "Laterais": 5,
+  "Tiros de meta": 5
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-08-07T12:28:12Z",
-  "ts_brt": "2026-08-07 09:28",
+  "ts_utc": "2026-08-07T13:28:09Z",
+  "ts_brt": "2026-08-07 10:28",
   "n_events": 768,
   "n_fixtures": 768,
   "n_markets": 0,
   "min_events": 193,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_e55faad9b3fdc2a47b11.json",
-  "pointer_at": "2026-08-07T09:28:12-03:00",
+  "pointer_file": "_snapshots/sofa_0bff0b95dcfd444c8e21.json",
+  "pointer_at": "2026-08-07T10:28:09-03:00",
   "pointer_n": 768,
   "pointer_age_h": 0.0,
-  "duration_sec": 172.7,
+  "duration_sec": 179.4,
   "error": null,
   "error_class": null,
   "transport": {
@@ -157,5 +186,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "close"
+ "mode": "full"
 }
