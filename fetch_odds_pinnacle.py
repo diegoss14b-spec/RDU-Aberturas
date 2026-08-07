@@ -126,9 +126,15 @@ def _pxy():
     """
     try:
         from capture_common import br_proxies
-        return br_proxies("pinnacle")
+        return br_proxies("pinnacle", force=_FORCE_PXY)
     except Exception:
         return None
+
+
+# 07/08: liga o fallback do wrapper — quando a captura direta zera, o run repete
+# via Decodo BR. O experimento que o texto acima pedia foi rodado pela realidade:
+# 3 dias × ~30 runs DIRETO = 0 eventos, mesma chamada local = 16.471. Causa provada.
+_FORCE_PXY = False
 
 
 def get(path, tries=3, fresh=True):
@@ -473,6 +479,21 @@ if __name__ == "__main__":
     _t0 = _t.time()
     try:
         _n = main() or 0
+        if _n == 0 and not _FORCE_PXY and _pxy() is None and os.environ.get("DECODO_USER"):
+            # 0 eventos DIRETO com credencial parada no bolso é o pior dos dois
+            # mundos (05-07/08: 3 dias de zero silencioso com PROXY_OFF=pinnacle).
+            # Repete a captura INTEIRA via proxy BR no mesmo run.
+            print("[pinnacle] 0 eventos direto — fallback via proxy BR no mesmo run")
+            _FORCE_PXY = True
+            _n = main() or 0
+        if _n == 0:
+            # zero NUNCA sai sem mensagem — era o buraco que deixou 3 dias de pane
+            # com error=None no status.
+            _msg = ("0 eventos direto E via fallback proxy BR"
+                    if _FORCE_PXY else
+                    "0 eventos direto (sem credencial Decodo pra fallback)")
+            finish("pinnacle", 0, MIN_EFF, error=_msg, t0=_t0)
+            sys.exit(2)
         sys.exit(finish("pinnacle", _n, MIN_EFF, t0=_t0))
     except SystemExit:
         raise

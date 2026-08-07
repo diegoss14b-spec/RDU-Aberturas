@@ -341,6 +341,20 @@ if __name__ == "__main__":
     from capture_common import finish
     try:
         _n = main() or 0
+        if _n == 0 and PROX is None and os.environ.get("DECODO_USER"):
+            # 07/08: PROXY_OFF incluía o 7k e a captura rodou 3 dias DIRETO da
+            # Azure — geo-block do .bet.br (medido 10/07: IP estrangeiro = 403).
+            # Fallback: repete a captura inteira via Decodo BR no mesmo run.
+            print("[7k] 0 eventos direto — fallback via proxy BR no mesmo run")
+            PROX = br_proxies("7k", force=True)
+            if PROX:
+                _n = main() or 0
+        if _n == 0:
+            _msg = ("0 eventos direto E via fallback proxy BR"
+                    if PROX else
+                    "0 eventos direto (sem credencial Decodo pra fallback)")
+            finish("7k", 0, MIN_EFF, error=_msg, t0=_t0)
+            sys.exit(2)
         sys.exit(finish("7k", _n, MIN_EFF, t0=_t0))
     except SystemExit:
         raise

@@ -167,5 +167,37 @@ class SofaRespeitaProxyOffTest(unittest.TestCase):
         self.assertNotIn("sofa", cc._PROXY_USADO)
 
 
+class ForceFallbackTest(unittest.TestCase):
+    """force=True (07/08) — o fallback do mesmo run quando a captura direta zera.
+
+    Pinnacle e 7k ficaram 3 DIAS em zero (05-07/08) com PROXY_OFF listando as
+    duas: o experimento "mede direto" nunca foi lido e virou pane permanente.
+    O force transforma PROXY_OFF em "tenta direto primeiro" — mas SÓ com
+    credencial, e sem force o comportamento antigo fica intacto (controles)."""
+
+    def setUp(self):
+        cc._PROXY_USADO.clear()
+
+    def test_force_fura_proxy_off(self):
+        with patch.dict(os.environ, dict(CREDS, PROXY_OFF="pinnacle,7k"), clear=False):
+            px = cc.br_proxies("pinnacle", force=True)
+        self.assertIsNotNone(px, "force=True deve ignorar PROXY_OFF")
+        self.assertIn("pinnacle", cc._PROXY_USADO)
+
+    def test_force_sem_credencial_continua_none(self):
+        # CONTROLE NEGATIVO: force não inventa proxy sem DECODO_USER/PASS
+        env = {k: "" for k in CREDS}
+        env["PROXY_OFF"] = "7k"
+        with patch.dict(os.environ, env, clear=False):
+            self.assertIsNone(cc.br_proxies("7k", force=True))
+        self.assertNotIn("7k", cc._PROXY_USADO)
+
+    def test_sem_force_proxy_off_segue_valendo(self):
+        # CONTROLE: o interruptor continua funcionando pra quem não pede force
+        with patch.dict(os.environ, dict(CREDS, PROXY_OFF="pinnacle"), clear=False):
+            self.assertIsNone(cc.br_proxies("pinnacle"))
+        self.assertNotIn("pinnacle", cc._PROXY_USADO)
+
+
 if __name__ == "__main__":
     unittest.main()

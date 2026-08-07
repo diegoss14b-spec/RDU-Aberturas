@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent
 STATUS_DIR = ROOT / "data" / "odds" / "_status"
 BRT = timezone(timedelta(hours=-3))
 
-def br_proxies(casa=""):
+def br_proxies(casa="", force=False):
     """Proxy residencial BR (Decodo) p/ furar geo-block na nuvem. None se sem env (= local/direto).
 
     ⚠ `PROXY_OFF` (04/08): lista separada por vírgula de casas que devem rodar
@@ -37,7 +37,11 @@ def br_proxies(casa=""):
     Só a captura inteira, rodando de IP de datacenter (= a nuvem), decide.
     """
     off = {x.strip().lower() for x in (os.environ.get("PROXY_OFF") or "").split(",") if x.strip()}
-    if casa and casa.strip().lower() in off:
+    if casa and casa.strip().lower() in off and not force:
+        # ⚠ force=True (07/08): fallback do mesmo run quando a captura DIRETA veio
+        # vazia — o PROXY_OFF vira "tenta direto primeiro", não interruptor de morte.
+        # Pinnacle e 7k ficaram 3 DIAS em zero (05-07/08) porque a lista incluía as
+        # duas e ninguém leu o resultado do experimento; credencial ainda é exigida.
         return None
     user = os.environ.get("DECODO_USER"); pw = os.environ.get("DECODO_PASS")
     if not user or not pw:
