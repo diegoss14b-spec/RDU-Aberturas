@@ -340,7 +340,18 @@ if __name__ == "__main__":
     import time as _t; _t0 = _t.time()
     from capture_common import finish
     try:
-        _n = main() or 0
+        # 07/08 (2ª rodada): a 1ª tentativa DIRETA pode ESTOURAR antes de devolver 0 —
+        # o token HTTP leva geo-block e o fetcher cai pro fallback Playwright, que
+        # quebra no runner (chromium não instalado). Exceção na 1ª tentativa também
+        # aciona o fallback via proxy, senão o retry nunca roda (visto no run 17:41).
+        _e1 = None
+        try:
+            _n = main() or 0
+        except SystemExit:
+            raise
+        except BaseException as _exc:
+            _e1 = _exc
+            _n = 0
         if _n == 0 and PROX is None and os.environ.get("DECODO_USER"):
             # 07/08: PROXY_OFF incluía o 7k e a captura rodou 3 dias DIRETO da
             # Azure — geo-block do .bet.br (medido 10/07: IP estrangeiro = 403).
@@ -350,9 +361,9 @@ if __name__ == "__main__":
             if PROX:
                 _n = main() or 0
         if _n == 0:
-            _msg = ("0 eventos direto E via fallback proxy BR"
-                    if PROX else
-                    "0 eventos direto (sem credencial Decodo pra fallback)")
+            _det = f" · 1ª tentativa: {type(_e1).__name__}: {str(_e1)[:120]}" if _e1 else ""
+            _msg = (("0 eventos direto E via fallback proxy BR" if PROX else
+                     "0 eventos direto (sem credencial Decodo pra fallback)") + _det)
             finish("7k", 0, MIN_EFF, error=_msg, t0=_t0)
             sys.exit(2)
         sys.exit(finish("7k", _n, MIN_EFF, t0=_t0))
