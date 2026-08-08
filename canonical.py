@@ -237,6 +237,12 @@ _WEAK_DEFAULT = {
     "deportiva", "deportes", "racing", "independiente", "internacional", "inter",
     "universidad", "universitario", "universidade", "america", "juventud",
     "juventude", "union", "olimpia", "olimpic", "olympic", "central", "junior",
+    # 08/08: sufixos ingleses genéricos — caso Telford: "Brackley TOWN" ×
+    # "Crawley TOWN" ganhou 92 de lado forte pelo token compartilhado e casou o
+    # jogo da National League North com o Watford×Crawley da EFL Cup (mesmo
+    # kickoff), envenenando o sofa_id e TRAVANDO o deploy pela pureza. "city" já
+    # estava aqui; "town" é o sufixo mais comum da Inglaterra e faltava.
+    "town", "county", "rovers", "wanderers", "albion", "borough",
 }
 
 

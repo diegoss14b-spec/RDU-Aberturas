@@ -259,3 +259,22 @@ def test_flag_de_uma_letra_so_no_fim_do_nome():
     assert _flags(norm_team("Atletico B")) == {"b"}
     assert flags_compatible(norm_team("Yokohama F Marinos"), "x",
                             norm_team("Yokohama F. Marinos"), "x")
+
+
+def test_weak_town_suffix_nao_sustenta_lado_forte():
+    """Caso Telford (08/08/2026): 'Brackley TOWN' × 'Crawley TOWN' ganhava 92 de
+    lado forte pelo sufixo compartilhado e casou National League North com a EFL
+    Cup no MESMO kickoff — sofa_id envenenado, deploy travado pela pureza por 3h.
+    'town' (e irmãos ingleses) agora são fracos, como 'city' já era."""
+    from canonical import side_hit_strong
+    assert side_hit_strong("brackley town", "crawley town") < 70
+    for a, b in [("tranmere rovers", "blackburn rovers"),
+                 ("wycombe wanderers", "bolton wanderers"),
+                 ("derby county", "notts county")]:
+        assert side_hit_strong(a, b) < 70, f"{a} × {b} nao podem casar"
+
+
+def test_weak_town_controle_positivo():
+    # o próprio clube segue casando forte pelo token distintivo
+    from canonical import side_hit_strong
+    assert side_hit_strong("crawley town", "crawley town fc") >= 90
