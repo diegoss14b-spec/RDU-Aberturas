@@ -1,24 +1,36 @@
 {
- "ts_utc": "2026-08-09T18:18:36Z",
- "ts_brt": "2026-08-09 15:18",
+ "ts_utc": "2026-08-09T19:02:10Z",
+ "ts_brt": "2026-08-09 16:02",
  "casas_ok": [
   "superbet",
-  "estrelabet",
-  "7k",
-  "pinnacle",
   "bet365",
-  "betfast",
-  "sportingbet"
+  "betfast"
  ],
  "casas_fail": [
   {
    "casa": "betano",
    "error": "exit=2"
+  },
+  {
+   "casa": "estrelabet",
+   "error": "exit=2"
+  },
+  {
+   "casa": "7k",
+   "error": "0 eventos direto E via fallback proxy BR"
+  },
+  {
+   "casa": "pinnacle",
+   "error": "0 eventos direto E via fallback proxy BR"
+  },
+  {
+   "casa": "sportingbet",
+   "error": "exit=2"
   }
  ],
- "n_ok": 7,
- "n_fail": 1,
- "total_events": 158,
+ "n_ok": 3,
+ "n_fail": 5,
+ "total_events": 170,
  "per_casa": {
   "betano": {
    "ok": false,
@@ -31,126 +43,111 @@
   },
   "superbet": {
    "ok": true,
-   "n_events": 44,
+   "n_events": 123,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 18,
-    "Chutes no gol": 10,
-    "Desarmes": 4,
-    "Escanteios": 44,
-    "Faltas": 6,
-    "Finalizações": 9,
-    "Impedimentos": 6,
-    "Laterais": 4,
-    "Tiros de meta": 5
+    "Cartões": 65,
+    "Chutes no gol": 28,
+    "Desarmes": 8,
+    "Escanteios": 123,
+    "Faltas": 15,
+    "Finalizações": 36,
+    "Impedimentos": 15,
+    "Laterais": 11,
+    "Tiros de meta": 11
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-09_1505.jsonl",
+   "pointer_file": "superbet_2026-08-09_1555.jsonl",
    "error": null
   },
   "estrelabet": {
-   "ok": true,
-   "n_events": 35,
-   "n_markets": 6,
-   "market_counts": {
-    "Cartões": 11,
-    "Chutes no gol": 9,
-    "Escanteios": 35,
-    "Faltas": 6,
-    "Finalizações": 9,
-    "Impedimentos": 7
-   },
+   "ok": false,
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-08-09_1505.jsonl",
+   "pointer_file": null,
    "error": null
   },
   "7k": {
-   "ok": true,
-   "n_events": 15,
-   "n_markets": 4,
-   "market_counts": {
-    "Cartões": 8,
-    "Desarmes": 2,
-    "Escanteios": 15,
-    "Faltas": 4
-   },
+   "ok": false,
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "7k_2026-08-09_1505.jsonl",
-   "error": null
+   "pointer_file": null,
+   "error": "0 eventos direto E via fallback proxy BR"
   },
   "pinnacle": {
-   "ok": true,
-   "n_events": 19,
-   "n_markets": 2,
-   "market_counts": {
-    "Cartões": 2,
-    "Escanteios": 19
-   },
+   "ok": false,
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-08-09_1505.jsonl",
-   "error": null
+   "pointer_file": null,
+   "error": "0 eventos direto E via fallback proxy BR"
   },
   "bet365": {
    "ok": true,
-   "n_events": 11,
-   "n_markets": 1,
+   "n_events": 23,
+   "n_markets": 4,
    "market_counts": {
-    "Escanteios": 11
+    "Cartões": 6,
+    "Chutes no gol": 1,
+    "Escanteios": 23,
+    "Finalizações": 4
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-09_1505.jsonl",
+   "pointer_file": "bet365_2026-08-09_1555.jsonl",
    "error": null
   },
   "betfast": {
    "ok": true,
-   "n_events": 29,
+   "n_events": 24,
    "n_markets": 8,
    "market_counts": {
-    "Cartões": 14,
+    "Cartões": 12,
     "Chutes no gol": 7,
-    "Escanteios": 29,
-    "Faltas": 5,
+    "Escanteios": 24,
+    "Faltas": 6,
     "Finalizações": 7,
-    "Impedimentos": 5,
-    "Laterais": 4,
-    "Tiros de meta": 4
+    "Impedimentos": 6,
+    "Laterais": 5,
+    "Tiros de meta": 5
    },
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-08-09_1505.jsonl",
+   "pointer_file": "betfast_2026-08-09_1601.jsonl",
    "error": null
   },
   "sportingbet": {
-   "ok": true,
-   "n_events": 5,
-   "n_markets": 2,
-   "market_counts": {
-    "Cartões": 4,
-    "Escanteios": 5
-   },
+   "ok": false,
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-08-09_1505.jsonl",
+   "pointer_file": null,
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 57,
-  "Chutes no gol": 26,
-  "Desarmes": 6,
-  "Escanteios": 158,
+  "Cartões": 83,
+  "Chutes no gol": 36,
+  "Desarmes": 8,
+  "Escanteios": 170,
   "Faltas": 21,
-  "Finalizações": 25,
-  "Impedimentos": 18,
-  "Laterais": 8,
-  "Tiros de meta": 9
+  "Finalizações": 47,
+  "Impedimentos": 21,
+  "Laterais": 16,
+  "Tiros de meta": 16
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-08-09T18:06:48Z",
-  "ts_brt": "2026-08-09 15:06",
-  "n_events": 40,
-  "n_fixtures": 40,
+  "ts_utc": "2026-08-09T18:56:49Z",
+  "ts_brt": "2026-08-09 15:56",
+  "n_events": 0,
+  "n_fixtures": 0,
   "n_markets": 0,
   "min_events": 149,
   "promoted": false,
@@ -158,22 +155,23 @@
   "pointer_file": "_snapshots/sofa_34594e3c0497761abffa.json",
   "pointer_at": "2026-08-09T14:46:29-03:00",
   "pointer_n": 593,
-  "pointer_age_h": 0.339,
-  "duration_sec": 51.6,
-  "error": "snapshot não saudável: n=40, mínimo=149; fallback preservado n=593; transporte req=17 proxy=17 direto=0 http=200:7,404:2 ultimo=ConnectionError via proxy; circuit open circuito=1 falhas=UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Eliteserien,Liber",
+  "pointer_age_h": 1.172,
+  "duration_sec": 41.1,
+  "error": "snapshot não saudável: n=0, mínimo=149; fallback preservado n=593; transporte req=8 proxy=8 direto=0 http=nenhum ultimo=ConnectionError via proxy; circuit open circuito=1 falhas=BR-A,BR-B,BR-CdB,WC,UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Elite",
   "error_class": "Other",
   "transport": {
-   "requests": 17,
-   "proxy_attempts": 17,
+   "requests": 8,
+   "proxy_attempts": 8,
    "direct_attempts": 0,
-   "statuses": {
-    "200": 7,
-    "404": 2
-   },
+   "statuses": {},
    "last_error": "ConnectionError via proxy; circuit open",
    "consecutive_failures": 4,
    "circuit_open": true,
    "failed_tournaments": [
+    "BR-A",
+    "BR-B",
+    "BR-CdB",
+    "WC",
     "UCL",
     "UEL",
     "EPL",
@@ -234,13 +232,10 @@
     "DFB",
     "FAC"
    ],
-   "inactive_tournaments": [
-    "BR-CdB",
-    "WC"
-   ]
+   "inactive_tournaments": []
   }
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "close"
+ "mode": "full"
 }
