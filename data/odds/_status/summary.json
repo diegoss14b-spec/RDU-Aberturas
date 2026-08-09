@@ -1,10 +1,12 @@
 {
- "ts_utc": "2026-08-09T19:48:39Z",
- "ts_brt": "2026-08-09 16:48",
+ "ts_utc": "2026-08-09T20:05:37Z",
+ "ts_brt": "2026-08-09 17:05",
  "casas_ok": [
   "superbet",
+  "estrelabet",
   "bet365",
-  "betfast"
+  "betfast",
+  "sportingbet"
  ],
  "casas_fail": [
   {
@@ -12,25 +14,17 @@
    "error": "exit=2"
   },
   {
-   "casa": "estrelabet",
-   "error": "exit=2"
-  },
-  {
    "casa": "7k",
-   "error": "0 eventos direto E via fallback proxy BR"
+   "error": "BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please ru"
   },
   {
    "casa": "pinnacle",
    "error": "0 eventos direto E via fallback proxy BR"
-  },
-  {
-   "casa": "sportingbet",
-   "error": "exit=2"
   }
  ],
- "n_ok": 3,
- "n_fail": 5,
- "total_events": 151,
+ "n_ok": 5,
+ "n_fail": 3,
+ "total_events": 50,
  "per_casa": {
   "betano": {
    "ok": false,
@@ -43,25 +37,25 @@
   },
   "superbet": {
    "ok": true,
-   "n_events": 102,
+   "n_events": 24,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 53,
-    "Chutes no gol": 21,
-    "Desarmes": 5,
-    "Escanteios": 102,
-    "Faltas": 10,
-    "Finalizações": 29,
-    "Impedimentos": 10,
-    "Laterais": 8,
-    "Tiros de meta": 8
+    "Cartões": 12,
+    "Chutes no gol": 6,
+    "Desarmes": 4,
+    "Escanteios": 24,
+    "Faltas": 6,
+    "Finalizações": 6,
+    "Impedimentos": 6,
+    "Laterais": 6,
+    "Tiros de meta": 6
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-09_1643.jsonl",
+   "pointer_file": "superbet_2026-08-09_1703.jsonl",
    "error": null
   },
   "estrelabet": {
-   "ok": false,
+   "ok": true,
    "n_events": 0,
    "n_markets": 0,
    "market_counts": {},
@@ -76,7 +70,7 @@
    "market_counts": {},
    "pointer_valid": true,
    "pointer_file": null,
-   "error": "0 eventos direto E via fallback proxy BR"
+   "error": "BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please ru"
   },
   "pinnacle": {
    "ok": false,
@@ -89,26 +83,25 @@
   },
   "bet365": {
    "ok": true,
-   "n_events": 23,
-   "n_markets": 4,
+   "n_events": 9,
+   "n_markets": 3,
    "market_counts": {
-    "Cartões": 6,
-    "Chutes no gol": 2,
-    "Escanteios": 23,
-    "Finalizações": 4
+    "Cartões": 3,
+    "Escanteios": 9,
+    "Finalizações": 1
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-09_1643.jsonl",
+   "pointer_file": "bet365_2026-08-09_1703.jsonl",
    "error": null
   },
   "betfast": {
    "ok": true,
-   "n_events": 26,
+   "n_events": 17,
    "n_markets": 8,
    "market_counts": {
-    "Cartões": 11,
+    "Cartões": 9,
     "Chutes no gol": 4,
-    "Escanteios": 25,
+    "Escanteios": 17,
     "Faltas": 3,
     "Finalizações": 4,
     "Impedimentos": 3,
@@ -116,11 +109,11 @@
     "Tiros de meta": 3
    },
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-08-09_1644.jsonl",
+   "pointer_file": "betfast_2026-08-09_1703.jsonl",
    "error": null
   },
   "sportingbet": {
-   "ok": false,
+   "ok": true,
    "n_events": 0,
    "n_markets": 0,
    "market_counts": {},
@@ -130,22 +123,22 @@
   }
  },
  "market_counts": {
-  "Cartões": 70,
-  "Chutes no gol": 27,
-  "Desarmes": 5,
-  "Escanteios": 150,
-  "Faltas": 13,
-  "Finalizações": 37,
-  "Impedimentos": 13,
-  "Laterais": 11,
-  "Tiros de meta": 11
+  "Cartões": 24,
+  "Chutes no gol": 10,
+  "Desarmes": 4,
+  "Escanteios": 50,
+  "Faltas": 9,
+  "Finalizações": 11,
+  "Impedimentos": 9,
+  "Laterais": 9,
+  "Tiros de meta": 9
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-08-09T19:44:59Z",
-  "ts_brt": "2026-08-09 16:44",
+  "ts_utc": "2026-08-09T20:04:45Z",
+  "ts_brt": "2026-08-09 17:04",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -155,8 +148,8 @@
   "pointer_file": "_snapshots/sofa_34594e3c0497761abffa.json",
   "pointer_at": "2026-08-09T14:46:29-03:00",
   "pointer_n": 593,
-  "pointer_age_h": 1.975,
-  "duration_sec": 41.2,
+  "pointer_age_h": 2.305,
+  "duration_sec": 40.9,
   "error": "snapshot não saudável: n=0, mínimo=149; fallback preservado n=593; transporte req=8 proxy=8 direto=0 http=nenhum ultimo=ConnectionError via proxy; circuit open circuito=1 falhas=BR-A,BR-B,BR-CdB,WC,UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Elite",
   "error_class": "Other",
   "transport": {
@@ -237,5 +230,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "full"
+ "mode": "close"
 }
