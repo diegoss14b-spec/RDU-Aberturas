@@ -59,6 +59,16 @@ def br_proxies(casa="", force=False):
 # que responde "existe credencial", não "esta casa passou pelo Brasil".
 _PROXY_USADO = set()
 
+
+def mercados_off():
+    """MERCADOS_OFF (env, lista separada por vírgula, nomes canônicos em minúsculas —
+    ex. 'escanteios'): mercados que os fetchers NÃO devem capturar quando a captura
+    do mercado é separável por request (aba da Betano, filhos Corners da Pinnacle).
+    Pedido do Diego 10/08: 'eu não uso escanteios nunca' — cortar a captura economiza
+    Decodo. Onde o mercado vem embutido no payload (superbet/estrelabet/7k), o corte
+    não economiza byte e o parse segue normal. Reverter = tirar da env (vars do repo)."""
+    return {x.strip().lower() for x in (os.environ.get("MERCADOS_OFF") or "").split(",") if x.strip()}
+
 def playwright_proxy():
     """Config de proxy pro Playwright (7k). None se sem env."""
     user = os.environ.get("DECODO_USER"); pw = os.environ.get("DECODO_PASS")

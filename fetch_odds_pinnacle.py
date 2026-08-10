@@ -63,6 +63,8 @@ MIN_EFF = MIN_EVENTS
 MAX_SPECIALS = 100  # teto de filhos corners/bookings por rodada
 
 # units Arcadia → mercado canônico do board
+from capture_common import mercados_off as _mk_off_fn
+_MK_OFF = _mk_off_fn()
 UNIT_CANON = {
     "corners": "Escanteios",
     "bookings": "Cartões",
@@ -311,6 +313,8 @@ def main():
         ul = units.lower()
         if ul not in UNIT_CANON:
             continue
+        if UNIT_CANON[ul].lower() in _MK_OFF:
+            continue   # mercado desligado (MERCADOS_OFF): não busca o detalhe do filho
         if not m.get("parentId"):
             continue
         # props de elenco: type=special (ex. "Rodri / Gavi / …" Bookings)

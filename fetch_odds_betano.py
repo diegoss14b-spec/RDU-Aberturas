@@ -25,6 +25,8 @@ H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
      "Accept": "application/json", "Accept-Language": "pt-BR"}
 BASE = "https://www.betano.bet.br"
 TABS = {"1": "gols", "4": "escanteios", "5": "cartoes", "6": "estatisticas"}
+from capture_common import mercados_off as _mk_off_fn
+_MK_OFF = _mk_off_fn()   # ex. {'escanteios'} corta a aba bt=4 (~20% dos requests/run)
 MAX_EVENTS = 60
 MIN_EVENTS = 15                     # menos que isso = captura ruim (exit 2)
 from capture_common import br_proxies, finish, odds_window, in_window
@@ -112,6 +114,8 @@ def main():
                 rec["markets"]["principais_ou"] = extract_ou(mks)
             time.sleep(0.45)
             for bt, label in TABS.items():
+                if label in _MK_OFF:
+                    continue   # mercado desligado (MERCADOS_OFF) — economiza 1 request/evento
                 d = get(f"{BASE}/api{ev['url']}?bt={bt}")
                 if d:
                     mks = ((d.get("data") or {}).get("event") or {}).get("markets") or []

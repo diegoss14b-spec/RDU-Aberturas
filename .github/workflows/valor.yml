@@ -207,6 +207,11 @@ jobs:
           # pelo proxy, exatamente como antes. Reverter = apagar o nome da lista.
           # Ler o resultado em data/odds/_status/{casa}.json → n_events e ok.
           PROXY_OFF: ${{ vars.PROXY_OFF }}
+          # Economia de Decodo (10/08, pedido do Diego): escanteios fora da captura
+          # (ele nunca usa) e full alternado nas 2 casas de payload gordo sem corte
+          # por mercado. Ambas com override por vars do repo (mudar sem redeploy).
+          MERCADOS_OFF: ${{ vars.MERCADOS_OFF || 'escanteios' }}
+          FULL_STRIDE: ${{ vars.FULL_STRIDE || '{"estrelabet":2,"7k":2}' }}
           BETSAPI_TOKEN: ${{ secrets.BETSAPI_TOKEN }}   # bet365 via BetsAPI (repo público — só via secret)
           ODDS_WINDOW_H: ${{ env.MODE == 'close' && '2.5' || '' }}
         run: python run_capture.py

@@ -93,14 +93,38 @@ def main():
     results = {}
     from concurrent.futures import ThreadPoolExecutor
     print("===== captura paralela das casas + sofa fixtures =====", flush=True)
+    # FULL_STRIDE (env json, ex. {"estrelabet":2,"7k":2}): em modo FULL a casa só
+    # captura quando hour %% stride == 0 — close (janela curta, barato) roda sempre.
+    # Economia de Decodo (10/08): estrelabet ~6MB e 7k ~4MB por full — stride 2
+    # corta metade. Casa pulada mantém o status/pointer anterior (stale-keep de 12h
+    # do write_odds_latest cobre o buraco). Reverter = tirar da env.
+    import datetime as _dt
+    _stride = {}
+    try:
+        _stride = {k.lower(): max(1, int(v)) for k, v in
+                   json.loads(os.environ.get("FULL_STRIDE") or "{}").items()}
+    except Exception:
+        print("[stride] FULL_STRIDE inválida — ignorando (todas capturam)")
+    _is_full = not os.environ.get("ODDS_WINDOW_H")
+    _hr = _dt.datetime.utcnow().hour
+    _run = []
+    for c, script, tmo in FETCHERS:
+        st = _stride.get(c.lower(), 1)
+        if _is_full and st > 1 and (_hr % st) != 0:
+            print(f"[stride] {c}: full pulado (hora {_hr} %% {st} != 0) — pointer anterior segue valendo")
+            results[c] = 0
+            continue
+        _run.append((c, script, tmo))
     with ThreadPoolExecutor(max_workers=6) as ex:
-        futs = {c: ex.submit(run_one, c, script, tmo) for c, script, tmo in FETCHERS}
+        futs = {c: ex.submit(run_one, c, script, tmo) for c, script, tmo in _run}
         fx_casa, fx_script, fx_tmo = FIXTURE_FETCH
         futs[fx_casa] = ex.submit(run_one, fx_casa, fx_script, fx_tmo)
         for casa, fut in futs.items():
             results[casa] = fut.result()
 
     for casa, script, tmo in FETCHERS:
+        if casa not in {c for c, _, _ in _run}:
+            continue   # pulada pelo stride: não re-tentar
         if not casa_ok(casa):
             print(f"\n===== RETRY {casa} =====", flush=True)
             results[casa] = run_one(casa, script, tmo)
