@@ -261,7 +261,14 @@ def _market_promotion_reasons(new_counts, old_counts, oportunidade=None):
     ratio = float(os.environ.get("PROMOTE_MARKET_MIN_RATIO", "0.35"))
     base_min = int(os.environ.get("PROMOTE_MARKET_BASE_MIN", "8"))
     reasons = []
+    _off = mercados_off()
     for market, before in (old_counts or {}).items():
+        # mercado DESLIGADO por config (MERCADOS_OFF, ex. escanteios desde 10/08):
+        # a queda pra 0 é intencional — sem esta isenção, o 1º full pós-corte
+        # compararia com o baseline antigo (Escanteios 54 → 0) e a promoção
+        # ficaria bloqueada PARA SEMPRE (baseline nunca se renovaria).
+        if str(market).strip().lower() in _off:
+            continue
         before = int(before or 0)
         after = int((new_counts or {}).get(market) or 0)
         if before >= base_min and after < before * ratio:
