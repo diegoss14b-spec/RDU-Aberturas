@@ -135,9 +135,10 @@ def _pxy():
 # via Decodo BR. O experimento que o texto acima pedia foi rodado pela realidade:
 # 3 dias × ~30 runs DIRETO = 0 eventos, mesma chamada local = 16.471. Causa provada.
 _FORCE_PXY = False
+_det_fail = 0
 
 
-def get(path, tries=3, fresh=True):
+def get(path, tries=3, fresh=True, pxy_override=None):
     """GET no guest. `fresh` fura o CDN pela contagem de barras.
 
     ⚠ 204 NÃO é "vazio": é a rota/param sendo REJEITADA. Devolver [] aqui fazia
@@ -147,7 +148,7 @@ def get(path, tries=3, fresh=True):
     escolhe a otimista"). Agora devolve None, que o chamador distingue.
     """
     p = path.lstrip("/")
-    px = _pxy()
+    px = pxy_override if pxy_override is not None else _pxy()
     for a in range(tries):
         url = BASE + ("/" * (_n_barras() + a) if fresh else "/") + p
         try:
@@ -285,9 +286,20 @@ def main():
     now = datetime.now(BRT)
     mups = get(f"/sports/{SPORT}/matchups?withSpecials=true&brandId=0") or []
     print(f"[pinnacle] matchups: {len(mups)}")
+    if not mups and not _FORCE_PXY:
+        # DIETA DE PROXY (10/08): a lista é ~93% do tráfego da casa (≈1 MB no fio
+        # × ~80 runs/dia ≈ 2,4 GB/mês no Decodo se o run inteiro for proxiado).
+        # Quando o direto falha, busca SÓ A LISTA via proxy; os ~100 detalhes
+        # (≈70 KB somados) seguem DIRETOS — nunca houve prova de bloqueio deles.
+        from capture_common import br_proxies as _bp
+        _px = _bp("pinnacle", force=True)
+        if _px:
+            print("[pinnacle] lista vazia DIRETO — buscando SÓ a lista via proxy BR (detalhes seguem diretos)")
+            mups = get(f"/sports/{SPORT}/matchups?withSpecials=true&brandId=0", pxy_override=_px) or []
+            print(f"[pinnacle] matchups via proxy: {len(mups)}")
     if not mups:
-        print("[pinnacle] sem matchups (API guest vazia/bloqueada)")
-        return 0
+        print("[pinnacle] sem matchups (API guest vazia/bloqueada nas duas rotas)")
+        return None   # sentinela ≠ "rodou e a fonte não publicou specials" (que é 0 legítimo)
 
     by_id = {m["id"]: m for m in mups if m.get("id")}
 
@@ -383,7 +395,16 @@ def main():
         mkts = get(f"/matchups/{mid}/markets/straight")
         time.sleep(random.uniform(0.12, 0.28))
         if not mkts:
+            # escalonamento (10/08): 3 detalhes SEGUIDOS mudos no caminho direto =
+            # bloqueio de detalhe (nunca visto, mas o híbrido não pode morrer calado)
+            # → resto do run via proxy. Falha isolada não conta (204/rota é normal).
+            global _det_fail
+            _det_fail += 1
+            if _det_fail >= 3 and not _FORCE_PXY and os.environ.get("DECODO_USER"):
+                globals()["_FORCE_PXY"] = True
+                print("[pinnacle] 3 detalhes seguidos sem resposta DIRETO — detalhes via proxy daqui em diante")
             continue
+        _det_fail = 0
         match_lines, home_lines, away_lines, hand_lines = parse_markets(mkts, period=0)
         if not match_lines and not home_lines and not away_lines and not hand_lines:
             continue
@@ -478,23 +499,25 @@ if __name__ == "__main__":
     import time as _t
     _t0 = _t.time()
     try:
-        _n = main() or 0
-        if _n == 0 and not _FORCE_PXY and _pxy() is None and os.environ.get("DECODO_USER"):
+        _n = main()
+        if _n is None and not _FORCE_PXY and os.environ.get("DECODO_USER"):
             # 0 eventos DIRETO com credencial parada no bolso é o pior dos dois
             # mundos (05-07/08: 3 dias de zero silencioso com PROXY_OFF=pinnacle).
             # Repete a captura INTEIRA via proxy BR no mesmo run.
-            print("[pinnacle] 0 eventos direto — fallback via proxy BR no mesmo run")
+            # última linha de defesa: lista falhou nas 2 rotas do híbrido — repete o
+            # run INTEIRO via proxy (pode ser detalhe bloqueado, não só a lista)
+            print("[pinnacle] lista vazia nas 2 rotas — run inteiro via proxy BR")
             _FORCE_PXY = True
-            _n = main() or 0
-        if _n == 0:
+            _n = main()
+        if _n is None:
             # zero NUNCA sai sem mensagem — era o buraco que deixou 3 dias de pane
             # com error=None no status.
-            _msg = ("0 eventos direto E via fallback proxy BR"
-                    if _FORCE_PXY else
-                    "0 eventos direto (sem credencial Decodo pra fallback)")
+            _msg = ("lista vazia nas rotas direta e proxy"
+                    if os.environ.get("DECODO_USER") else
+                    "lista vazia direto (sem credencial Decodo pra fallback)")
             finish("pinnacle", 0, MIN_EFF, error=_msg, t0=_t0)
             sys.exit(2)
-        sys.exit(finish("pinnacle", _n, MIN_EFF, t0=_t0))
+        sys.exit(finish("pinnacle", _n or 0, MIN_EFF, t0=_t0))
     except SystemExit:
         raise
     except BaseException as _e:

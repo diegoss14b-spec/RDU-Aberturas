@@ -155,6 +155,8 @@ def flat_ids(v):
 def main():
     now = datetime.now(BRT)
     lst = get(f"{BASE}/GetEvents?{PARAMS}&sportId=66&hoursRange={HOURS}&categoryId=0&championshipIds=0")
+    if lst is None:
+        return None   # sentinela: transporte morto (GetEvents não respondeu) → flip de rota
     events = (lst or {}).get("events") or []
     _wh = odds_window()
     if _wh is not None:   # modo close: filtra ANTES do sort/cap (senão o top-200 por mercados descarta jogos da janela)
@@ -238,14 +240,26 @@ def main():
     print(f"[estrelabet] {n_det} detalhes · {n_out} jogos com mercado de estatística salvos em {out_path.name}")
     return n_out
 
+CASA = "estrelabet"
 if __name__ == "__main__":
     import time as _t; _t0 = _t.time()
-    from capture_common import finish
+    from capture_common import finish, br_proxies
     try:
-        _n = main() or 0
-        sys.exit(finish("estrelabet", _n, MIN_EFF, t0=_t0))
+        _n = main()
+        if _n is None:
+            # lista não veio pela rota primária → tenta a OUTRA rota no MESMO run
+            # (simétrico: direto→proxy se PROXY_OFF lista a casa; proxy→direto se o
+            # Decodo morrer — pane de 09/08: 407 derrubou 5 casas por 10h em silêncio)
+            _rota2 = "proxy BR" if PROX is None else "DIRETO"
+            print(f"[{CASA}] lista vazia na rota primária — tentando {_rota2} no mesmo run")
+            globals()["PROX"] = br_proxies(CASA, force=True) if PROX is None else None
+            _n = main()
+        if _n is None:
+            finish(CASA, 0, MIN_EFF, error="lista vazia nas DUAS rotas (direto e proxy)", t0=_t0)
+            sys.exit(2)
+        sys.exit(finish(CASA, _n, MIN_EFF, t0=_t0))
     except SystemExit:
         raise
     except BaseException as _e:
-        finish("estrelabet", 0, MIN_EFF, error=_e, t0=_t0)
+        finish(CASA, 0, MIN_EFF, error=_e, t0=_t0)
         sys.exit(1)

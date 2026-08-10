@@ -352,7 +352,21 @@ if __name__ == "__main__":
         except BaseException as _exc:
             _e1 = _exc
             _n = 0
-        if _n == 0 and PROX is None and os.environ.get("DECODO_USER"):
+        if _n == 0 and PROX is not None:
+            # SIMÉTRICO (10/08): proxy era a rota primária e veio 0 — Decodo morto
+            # (pane 407 de 09/08) ou fonte fora; tenta DIRETO no mesmo run. Se o
+            # geo-block do .bet.br segue de pé o direto também dá 0 (custa ~15s),
+            # mas se a fonte relaxar a captura volta SOZINHA sem mexer em config.
+            print("[7k] 0 eventos via proxy — tentando DIRETO no mesmo run")
+            PROX = None
+            try:
+                _n = main() or 0
+            except SystemExit:
+                raise
+            except BaseException as _exc2:
+                _e1 = _e1 or _exc2
+                _n = 0
+        elif _n == 0 and PROX is None and os.environ.get("DECODO_USER"):
             # 07/08: PROXY_OFF incluía o 7k e a captura rodou 3 dias DIRETO da
             # Azure — geo-block do .bet.br (medido 10/07: IP estrangeiro = 403).
             # Fallback: repete a captura inteira via Decodo BR no mesmo run.

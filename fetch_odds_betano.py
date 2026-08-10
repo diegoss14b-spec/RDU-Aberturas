@@ -79,7 +79,7 @@ def extract_1x2(markets):
 def main():
     feed = get(f"{BASE}/api/sport/futebol/jogos-de-hoje/")
     if not feed:
-        log("feed indisponível"); return
+        log("feed indisponível"); return None   # sentinela: transporte morto → flip de rota
     events = []
     for b in ((feed.get("data") or {}).get("blocks") or []):
         for ev in (b.get("events") or []):
@@ -124,13 +124,26 @@ def main():
     log(f"✅ {n_ok} eventos capturados → {fp.name}")
     return n_ok
 
+CASA = "betano"
 if __name__ == "__main__":
     import time as _t; _t0 = _t.time()
+    from capture_common import finish, br_proxies
     try:
-        _n = main() or 0
-        sys.exit(finish("betano", _n, MIN_EFF, t0=_t0))
+        _n = main()
+        if _n is None:
+            # lista não veio pela rota primária → tenta a OUTRA rota no MESMO run
+            # (simétrico: direto→proxy se PROXY_OFF lista a casa; proxy→direto se o
+            # Decodo morrer — pane de 09/08: 407 derrubou 5 casas por 10h em silêncio)
+            _rota2 = "proxy BR" if PROX is None else "DIRETO"
+            print(f"[{CASA}] lista vazia na rota primária — tentando {_rota2} no mesmo run")
+            globals()["PROX"] = br_proxies(CASA, force=True) if PROX is None else None
+            _n = main()
+        if _n is None:
+            finish(CASA, 0, MIN_EFF, error="lista vazia nas DUAS rotas (direto e proxy)", t0=_t0)
+            sys.exit(2)
+        sys.exit(finish(CASA, _n, MIN_EFF, t0=_t0))
     except SystemExit:
         raise
     except BaseException as _e:
-        finish("betano", 0, MIN_EFF, error=_e, t0=_t0)
+        finish(CASA, 0, MIN_EFF, error=_e, t0=_t0)
         sys.exit(1)
