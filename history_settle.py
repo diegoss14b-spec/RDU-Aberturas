@@ -386,6 +386,22 @@ def settle_one(key, record, results, now, cobertura=None):
     if field == "cards":
         record["result_yellows"] = _number(result_row.get("yellow_cards"))
         record["result_reds"] = _number(result_row.get("red_cards"))
+        # 10/08 (auditoria D1): TODAS as casas da Mesa liquidam vermelho DIRETO=2
+        # (Betano/bet365/Sportingbet/Superbet/EstrelaBet/7k/Betfast — red=1 é só
+        # Betfair/Betnacional, que a Mesa não captura). O feed do site agora manda
+        # cards_r2 = Y + 2·direto + 1·2º-amarelo (dos INCIDENTES) — quando existe,
+        # a liquidação usa a régua REAL da casa; sem incidentes, segue o y+r antigo
+        # com o carimbo r1_fallback pra análise filtrar. Os DOIS números viajam.
+        _r2 = _number(result_row.get("cards_r2"))
+        record["result_r1"] = result
+        if _r2 is not None:
+            record["result_r2"] = _r2
+            record["settlement_rule"] = "red2_incidents"
+            result = _r2
+            record["result"] = result
+        else:
+            record["result_r2"] = None
+            record["settlement_rule"] = "r1_fallback"
     if abs(result - line) < 1e-9:
         record["won"] = None
     else:

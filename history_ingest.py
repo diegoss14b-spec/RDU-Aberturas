@@ -330,6 +330,11 @@ def main():
                                 "kickoff": kick_iso,
                                 "home_raw": ev["home_raw"], "away_raw": ev["away_raw"],
                                 "home_norm": h, "away_norm": a,
+                                # 10/08 (auditoria D2): liga vira campo PRÓPRIO na
+                                # criação — antes pegava carona no carimbo do modelo
+                                # (m_comp) e 62% das chaves de julho ficaram sem liga.
+                                # É o rótulo CRU da casa; análise normaliza depois.
+                                "league_raw": ev.get("league") or None,
                                 "sofa_id": idt.get("sofa_id"),
                                 "match_method": idt.get("match_method"),
                                 "match_confidence": idt.get("match_confidence"),
