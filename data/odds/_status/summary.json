@@ -1,97 +1,72 @@
 {
- "ts_utc": "2026-08-12T06:32:27Z",
- "ts_brt": "2026-08-12 03:32",
+ "ts_utc": "2026-08-12T06:51:37Z",
+ "ts_brt": "2026-08-12 03:51",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
-  "7k",
+  "pinnacle",
   "bet365",
-  "betfast",
-  "sportingbet"
+  "betfast"
  ],
  "casas_fail": [
   {
-   "casa": "pinnacle",
+   "casa": "7k",
+   "error": "0 eventos direto E via fallback proxy BR · 1ª tentativa: Error: BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-he"
+  },
+  {
+   "casa": "sportingbet",
    "error": "exit=2"
   }
  ],
- "n_ok": 7,
- "n_fail": 1,
- "total_events": 417,
+ "n_ok": 6,
+ "n_fail": 2,
+ "total_events": 12,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 60,
-   "n_markets": 9,
+   "n_events": 8,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 17,
-    "Chutes no gol": 13,
-    "Desarmes": 1,
-    "Escanteios": 36,
-    "Faltas": 6,
-    "Finalizações": 13,
-    "Impedimentos": 5,
-    "Laterais": 3,
-    "Tiros de meta": 3
+    "Escanteios": 2
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-12_0324.jsonl",
+   "pointer_file": "betano_2026-08-12_0347.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 109,
-   "n_markets": 9,
+   "n_events": 1,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 24,
-    "Chutes no gol": 17,
-    "Desarmes": 1,
-    "Escanteios": 103,
-    "Faltas": 8,
-    "Finalizações": 32,
-    "Impedimentos": 8,
-    "Laterais": 1,
-    "Tiros de meta": 1
+    "Escanteios": 1
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-12_0324.jsonl",
+   "pointer_file": "superbet_2026-08-12_0347.jsonl",
    "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 72,
-   "n_markets": 8,
+   "n_events": 1,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 31,
-    "Chutes no gol": 20,
-    "Desarmes": 2,
-    "Escanteios": 71,
-    "Faltas": 14,
-    "Finalizações": 20,
-    "Impedimentos": 12,
-    "Laterais": 1
+    "Escanteios": 1
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-08-12_0324.jsonl",
+   "pointer_file": "estrelabet_2026-08-12_0347.jsonl",
    "error": null
   },
   "7k": {
-   "ok": true,
-   "n_events": 120,
-   "n_markets": 4,
-   "market_counts": {
-    "Cartões": 40,
-    "Desarmes": 6,
-    "Escanteios": 120,
-    "Faltas": 16
-   },
+   "ok": false,
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "7k_2026-08-12_0324.jsonl",
-   "error": null
+   "pointer_file": null,
+   "error": "0 eventos direto E via fallback proxy BR · 1ª tentativa: Error: BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-he"
   },
   "pinnacle": {
-   "ok": false,
+   "ok": true,
    "n_events": 0,
    "n_markets": 0,
    "market_counts": {},
@@ -101,13 +76,13 @@
   },
   "bet365": {
    "ok": true,
-   "n_events": 30,
+   "n_events": 2,
    "n_markets": 1,
    "market_counts": {
-    "Escanteios": 30
+    "Escanteios": 2
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-12_0324.jsonl",
+   "pointer_file": "bet365_2026-08-12_0347.jsonl",
    "error": null
   },
   "betfast": {
@@ -120,47 +95,35 @@
    "error": null
   },
   "sportingbet": {
-   "ok": true,
-   "n_events": 26,
-   "n_markets": 3,
-   "market_counts": {
-    "Cartões": 7,
-    "Escanteios": 26,
-    "Finalizações": 1
-   },
+   "ok": false,
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-08-12_0324.jsonl",
+   "pointer_file": null,
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 119,
-  "Chutes no gol": 50,
-  "Desarmes": 10,
-  "Escanteios": 386,
-  "Faltas": 44,
-  "Finalizações": 66,
-  "Impedimentos": 25,
-  "Laterais": 5,
-  "Tiros de meta": 4
+  "Escanteios": 6
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-08-12T06:28:17Z",
-  "ts_brt": "2026-08-12 03:28",
-  "n_events": 883,
-  "n_fixtures": 883,
+  "ts_utc": "2026-08-12T06:51:08Z",
+  "ts_brt": "2026-08-12 03:51",
+  "n_events": 882,
+  "n_fixtures": 882,
   "n_markets": 0,
   "min_events": 221,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_8250cd623ef0c005e904.json",
-  "pointer_at": "2026-08-12T03:28:17-03:00",
-  "pointer_n": 883,
+  "pointer_file": "_snapshots/sofa_07edd299a2bd453e3ca7.json",
+  "pointer_at": "2026-08-12T03:51:08-03:00",
+  "pointer_n": 882,
   "pointer_age_h": 0.0,
-  "duration_sec": 194.6,
+  "duration_sec": 186.9,
   "error": null,
   "error_class": null,
   "transport": {
@@ -185,5 +148,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "full"
+ "mode": "close"
 }
