@@ -40,6 +40,12 @@ ALIASES = {
     "vasco": "vasco da gama", "athletico": "athletico paranaense",
     "gremio novorizontino": "novorizontino", "operario": "operario ferroviario",
     "operario pr": "operario ferroviario", "crb": "crb al", "crb al": "crb al",
+    # Al Diriyah (KSA, recém-promovido à Saudi Pro League 26/27) — as casas escrevem
+    # de 3 jeitos e o board TRAVOU o deploy em 12/08 (identidade impura sofa:16629410,
+    # Al Diriyah x Al-Ahli 13/08): Superbet "Al Draih", 7k "Diriyah Club", Sofa "Al
+    # Diriyah". Mesma família do RFS abaixo. O away "Al-Ahli [KSA]" perde o tag de país.
+    "al draih": "al diriyah", "diriyah": "al diriyah", "diriyah club": "al diriyah",
+    "al diraiyah": "al diriyah", "al ahli ksa": "al ahli",
     # Rīgas Futbola Skola (LET) — as casas escrevem de 3 jeitos e o board quebrava o
     # MESMO jogo em 3 linhas (05/08/2026): FK Jablonec x RFS, 06/08 13:00, saía como
     # "Rigas Futbola Skola" (Betano/Betfast/EstrelaBet), "Riga FS" (Superbet) e "RFS"
