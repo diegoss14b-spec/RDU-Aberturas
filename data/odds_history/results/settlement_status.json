@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-14T13:01:47.681347-03:00",
+  "generated_at": "2026-08-14T13:24:58.561243-03:00",
   "results_rows": 2398,
   "result_field_coverage": {
     "cards": {
@@ -41,9 +41,9 @@
   },
   "totals_by_status": {
     "settled": 140290,
-    "pending_result": 59082,
+    "pending_result": 59114,
     "unavailable": 112307,
-    "open": 16145
+    "open": 16884
   },
   "settled_date_offsets": {
     "-1": 4,
@@ -52,19 +52,19 @@
   },
   "by_market": {
     "Cartões": {
-      "total": 23117,
+      "total": 23137,
       "status": {
         "settled": 17516,
         "unavailable": 1610,
         "pending_result": 3081,
-        "open": 910
+        "open": 930
       },
       "pending_age": {
         "30d+": 10,
         "7-30d": 1120,
         "3-7d": 592,
-        "1-3d": 359,
-        "0-24h": 1000
+        "1-3d": 381,
+        "0-24h": 978
       },
       "pending_reasons": {
         "stat_missing:cards": 532,
@@ -72,36 +72,36 @@
       }
     },
     "Cartões@away": {
-      "total": 4389,
+      "total": 4407,
       "status": {
         "unavailable": 3943,
-        "open": 446
+        "open": 464
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Cartões@home": {
-      "total": 4369,
+      "total": 4389,
       "status": {
         "unavailable": 3915,
-        "open": 454
+        "open": 474
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Chutes no gol": {
-      "total": 13496,
+      "total": 13528,
       "status": {
         "settled": 11289,
         "unavailable": 448,
         "pending_result": 1373,
-        "open": 386
+        "open": 418
       },
       "pending_age": {
         "7-30d": 200,
         "3-7d": 488,
-        "1-3d": 169,
-        "0-24h": 516
+        "1-3d": 189,
+        "0-24h": 496
       },
       "pending_reasons": {
         "stat_missing:shots_on_goal": 24,
@@ -109,19 +109,19 @@
       }
     },
     "Chutes no gol@away": {
-      "total": 4455,
+      "total": 4493,
       "status": {
         "unavailable": 4011,
-        "open": 444
+        "open": 482
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Chutes no gol@home": {
-      "total": 4522,
+      "total": 4562,
       "status": {
         "unavailable": 4072,
-        "open": 450
+        "open": 490
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -164,38 +164,38 @@
       "pending_reasons": {}
     },
     "Escanteios": {
-      "total": 180741,
+      "total": 181066,
       "status": {
         "unavailable": 36942,
         "settled": 84928,
-        "pending_result": 51524,
-        "open": 7347
+        "pending_result": 51556,
+        "open": 7640
       },
       "pending_age": {
         "7-30d": 18343,
-        "1-3d": 2657,
+        "1-3d": 2742,
         "3-7d": 24469,
-        "0-24h": 6055
+        "0-24h": 6002
       },
       "pending_reasons": {
         "stat_missing:corners": 482,
-        "game_not_in_results": 51042
+        "game_not_in_results": 51074
       }
     },
     "Escanteios@away": {
-      "total": 21298,
+      "total": 21380,
       "status": {
         "unavailable": 19395,
-        "open": 1903
+        "open": 1985
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Escanteios@home": {
-      "total": 21362,
+      "total": 21444,
       "status": {
         "unavailable": 19511,
-        "open": 1851
+        "open": 1933
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -238,18 +238,18 @@
       "pending_reasons": {}
     },
     "Finalizações": {
-      "total": 14346,
+      "total": 14378,
       "status": {
         "settled": 11992,
         "unavailable": 394,
         "pending_result": 1488,
-        "open": 472
+        "open": 504
       },
       "pending_age": {
         "7-30d": 256,
         "3-7d": 478,
-        "1-3d": 152,
-        "0-24h": 602
+        "1-3d": 172,
+        "0-24h": 582
       },
       "pending_reasons": {
         "stat_missing:shots": 100,
@@ -257,19 +257,19 @@
       }
     },
     "Finalizações@away": {
-      "total": 4650,
+      "total": 4690,
       "status": {
         "unavailable": 4192,
-        "open": 458
+        "open": 498
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Finalizações@home": {
-      "total": 4718,
+      "total": 4760,
       "status": {
         "unavailable": 4268,
-        "open": 450
+        "open": 492
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -393,20 +393,20 @@
     }
   },
   "backlog": {
-    "total": 59082,
+    "total": 59114,
     "age": {
       "30d+": 26,
       "7-30d": 20167,
-      "1-3d": 3723,
+      "1-3d": 3870,
       "3-7d": 26313,
-      "0-24h": 8853
+      "0-24h": 8738
     },
     "age_unknown": 0,
     "reasons": {
       "stat_missing:offsides": 28,
       "stat_missing:corners": 482,
       "stat_missing:cards": 532,
-      "game_not_in_results": 57848,
+      "game_not_in_results": 57880,
       "stat_missing:fouls": 44,
       "stat_missing:shots": 100,
       "stat_missing:shots_on_goal": 24,
@@ -418,7 +418,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|3.5|over",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -426,7 +426,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|3.5|under",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -434,7 +434,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|2.5|over",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -442,7 +442,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|2.5|under",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -450,7 +450,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|4.5|over",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -458,7 +458,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|4.5|under",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -466,7 +466,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|0.5|over",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -474,7 +474,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|0.5|under",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -482,7 +482,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|1.5|over",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -490,7 +490,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|1.5|under",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -498,7 +498,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|5.5|over",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -506,7 +506,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|5.5|under",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -514,7 +514,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|6.5|over",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -522,7 +522,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|6.5|under",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -530,7 +530,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|7.5|over",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -538,7 +538,7 @@
         "key": "betano|2026-07-09|franca|marrocos|Impedimentos|7.5|under",
         "market": "Impedimentos",
         "kickoff": "2026-07-09T17:00:00-0300",
-        "age_days": 35.83,
+        "age_days": 35.85,
         "reason": "stat_missing:offsides",
         "attempts": 103
       },
@@ -546,7 +546,7 @@
         "key": "betano|sofa:16343041|Cartões|3.5|over",
         "market": "Cartões",
         "kickoff": "2026-07-14T14:30:00-0300",
-        "age_days": 30.94,
+        "age_days": 30.95,
         "reason": "stat_missing:cards",
         "attempts": 87
       },
@@ -554,7 +554,7 @@
         "key": "betano|sofa:16343041|Cartões|3.5|under",
         "market": "Cartões",
         "kickoff": "2026-07-14T14:30:00-0300",
-        "age_days": 30.94,
+        "age_days": 30.95,
         "reason": "stat_missing:cards",
         "attempts": 87
       },
@@ -562,7 +562,7 @@
         "key": "superbet|sofa:16343041|Cartões|3.5|over",
         "market": "Cartões",
         "kickoff": "2026-07-14T14:30:00-0300",
-        "age_days": 30.94,
+        "age_days": 30.95,
         "reason": "stat_missing:cards",
         "attempts": 87
       },
@@ -570,7 +570,7 @@
         "key": "superbet|sofa:16343041|Cartões|3.5|under",
         "market": "Cartões",
         "kickoff": "2026-07-14T14:30:00-0300",
-        "age_days": 30.94,
+        "age_days": 30.95,
         "reason": "stat_missing:cards",
         "attempts": 87
       },
@@ -578,7 +578,7 @@
         "key": "estrelabet|sofa:16343041|Cartões|2.5|over",
         "market": "Cartões",
         "kickoff": "2026-07-14T14:30:00-0300",
-        "age_days": 30.94,
+        "age_days": 30.95,
         "reason": "stat_missing:cards",
         "attempts": 87
       },
@@ -586,7 +586,7 @@
         "key": "estrelabet|sofa:16343041|Cartões|2.5|under",
         "market": "Cartões",
         "kickoff": "2026-07-14T14:30:00-0300",
-        "age_days": 30.94,
+        "age_days": 30.95,
         "reason": "stat_missing:cards",
         "attempts": 87
       },
@@ -594,7 +594,7 @@
         "key": "estrelabet|sofa:16343041|Cartões|3.5|over",
         "market": "Cartões",
         "kickoff": "2026-07-14T14:30:00-0300",
-        "age_days": 30.94,
+        "age_days": 30.95,
         "reason": "stat_missing:cards",
         "attempts": 87
       },
@@ -602,7 +602,7 @@
         "key": "estrelabet|sofa:16343041|Cartões|3.5|under",
         "market": "Cartões",
         "kickoff": "2026-07-14T14:30:00-0300",
-        "age_days": 30.94,
+        "age_days": 30.95,
         "reason": "stat_missing:cards",
         "attempts": 87
       },
@@ -610,7 +610,7 @@
         "key": "estrelabet|sofa:16343041|Cartões|4.5|over",
         "market": "Cartões",
         "kickoff": "2026-07-14T14:30:00-0300",
-        "age_days": 30.94,
+        "age_days": 30.95,
         "reason": "stat_missing:cards",
         "attempts": 87
       }
