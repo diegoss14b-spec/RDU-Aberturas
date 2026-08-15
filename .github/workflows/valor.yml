@@ -221,6 +221,11 @@ jobs:
         id: history
         if: always()
         continue-on-error: true
+        # 15/08: runs penduraram NESTE passo por 30-50min (runner do GitHub; scripts
+        # rodam em ~3min local) e o preso segurava a fila inteira via concurrency.
+        # Teto: estourou => o board sai com o banco da rodada anterior (degradação
+        # limpa), a Mesa NUNCA congela por causa dele.
+        timeout-minutes: 18
         run: |
           python migrate_history_keys.py
           python history_ingest.py
