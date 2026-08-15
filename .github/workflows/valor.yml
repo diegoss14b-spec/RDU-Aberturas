@@ -149,7 +149,12 @@ jobs:
     needs: gate
     if: needs.gate.outputs.mode != 'skip'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 75 (era 45) desde 15/08: o persist reconcilia re-rodando o pipeline inteiro
+    # (~14min/tentativa no runner) sempre que o feeder local da Pinnacle avanca o main
+    # (a cada ~20min) — com 45 o job morria na 2a tentativa do persist, DEPOIS do banco
+    # e ANTES do commit, e a Mesa congelava (medido 15/08: banco 17min ok, persist
+    # morto aos 45min sem snapshot). O teto do banco (18min) segue por baixo.
+    timeout-minutes: 75
     env:
       MODE: ${{ needs.gate.outputs.mode }}
     steps:
