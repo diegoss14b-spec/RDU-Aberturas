@@ -1,174 +1,176 @@
 {
- "ts_utc": "2026-08-16T21:24:33Z",
- "ts_brt": "2026-08-16 18:24",
+ "ts_utc": "2026-08-16T21:47:18Z",
+ "ts_brt": "2026-08-16 18:47",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
   "7k",
-  "pinnacle",
   "bet365",
   "betfast",
   "sportingbet"
  ],
- "casas_fail": [],
- "n_ok": 8,
- "n_fail": 0,
- "total_events": 140,
+ "casas_fail": [
+  {
+   "casa": "pinnacle",
+   "error": "exit=2"
+  }
+ ],
+ "n_ok": 7,
+ "n_fail": 1,
+ "total_events": 105,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 34,
+   "n_events": 31,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 12,
-    "Chutes no gol": 10,
-    "Desarmes": 3,
-    "Escanteios": 29,
-    "Faltas": 3,
-    "Finalizações": 10,
-    "Impedimentos": 5,
-    "Laterais": 3,
-    "Tiros de meta": 3
+    "Cartões": 7,
+    "Chutes no gol": 6,
+    "Desarmes": 1,
+    "Escanteios": 24,
+    "Faltas": 1,
+    "Finalizações": 6,
+    "Impedimentos": 1,
+    "Laterais": 1,
+    "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-16_1820.jsonl",
+   "pointer_file": "betano_2026-08-16_1842.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 27,
+   "n_events": 22,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 15,
-    "Chutes no gol": 10,
-    "Desarmes": 5,
-    "Escanteios": 26,
-    "Faltas": 10,
-    "Finalizações": 10,
-    "Impedimentos": 10,
-    "Laterais": 8,
-    "Tiros de meta": 10
+    "Cartões": 8,
+    "Chutes no gol": 6,
+    "Desarmes": 1,
+    "Escanteios": 21,
+    "Faltas": 6,
+    "Finalizações": 6,
+    "Impedimentos": 6,
+    "Laterais": 4,
+    "Tiros de meta": 6
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-16_1820.jsonl",
+   "pointer_file": "superbet_2026-08-16_1842.jsonl",
    "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 19,
+   "n_events": 13,
    "n_markets": 6,
    "market_counts": {
-    "Cartões": 12,
-    "Chutes no gol": 12,
-    "Escanteios": 19,
-    "Faltas": 7,
-    "Finalizações": 12,
-    "Impedimentos": 12
+    "Cartões": 6,
+    "Chutes no gol": 6,
+    "Escanteios": 13,
+    "Faltas": 5,
+    "Finalizações": 6,
+    "Impedimentos": 6
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-08-16_1820.jsonl",
+   "pointer_file": "estrelabet_2026-08-16_1842.jsonl",
    "error": null
   },
   "7k": {
    "ok": true,
-   "n_events": 12,
+   "n_events": 8,
    "n_markets": 4,
    "market_counts": {
-    "Cartões": 10,
-    "Desarmes": 3,
-    "Escanteios": 12,
-    "Faltas": 3
+    "Cartões": 7,
+    "Desarmes": 1,
+    "Escanteios": 8,
+    "Faltas": 1
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-08-16_1820.jsonl",
+   "pointer_file": "7k_2026-08-16_1842.jsonl",
    "error": null
   },
   "pinnacle": {
-   "ok": true,
-   "n_events": 2,
-   "n_markets": 1,
-   "market_counts": {
-    "Cartões": 2
-   },
+   "ok": false,
+   "n_events": 0,
+   "n_markets": 0,
+   "market_counts": {},
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-08-16_1820.jsonl",
+   "pointer_file": null,
    "error": null
   },
   "bet365": {
    "ok": true,
-   "n_events": 12,
+   "n_events": 11,
    "n_markets": 4,
    "market_counts": {
-    "Cartões": 6,
-    "Chutes no gol": 4,
-    "Escanteios": 12,
-    "Finalizações": 4
+    "Cartões": 4,
+    "Chutes no gol": 2,
+    "Escanteios": 11,
+    "Finalizações": 2
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-16_1820.jsonl",
+   "pointer_file": "bet365_2026-08-16_1842.jsonl",
    "error": null
   },
   "betfast": {
    "ok": true,
-   "n_events": 15,
+   "n_events": 9,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 12,
-    "Chutes no gol": 10,
-    "Desarmes": 3,
-    "Escanteios": 15,
-    "Faltas": 7,
-    "Finalizações": 9,
-    "Impedimentos": 3,
-    "Laterais": 5,
-    "Tiros de meta": 5
+    "Cartões": 8,
+    "Chutes no gol": 6,
+    "Desarmes": 1,
+    "Escanteios": 9,
+    "Faltas": 5,
+    "Finalizações": 6,
+    "Impedimentos": 2,
+    "Laterais": 3,
+    "Tiros de meta": 3
    },
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-08-16_1820.jsonl",
+   "pointer_file": "betfast_2026-08-16_1842.jsonl",
    "error": null
   },
   "sportingbet": {
    "ok": true,
-   "n_events": 19,
+   "n_events": 11,
    "n_markets": 2,
    "market_counts": {
-    "Cartões": 7,
-    "Escanteios": 19
+    "Cartões": 3,
+    "Escanteios": 11
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-08-16_1820.jsonl",
+   "pointer_file": "sportingbet_2026-08-16_1842.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 76,
-  "Chutes no gol": 46,
-  "Desarmes": 14,
-  "Escanteios": 132,
-  "Faltas": 30,
-  "Finalizações": 45,
-  "Impedimentos": 30,
-  "Laterais": 16,
-  "Tiros de meta": 18
+  "Cartões": 43,
+  "Chutes no gol": 26,
+  "Desarmes": 4,
+  "Escanteios": 97,
+  "Faltas": 18,
+  "Finalizações": 26,
+  "Impedimentos": 15,
+  "Laterais": 8,
+  "Tiros de meta": 10
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-08-16T21:23:43Z",
-  "ts_brt": "2026-08-16 18:23",
-  "n_events": 731,
-  "n_fixtures": 731,
+  "ts_utc": "2026-08-16T21:45:52Z",
+  "ts_brt": "2026-08-16 18:45",
+  "n_events": 724,
+  "n_fixtures": 724,
   "n_markets": 0,
   "min_events": 184,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_feb340e0606c57830266.json",
-  "pointer_at": "2026-08-16T18:23:43-03:00",
-  "pointer_n": 731,
+  "pointer_file": "_snapshots/sofa_71538213807395e0bfe4.json",
+  "pointer_at": "2026-08-16T18:45:52-03:00",
+  "pointer_n": 724,
   "pointer_age_h": 0.0,
-  "duration_sec": 183.2,
+  "duration_sec": 185.5,
   "error": null,
   "error_class": null,
   "transport": {
