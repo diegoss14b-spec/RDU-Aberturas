@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-08-17T03:18:29Z",
- "ts_brt": "2026-08-17 00:18",
+ "ts_utc": "2026-08-17T03:43:16Z",
+ "ts_brt": "2026-08-17 00:43",
  "casas_ok": [
   "betano",
   "superbet",
@@ -14,7 +14,7 @@
  "casas_fail": [],
  "n_ok": 8,
  "n_fail": 0,
- "total_events": 236,
+ "total_events": 235,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -32,18 +32,18 @@
     "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-17_0010.jsonl",
+   "pointer_file": "betano_2026-08-17_0035.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 104,
+   "n_events": 105,
    "n_markets": 9,
    "market_counts": {
     "Cartões": 43,
     "Chutes no gol": 16,
     "Desarmes": 1,
-    "Escanteios": 100,
+    "Escanteios": 101,
     "Faltas": 13,
     "Finalizações": 39,
     "Impedimentos": 13,
@@ -51,7 +51,7 @@
     "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-17_0010.jsonl",
+   "pointer_file": "superbet_2026-08-17_0035.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -90,7 +90,7 @@
     "Cartões": 3
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-08-17_0010.jsonl",
+   "pointer_file": "pinnacle_2026-08-17_0035.jsonl",
    "error": null
   },
   "bet365": {
@@ -104,31 +104,31 @@
     "Finalizações": 4
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-17_0010.jsonl",
+   "pointer_file": "bet365_2026-08-17_0035.jsonl",
    "error": null
   },
   "betfast": {
    "ok": true,
-   "n_events": 14,
+   "n_events": 13,
    "n_markets": 2,
    "market_counts": {
     "Cartões": 1,
-    "Escanteios": 14
+    "Escanteios": 13
    },
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-08-17_0010.jsonl",
+   "pointer_file": "betfast_2026-08-17_0035.jsonl",
    "error": null
   },
   "sportingbet": {
    "ok": true,
-   "n_events": 21,
+   "n_events": 20,
    "n_markets": 2,
    "market_counts": {
     "Cartões": 2,
-    "Escanteios": 21
+    "Escanteios": 20
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-08-17_0010.jsonl",
+   "pointer_file": "sportingbet_2026-08-17_0035.jsonl",
    "error": null
   }
  },
@@ -136,7 +136,7 @@
   "Cartões": 76,
   "Chutes no gol": 30,
   "Desarmes": 2,
-  "Escanteios": 214,
+  "Escanteios": 213,
   "Faltas": 16,
   "Finalizações": 53,
   "Impedimentos": 16,
@@ -146,39 +146,68 @@
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
-  "ok": true,
-  "ts_utc": "2026-08-17T03:14:21Z",
-  "ts_brt": "2026-08-17 00:14",
-  "n_events": 717,
-  "n_fixtures": 717,
+  "ok": false,
+  "ts_utc": "2026-08-17T03:38:11Z",
+  "ts_brt": "2026-08-17 00:38",
+  "n_events": 399,
+  "n_fixtures": 399,
   "n_markets": 0,
   "min_events": 181,
-  "promoted": true,
+  "promoted": false,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_1f46d25e64c76f4c9282.json",
-  "pointer_at": "2026-08-17T00:14:21-03:00",
-  "pointer_n": 717,
-  "pointer_age_h": 0.0,
-  "duration_sec": 176.3,
-  "error": null,
-  "error_class": null,
+  "pointer_file": "_snapshots/sofa_6219fc2cf7ae03988fa1.json",
+  "pointer_at": "2026-08-16T20:35:42-03:00",
+  "pointer_n": 722,
+  "pointer_age_h": 4.042,
+  "duration_sec": 118.8,
+  "error": "snapshot não saudável: n=399, mínimo=181; fallback preservado n=722; transporte req=69 proxy=69 direto=0 http=200:66,403:1,404:1 ultimo=HTTP 403 via proxy circuito=1 falhas=MEXE,EFLC,ECL,NED,GER2,SCO,ENG2,BEL,POR,ITA2,JPN,AUT,POL,TUR,GRE,SAU,UKR,CRO,SRB,BUL,VEN,PAR,AUS,ESP2,FRA2,CDF,CDI,CDR,DFB,FAC ",
+  "error_class": "Geo",
   "transport": {
-   "requests": 129,
-   "proxy_attempts": 129,
+   "requests": 69,
+   "proxy_attempts": 69,
    "direct_attempts": 0,
    "statuses": {
-    "200": 125,
-    "404": 4
+    "200": 66,
+    "404": 1,
+    "403": 1
    },
-   "last_error": "HTTP 404 via proxy",
+   "last_error": "HTTP 403 via proxy",
    "consecutive_failures": 0,
-   "circuit_open": false,
-   "failed_tournaments": [],
-   "inactive_tournaments": [
-    "WC",
+   "circuit_open": true,
+   "failed_tournaments": [
+    "MEXE",
+    "EFLC",
+    "ECL",
+    "NED",
+    "GER2",
+    "SCO",
+    "ENG2",
+    "BEL",
+    "POR",
+    "ITA2",
+    "JPN",
+    "AUT",
+    "POL",
+    "TUR",
+    "GRE",
+    "SAU",
+    "UKR",
+    "CRO",
+    "SRB",
+    "BUL",
+    "VEN",
+    "PAR",
+    "AUS",
+    "ESP2",
+    "FRA2",
     "CDF",
+    "CDI",
     "CDR",
+    "DFB",
     "FAC"
+   ],
+   "inactive_tournaments": [
+    "WC"
    ]
   }
  },
