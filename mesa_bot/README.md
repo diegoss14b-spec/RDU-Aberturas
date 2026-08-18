@@ -1,47 +1,34 @@
-# mesa-bot — sinais Mesa → Telegram
+# mesa-bot — odds Mesa × modelo → Telegram
 
-Lê os flags de valor já publicados em `board.js` da Mesa de Aberturas e envia
-ao Telegram. **Não recalcula** μ / EV — a fonte de verdade é o `build_board` da Mesa.
+Lê **linhas e odds** do `board.js` da Mesa, precifica com o mesmo
+`candidate_pricer` da Mesa/Prévia, aplica o gate (EV≥5%, edge≥4%, margem 0–12%,
+P∈[15%,85%]) e envia valor novo no Telegram.
 
-## Fase 1 (esta)
+**Não é carteiro** do `BOARD.valor[]` — julga de novo a cada ciclo.
+
+## Rodar
 
 ```bash
-# dry-run com board local
-python3 mesa-bot/run_once.py --path valor-app/valor/data/board.js --dry-run
-
-# dry-run com board ao vivo
+# dry-run com board ao vivo (precisa da pasta valor-app/ ao lado, com o bundle)
 python3 mesa-bot/run_once.py --url https://valor-rdu.netlify.app/data/board.js --dry-run
 
-# envio real (precisa das vars)
-export TELEGRAM_BOT_TOKEN=...
-export TELEGRAM_CHAT_ID=...
-python3 mesa-bot/run_once.py --url https://valor-rdu.netlify.app/data/board.js
+# no repo RDU-Aberturas (Actions / local)
+python3 mesa_bot/run_once.py --dry-run
 ```
 
-Config opcional: copiar `config.example.json` → `config.json`.
+Credenciais: `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` (env). Config opcional:
+`config.example.json` → `config.json`.
 
-Na nuvem: workflow `valor-app/.github/workflows/mesa_signals.yml` (cron ~15 min),
-secrets `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`. O código do bot é espelhado em
-`valor-app/mesa_bot/` para o Actions do repo RDU-Aberturas.
+Na nuvem: `.github/workflows/mesa_signals.yml` (cron ~15 min). O código vive em
+`valor-app/mesa_bot/` no repo da Mesa.
 
-Anti-spam: `data/sent.json` (chave `sofa_id|mercado|linha|lado|casa`). Reenvia se
-a odd mudar ≥2% ou o EV subir ≥1 p.p. Board com mais de 90 min → um alerta
-“Mesa parada” (cooldown 1 h), sem inventar sinal.
+Identidade dos times: `home_id`/`away_id`/`comp` no board (quando o `build_board`
+já publicou) **ou** `data/fixtures/sofa_latest.json` no checkout.
 
-## Fase 2 (roadmap — não implementada)
+Anti-spam: `data/sent.json` (`sofa_id|mercado|linha|lado|casa`). Board >90 min →
+alerta “Mesa parada” (1×/h) **sem** parar o juiz (`judge_when_stale`).
 
-Ambiente conjunto do jogo: deep-link da mensagem já aponta para a **Prévia do Jogo**
-(`?lg=&hm=&aw=`). Depois: enriquecer Prévia/Mesa com odds das casas no mesmo card.
+## Roadmap
 
-## Fase 3 (roadmap — não implementada)
-
-Recovery vivo: quando o board envelhece, além do alerta, API/Action diagnostica
-`_status/*.json` / último `valor.yml`, re-dispara captura e reporta no Telegram.
-LLM só se o diagnóstico mecânico não bastar. O `watchdog.yml` da Mesa já cobre
-parte disso.
-
-## O que este bot NÃO faz
-
-- Não altera captura / `build_board` / deploy da Mesa
-- Não usa `mesa-paralela`
-- Não usa Grok/LLM na Fase 1
+- **UI do jogo**: deep-link já aponta à Prévia (`?lg=&hm=&aw=`).
+- **Recovery**: watchdog da Mesa + alerta; re-disparo vivo fica pra depois.

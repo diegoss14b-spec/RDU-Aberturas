@@ -106,7 +106,7 @@ def format_signal(
         ev_s = "?"
 
     lines = [
-        "📊 <b>MESA · %s %s %s</b>" % (mercado, lado, linha),
+        "📊 <b>VALOR · %s %s %s</b>" % (mercado, lado, linha),
         "⚽ %s%s · %s" % (jogo, liga_txt, quando),
         "🏠 %s <b>%s</b> · μ %s · P %s · EV <b>%s</b>"
         % (casa, odd_s, mu_s, p_s, ev_s),
@@ -121,7 +121,7 @@ def format_board_stale(age_min: float, gerado: str) -> str:
     return (
         "⚠️ <b>MESA PARADA</b>\n"
         "board.js com <b>%.0f min</b> (gerado: %s).\n"
-        "Sem novos sinais neste ciclo — recovery fica com o watchdog / Fase 3."
+        "O juiz ainda avalia as odds do board; recovery fica com o watchdog."
         % (age_min, _esc(gerado or "?"))
     )
 
@@ -129,7 +129,7 @@ def format_board_stale(age_min: float, gerado: str) -> str:
 def format_summary(n_new: int, n_skip: int, n_total: int, gerado: str) -> str:
     return (
         "ℹ️ <b>MESA bot</b> — ciclo ok\n"
-        "flags no board: %d · novos: %d · dedup: %d\n"
+        "sinais (juiz): %d · novos: %d · dedup: %d\n"
         "gerado: %s"
         % (n_total, n_new, n_skip, _esc(gerado or "?"))
     )

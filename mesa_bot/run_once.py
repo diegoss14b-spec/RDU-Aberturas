@@ -1,20 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Um ciclo: fetch board → flatten → dedup → Telegram.
+"""Um ciclo: fetch board → juiz (modelo×odds) → dedup → Telegram.
+
+O bot NÃO é carteiro do BOARD.valor[]. Ele:
+  1. lê linhas/odds do board.js (Mesa)
+  2. precifica com candidate_pricer (mesma régua da Mesa/Prévia)
+  3. aplica gate EV/edge
+  4. manda valor novo no Telegram
 
 Uso:
   python3 mesa-bot/run_once.py --dry-run
   python3 mesa-bot/run_once.py --url https://valor-rdu.netlify.app/data/board.js
-  python3 mesa-bot/run_once.py --path valor-app/valor/data/board.js --dry-run
+  python3 mesa_bot/run_once.py --dry-run   # no repo RDU-Aberturas
 
-Credenciais: `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` (env).
-Não grave token em `config.json`. No GitHub (repo RDU-Aberturas): Settings → Secrets
-com os mesmos nomes, depois faça push de `mesa_bot/` + `.github/workflows/mesa_signals.yml`.
-
-Teste local de envio real (após export das vars):
-
-```bash
-python3 mesa-bot/run_once.py --url https://valor-rdu.netlify.app/data/board.js --limit 1
-```
+Credenciais: TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID (env). Não grave token em config.
 """
 from __future__ import annotations
 
@@ -36,7 +34,8 @@ from fetch_board import DEFAULT_BOARD_URL, load_board  # noqa: E402
 from format import (  # noqa: E402
     DEFAULT_PREVIA_BASE, format_board_stale, format_signal, format_summary,
 )
-from signals import board_age_minutes, flatten_signals  # noqa: E402
+from judge import judge_board  # noqa: E402
+from signals import board_age_minutes  # noqa: E402
 from telegram import send_message  # noqa: E402
 
 
@@ -50,6 +49,8 @@ def _load_config(path: Optional[Path]) -> dict:
         "ev_abs_resend": 1.0,
         "max_send_per_cycle": 25,
         "send_cycle_summary": False,
+        # Board velho: ainda JULGA (odds podem servir); só alerta infra.
+        "judge_when_stale": True,
         "state_path": str(_HERE / "data" / "sent.json"),
     }
     if path and path.exists():
@@ -63,7 +64,7 @@ def _load_config(path: Optional[Path]) -> dict:
 
 
 def run(argv=None) -> int:
-    ap = argparse.ArgumentParser(description="Mesa → Telegram (um ciclo)")
+    ap = argparse.ArgumentParser(description="Mesa odds × modelo → Telegram")
     ap.add_argument("--url", default=None, help="URL do board.js")
     ap.add_argument("--path", default=None, help="board.js local (pula fetch)")
     ap.add_argument("--config", default=None, help="config.json")
@@ -94,7 +95,6 @@ def run(argv=None) -> int:
         board = load_board(url=url, path=path)
     except Exception as e:
         print("ERRO ao carregar board: %s" % e, flush=True)
-        # tenta avisar no Telegram se possível
         send_message(
             "⚠️ <b>MESA bot</b> — falha ao ler board.js\n<code>%s</code>" % e,
             dry_run=args.dry_run,
@@ -107,13 +107,16 @@ def run(argv=None) -> int:
     state = load_state(state_path)
     prune_sent(state)
 
-    print("board gerado=%s age_min=%s flags_jogos=%d"
+    print("board gerado=%s age_min=%s jogos=%d"
           % (gerado, ("%.1f" % age) if age is not None else "?",
-             sum(1 for j in (board.get("jogos") or []) if j.get("valor"))),
+             len(board.get("jogos") or [])),
           flush=True)
 
-    if age is not None and age > stale_min:
-        print("BOARD STALE (%.0f > %.0f min) — sem sinais" % (age, stale_min), flush=True)
+    board_stale = age is not None and age > stale_min
+    if board_stale:
+        print("BOARD STALE (%.0f > %.0f min) — alerta infra; juiz=%s"
+              % (age, stale_min, "ON" if cfg.get("judge_when_stale", True) else "OFF"),
+              flush=True)
         cooldown = int(cfg.get("infra_cooldown_sec") or 3600)
         if args.force_stale_alert or infra_cooldown_ok(state, cooldown_sec=cooldown):
             ok = send_message(
@@ -125,9 +128,19 @@ def run(argv=None) -> int:
                 save_state(state_path, state)
         else:
             print("alerta infra em cooldown", flush=True)
-        return 0
+        if not cfg.get("judge_when_stale", True):
+            return 0
 
-    signals = flatten_signals(board)
+    try:
+        signals = judge_board(board)
+    except Exception as e:
+        print("ERRO no juiz: %s" % e, flush=True)
+        send_message(
+            "⚠️ <b>MESA bot</b> — falha no juiz (modelo×odds)\n<code>%s</code>" % e,
+            dry_run=args.dry_run,
+        )
+        return 3
+
     to_send, skipped = filter_new(
         signals, state,
         odd_rel=float(cfg.get("odd_rel_resend") or 0.02),
@@ -149,7 +162,6 @@ def run(argv=None) -> int:
             mark_sent(state, sig)
             n_ok += 1
             if not args.dry_run:
-                # leve espaçamento pra não bater flood limit
                 import time
                 time.sleep(0.35)
 

@@ -790,6 +790,20 @@ def main():
         # preça — mesmo com fixture casada.
         if fx_comp and any(m in _n(league) for m in LEAGUE_FORA):
             fx_comp = None
+        # Identidade pública pro mesa-bot (juiz independente): ids Sofa dos times +
+        # comp do bundle. Sem isso o bot só tinha nomes/sofa_id e não conseguia
+        # chamar candidate_pricer.price sem re-fuzzy. Fail-closed: só grava quando
+        # a fixture casou de verdade.
+        if fx_hid is not None and fx_aid is not None:
+            try:
+                j["home_id"] = int(fx_hid)
+                j["away_id"] = int(fx_aid)
+            except (TypeError, ValueError):
+                pass
+        if fx_label:
+            j["fx_label"] = fx_label
+        if fx_comp:
+            j["comp"] = fx_comp
         if (codes or fx_comp) and len(parts) == 2:
             for canon, model in MODELO.items():
                 if canon not in j["mercados"]: continue
