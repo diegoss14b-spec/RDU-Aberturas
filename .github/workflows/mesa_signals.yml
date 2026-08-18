@@ -1,0 +1,64 @@
+name: Mesa sinais → Telegram
+
+# Poll do board.js público → flags novos no Telegram.
+# Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+on:
+  schedule:
+    # a cada 15 min (fora do :00/:30 pra não colidir com valor.yml)
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Só imprimir (não envia Telegram)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mesa-signals
+  cancel-in-progress: true
+
+jobs:
+  signals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Restore dedup state
+        uses: actions/cache@v4
+        with:
+          path: mesa_bot/data/sent.json
+          # chave estável: o estado precisa sobreviver entre crons
+          key: mesa-bot-sent-v1
+          restore-keys: |
+            mesa-bot-sent-
+
+      - name: Run one cycle
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p mesa_bot/data
+          EXTRA=()
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            EXTRA+=(--dry-run)
+          fi
+          # sem secrets → dry-run automático (telegram.py)
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "Secrets Telegram ausentes — dry-run"
+            EXTRA+=(--dry-run)
+          fi
+          python3 mesa_bot/run_once.py \
+            --url "https://valor-rdu.netlify.app/data/board.js" \
+            --state mesa_bot/data/sent.json \
+            "${EXTRA[@]+"${EXTRA[@]}"}"
