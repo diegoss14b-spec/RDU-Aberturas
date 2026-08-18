@@ -1,13 +1,13 @@
 {
- "ts_utc": "2026-08-18T13:33:48Z",
- "ts_brt": "2026-08-18 10:33",
+ "ts_utc": "2026-08-18T14:00:54Z",
+ "ts_brt": "2026-08-18 11:00",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
-  "pinnacle",
   "bet365",
-  "betfast"
+  "betfast",
+  "sportingbet"
  ],
  "casas_fail": [
   {
@@ -15,36 +15,49 @@
    "error": "0 eventos direto (sem credencial Decodo pra fallback) · 1ª tentativa: Error: BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-he"
   },
   {
-   "casa": "sportingbet",
+   "casa": "pinnacle",
    "error": "exit=2"
   }
  ],
  "n_ok": 6,
  "n_fail": 2,
- "total_events": 29,
+ "total_events": 298,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 20,
-   "n_markets": 2,
+   "n_events": 60,
+   "n_markets": 8,
    "market_counts": {
-    "Cartões": 2,
-    "Escanteios": 5
+    "Cartões": 11,
+    "Chutes no gol": 11,
+    "Escanteios": 37,
+    "Faltas": 8,
+    "Finalizações": 11,
+    "Impedimentos": 11,
+    "Laterais": 1,
+    "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-18_1030.jsonl",
+   "pointer_file": "betano_2026-08-18_1053.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 7,
-   "n_markets": 2,
+   "n_events": 139,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 4,
-    "Escanteios": 7
+    "Cartões": 53,
+    "Chutes no gol": 24,
+    "Desarmes": 11,
+    "Escanteios": 138,
+    "Faltas": 19,
+    "Finalizações": 38,
+    "Impedimentos": 20,
+    "Laterais": 12,
+    "Tiros de meta": 12
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-18_1030.jsonl",
+   "pointer_file": "superbet_2026-08-18_1053.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -68,7 +81,7 @@
    "error": "0 eventos direto (sem credencial Decodo pra fallback) · 1ª tentativa: Error: BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-he"
   },
   "pinnacle": {
-   "ok": true,
+   "ok": false,
    "n_events": 0,
    "n_markets": 0,
    "market_counts": {},
@@ -78,55 +91,71 @@
   },
   "bet365": {
    "ok": true,
+   "n_events": 41,
+   "n_markets": 5,
+   "market_counts": {
+    "Cartões": 8,
+    "Chutes no gol": 8,
+    "Escanteios": 41,
+    "Finalizações": 8,
+    "Impedimentos": 1
+   },
+   "pointer_valid": true,
+   "pointer_file": "bet365_2026-08-18_1053.jsonl",
+   "error": null
+  },
+  "betfast": {
+   "ok": true,
    "n_events": 1,
    "n_markets": 1,
    "market_counts": {
     "Escanteios": 1
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-18_1030.jsonl",
-   "error": null
-  },
-  "betfast": {
-   "ok": true,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
-   "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "betfast_2026-08-18_1053.jsonl",
    "error": null
   },
   "sportingbet": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 56,
+   "n_markets": 2,
+   "market_counts": {
+    "Cartões": 8,
+    "Escanteios": 56
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "sportingbet_2026-08-18_1053.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 6,
-  "Escanteios": 14
+  "Cartões": 80,
+  "Chutes no gol": 43,
+  "Desarmes": 11,
+  "Escanteios": 274,
+  "Faltas": 27,
+  "Finalizações": 57,
+  "Impedimentos": 32,
+  "Laterais": 13,
+  "Tiros de meta": 13
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-08-18T13:33:14Z",
-  "ts_brt": "2026-08-18 10:33",
+  "ts_utc": "2026-08-18T13:56:38Z",
+  "ts_brt": "2026-08-18 10:56",
   "n_events": 913,
   "n_fixtures": 913,
   "n_markets": 0,
   "min_events": 229,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_51653010f131fdda76e9.json",
-  "pointer_at": "2026-08-18T10:33:14-03:00",
+  "pointer_file": "_snapshots/sofa_50e3415337f9372eab1a.json",
+  "pointer_at": "2026-08-18T10:56:38-03:00",
   "pointer_n": 913,
   "pointer_age_h": 0.0,
-  "duration_sec": 177.8,
+  "duration_sec": 196.3,
   "error": null,
   "error_class": null,
   "transport": {
@@ -151,5 +180,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "close"
+ "mode": "full"
 }
