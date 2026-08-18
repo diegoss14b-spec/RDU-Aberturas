@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-08-18T14:23:09Z",
- "ts_brt": "2026-08-18 11:23",
+ "ts_utc": "2026-08-18T14:47:01Z",
+ "ts_brt": "2026-08-18 11:47",
  "casas_ok": [
   "betano",
   "superbet",
@@ -21,41 +21,40 @@
  ],
  "n_ok": 6,
  "n_fail": 2,
- "total_events": 61,
+ "total_events": 69,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 36,
-   "n_markets": 2,
+   "n_events": 43,
+   "n_markets": 1,
    "market_counts": {
-    "Cartões": 2,
     "Escanteios": 14
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-18_1118.jsonl",
+   "pointer_file": "betano_2026-08-18_1140.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 14,
+   "n_events": 13,
    "n_markets": 2,
    "market_counts": {
-    "Cartões": 4,
-    "Escanteios": 14
+    "Cartões": 2,
+    "Escanteios": 13
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-18_1118.jsonl",
+   "pointer_file": "superbet_2026-08-18_1140.jsonl",
    "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 9,
+   "n_events": 10,
    "n_markets": 1,
    "market_counts": {
-    "Escanteios": 9
+    "Escanteios": 10
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-08-18_1118.jsonl",
+   "pointer_file": "estrelabet_2026-08-18_1140.jsonl",
    "error": null
   },
   "7k": {
@@ -84,16 +83,18 @@
     "Escanteios": 2
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-18_1118.jsonl",
+   "pointer_file": "bet365_2026-08-18_1140.jsonl",
    "error": null
   },
   "betfast": {
    "ok": true,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "n_events": 1,
+   "n_markets": 1,
+   "market_counts": {
+    "Escanteios": 1
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "betfast_2026-08-18_1140.jsonl",
    "error": null
   },
   "sportingbet": {
@@ -107,26 +108,26 @@
   }
  },
  "market_counts": {
-  "Cartões": 6,
-  "Escanteios": 39
+  "Cartões": 2,
+  "Escanteios": 40
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-08-18T14:21:44Z",
-  "ts_brt": "2026-08-18 11:21",
-  "n_events": 920,
-  "n_fixtures": 920,
+  "ts_utc": "2026-08-18T14:43:27Z",
+  "ts_brt": "2026-08-18 11:43",
+  "n_events": 924,
+  "n_fixtures": 924,
   "n_markets": 0,
   "min_events": 229,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_ad71c0964fc2b85289b3.json",
-  "pointer_at": "2026-08-18T11:21:44-03:00",
-  "pointer_n": 920,
+  "pointer_file": "_snapshots/sofa_c281b73303bc1e072edf.json",
+  "pointer_at": "2026-08-18T11:43:27-03:00",
+  "pointer_n": 924,
   "pointer_age_h": 0.0,
-  "duration_sec": 170.7,
+  "duration_sec": 179.8,
   "error": null,
   "error_class": null,
   "transport": {
