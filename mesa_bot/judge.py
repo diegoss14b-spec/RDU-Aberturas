@@ -4,6 +4,11 @@
 Não lê BOARD.valor[]. Percorre mercados[canon][casa] → price → EV/edge gate.
 Identidade: home_id/away_id/comp no board (após build_board novo) OU fixtures
 locais em valor-app/data/fixtures (Actions checkout).
+
+⚠ Review 19/08: limiares, FIXTURE_LABEL_COMP, LEAGUE_FORA, three_way e de_vig
+vêm de mesa_shared.py — o MESMO módulo que o build_board importa. A cópia
+espelhada que vivia aqui driftaria em silêncio (flag da Mesa ≠ sinal do bot
+sem ninguém saber por quê). Paridade vigiada por audit_mesa_bot_parity.py.
 """
 from __future__ import annotations
 
@@ -14,39 +19,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from signals import signal_key
 
-# Mesmos limiares de build_board.py (não divergir sem decisão)
-EV_MIN, EDGE_MIN = 0.05, 0.04
-MARGIN_MIN, MARGIN_CAP = 0.0, 0.12
-P_LO, P_HI = 0.15, 0.85
-
 MODELO = {
     "Cartões": "cartoes",
     "Faltas": "faltas",
     "Finalizações": "finalizacoes",
     "Escanteios": "escanteios",
 }
-
-# Fallback se import de build_board falhar (espelho — não inventar rótulos).
-_FIXTURE_LABEL_COMP_FALLBACK = {
-    "BR-A": "BR-A", "BR-B": "BR-B", "EPL": "PL", "LaLiga": "LL", "SerieA": "SA",
-    "Bundesliga": "BU", "Ligue1": "L1", "MLS": "MLS", "Argentina": "ARG",
-    "ARG2": "ARG2", "CSL": "CHN", "Allsvenskan": "SWE", "Uruguay": "URU",
-    "Ecuador": "ECU", "Russia": "RUS", "Eliteserien": "NOR", "LigaMX": "MEX",
-    "MEXE": "MEXE", "BOL": "BOL", "CHI": "CHI", "PER": "PER", "COL": "COL",
-    "COL2": "COL2", "CZE": "CZE", "ROU": "ROU", "DEN": "DEN", "SUI": "SUI",
-    "EFLC": "EFLC", "NED": "NED", "GER2": "GER2",
-    "SCO": "SCO", "ENG2": "ENG2", "BEL": "BEL", "POR": "POR",
-    "ITA2": "ITA2", "JPN": "JPN", "AUT": "AUT", "POL": "POL",
-    "TUR": "TUR", "GRE": "GRE", "SAU": "SAU", "UKR": "UKR",
-    "CRO": "CRO", "SRB": "SRB", "BUL": "BUL", "VEN": "VEN",
-    "PAR": "PAR", "AUS": "AUS", "ESP2": "ESP2", "FRA2": "FRA2",
-    "CDF": "CDF", "CDI": "CDI", "CDR": "CDR", "DFB": "DFB", "FAC": "FAC",
-}
-
-
-def _fixture_label_comp(root: Path) -> dict:
-    # Não importar build_board (puxa value_pricers + side-effects). Dict espelhado.
-    return _FIXTURE_LABEL_COMP_FALLBACK
 
 
 def _valor_root() -> Optional[Path]:
@@ -66,26 +44,39 @@ def _ensure_pricers():
         )
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
+    import mesa_shared  # noqa: WPS433 — contrato compartilhado com o build_board
+    from canonical import n as _n  # noqa: WPS433 — mesmo normalizador da Mesa
     from candidate_pricer import (  # noqa: WPS433
         CardsPricer, CornersPricer, FoulsPricer, ShotsPricer,
     )
     from pricing_math import (  # noqa: WPS433
         edge_vs_market, expected_value, fair_odd, is_integer_line,
     )
-    cp, sp, fp, xp = CardsPricer(), ShotsPricer(), FoulsPricer(), CornersPricer()
-    if not all(getattr(p, "ok", False) for p in (cp, sp, fp, xp)):
-        raise RuntimeError("bundle candidate_pricer incompleto (.ok=False)")
+    todos = {
+        "cartoes": CardsPricer(),
+        "finalizacoes": ShotsPricer(),
+        "faltas": FoulsPricer(),
+        "escanteios": CornersPricer(),
+    }
+    # Degrada POR MERCADO, igual à Mesa: o build_board só põe cartões no caminho
+    # da fixture quando o bundle traz reds+regime (CardsPricer.ok). Morrer inteiro
+    # porque UM mercado perdeu o pacote silenciaria faltas/chutes/escanteios —
+    # exatamente o que a Mesa não faz.
+    pricers = {k: p for k, p in todos.items() if getattr(p, "ok", False)}
+    mortos = sorted(set(todos) - set(pricers))
+    if mortos:
+        print("judge: mercados SEM pricer (bundle incompleto): %s" % ", ".join(mortos),
+              flush=True)
+    if not pricers:
+        raise RuntimeError("bundle candidate_pricer vazio (nenhum pricer .ok)")
     return {
-        "pricers": {
-            "cartoes": cp,
-            "finalizacoes": sp,
-            "faltas": fp,
-            "escanteios": xp,
-        },
+        "pricers": pricers,
         "expected_value": expected_value,
         "edge_vs_market": edge_vs_market,
         "fair_odd": fair_odd,
         "is_integer_line": is_integer_line,
+        "shared": mesa_shared,
+        "norm": _n,
         "model_status": "promoted",
         "model_source": "candidate_pricer",
         "root": root,
@@ -130,7 +121,7 @@ def _load_fixtures(root: Path) -> Dict[int, dict]:
     return out
 
 
-def resolve_identity(j: dict, root: Path) -> Optional[Tuple[str, int, int]]:
+def resolve_identity(j: dict, ctx: dict) -> Optional[Tuple[str, int, int]]:
     """Retorna (comp, home_id, away_id) ou None."""
     hid, aid = j.get("home_id"), j.get("away_id")
     comp = j.get("comp")
@@ -147,12 +138,19 @@ def resolve_identity(j: dict, root: Path) -> Optional[Tuple[str, int, int]]:
         sid = int(sofa)
     except (TypeError, ValueError):
         return None
-    fx = _load_fixtures(root).get(sid)
+    fx = _load_fixtures(ctx["root"]).get(sid)
     if not fx:
         return None
+    # ⚠ Barreira LEAGUE_FORA (review 19/08): o build_board VETA fx_comp quando o
+    # rótulo da casa é de recorte excluído (feminino/base/reserva/copa/2ª div) —
+    # e nesses casos publica o jogo SEM comp. Este fallback re-derivava o comp da
+    # fixture e o juiz precificava o que a Mesa recusou de propósito. Mesma
+    # barreira, mesmo normalizador, mesmo insumo (rótulo da casa).
+    liga = ctx["norm"](str(j.get("liga") or ""))
+    if liga and any(m in liga for m in ctx["shared"].LEAGUE_FORA):
+        return None
     label = fx.get("label") or j.get("fx_label")
-    mmap = _fixture_label_comp(root)
-    comp2 = mmap.get(label) if label else None
+    comp2 = ctx["shared"].FIXTURE_LABEL_COMP.get(label) if label else None
     if not comp2:
         return None
     try:
@@ -161,32 +159,15 @@ def resolve_identity(j: dict, root: Path) -> Optional[Tuple[str, int, int]]:
         return None
 
 
-def de_vig(over, under) -> Optional[dict]:
-    if not over or not under or over <= 1 or under <= 1:
-        return None
-    po, pu = 1 / over, 1 / under
-    tot = po + pu
-    return {"p_over": po / tot, "p_under": pu / tot, "margin": tot - 1}
-
-
-def three_way(ln_: dict) -> bool:
-    nm = (ln_.get("market_type_name") or "").lower()
-    nm = nm.replace(" ", "").replace("-", "").replace("_", "")
-    return (
-        "3vias" in nm or "3way" in nm or "tresvias" in nm or "trêsvias" in nm
-        or "3caminhos" in nm
-    )
-
-
 def judge_board(board: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Lista de sinais com EV≥gate, ordenada por EV desc."""
     ctx = _ctx()
+    sh = ctx["shared"]
     pricers = ctx["pricers"]
     expected_value = ctx["expected_value"]
     edge_vs_market = ctx["edge_vs_market"]
     fair_odd = ctx["fair_odd"]
     is_integer_line = ctx["is_integer_line"]
-    root = ctx["root"]
 
     out: List[Dict[str, Any]] = []
     n_skip_id = n_skip_price = n_skip_gate = 0
@@ -199,7 +180,7 @@ def judge_board(board: Dict[str, Any]) -> List[Dict[str, Any]]:
         sofa_id = j.get("sofa_id")
         if sofa_id is None:
             continue
-        ident = resolve_identity(j, root)
+        ident = resolve_identity(j, ctx)
         if not ident:
             n_skip_id += 1
             continue
@@ -235,7 +216,7 @@ def judge_board(board: Dict[str, Any]) -> List[Dict[str, Any]]:
                 for ln_ in linhas:
                     if not isinstance(ln_, dict):
                         continue
-                    if three_way(ln_):
+                    if sh.three_way(ln_):
                         continue
                     try:
                         linha = float(ln_["linha"])
@@ -247,9 +228,9 @@ def judge_board(board: Dict[str, Any]) -> List[Dict[str, Any]]:
                     if not pr:
                         n_skip_price += 1
                         continue
-                    dv = de_vig(o, u)
+                    dv = sh.de_vig(o, u)
                     if not dv or not (
-                        MARGIN_MIN - 1e-9 <= dv["margin"] <= MARGIN_CAP + 1e-9
+                        sh.MARGIN_MIN - 1e-9 <= dv["margin"] <= sh.MARGIN_CAP + 1e-9
                     ):
                         n_skip_gate += 1
                         continue
@@ -261,11 +242,11 @@ def judge_board(board: Dict[str, Any]) -> List[Dict[str, Any]]:
                         our_p = float(
                             pr.get("p_" + side + "_win", pr.get("p_" + side, 0.0))
                         )
-                        if our_p < P_LO or our_p > P_HI:
+                        if our_p < sh.P_LO or our_p > sh.P_HI:
                             continue
                         edge = edge_vs_market(our_p, dv["p_" + side], pp)
                         ev = expected_value(our_p, odd, pp)
-                        if ev < EV_MIN or edge < EDGE_MIN:
+                        if ev < sh.EV_MIN or edge < sh.EDGE_MIN:
                             continue
                         fo = fair_odd(our_p, pp)
                         sig = dict(base)

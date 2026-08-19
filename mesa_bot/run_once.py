@@ -51,6 +51,11 @@ def _load_config(path: Optional[Path]) -> dict:
         "send_cycle_summary": False,
         # Board velho: ainda JULGA (odds podem servir); só alerta infra.
         "judge_when_stale": True,
+        # Partida a frio (19/08): estado de dedup VAZIO + backlog de sinais = rajada
+        # de max_send_per_cycle mensagens antigas de uma vez. Acima deste teto, o 1º
+        # ciclo REGISTRA tudo sem enviar (manda só 1 resumo) e sinal NOVO flui a
+        # partir do 2º. 0/None desliga a guarda.
+        "seed_flood_guard": 10,
         "state_path": str(_HERE / "data" / "sent.json"),
     }
     if path and path.exists():
@@ -91,21 +96,34 @@ def run(argv=None) -> int:
     url = args.url or cfg.get("board_url") or DEFAULT_BOARD_URL
     path = Path(args.path) if args.path else None
 
+    # estado ANTES do fetch: o alerta de falha de leitura também usa o cooldown
+    # de infra (19/08 — sem isso, um soluço do Netlify no minuto do cron viraria
+    # 1 alerta a cada 15 min até passar).
+    state = load_state(state_path)
+    prune_sent(state)
+
     try:
         board = load_board(url=url, path=path)
     except Exception as e:
         print("ERRO ao carregar board: %s" % e, flush=True)
-        send_message(
-            "⚠️ <b>MESA bot</b> — falha ao ler board.js\n<code>%s</code>" % e,
-            dry_run=args.dry_run,
-        )
+        cooldown = int(cfg.get("infra_cooldown_sec") or 3600)
+        if args.force_stale_alert or infra_cooldown_ok(
+            state, kind="board_fetch", cooldown_sec=cooldown
+        ):
+            ok = send_message(
+                "⚠️ <b>MESA bot</b> — falha ao ler board.js\n<code>%s</code>" % e,
+                dry_run=args.dry_run,
+            )
+            if ok or args.dry_run:
+                mark_infra(state, kind="board_fetch")
+                save_state(state_path, state)
+        else:
+            print("alerta de fetch em cooldown", flush=True)
         return 2
 
     gerado = board.get("gerado_iso") or board.get("gerado") or "?"
     age = board_age_minutes(board)
     stale_min = float(cfg.get("stale_board_min") or 90)
-    state = load_state(state_path)
-    prune_sent(state)
 
     print("board gerado=%s age_min=%s jogos=%d"
           % (gerado, ("%.1f" % age) if age is not None else "?",
@@ -135,10 +153,19 @@ def run(argv=None) -> int:
         signals = judge_board(board)
     except Exception as e:
         print("ERRO no juiz: %s" % e, flush=True)
-        send_message(
-            "⚠️ <b>MESA bot</b> — falha no juiz (modelo×odds)\n<code>%s</code>" % e,
-            dry_run=args.dry_run,
-        )
+        cooldown = int(cfg.get("infra_cooldown_sec") or 3600)
+        if args.force_stale_alert or infra_cooldown_ok(
+            state, kind="judge_fail", cooldown_sec=cooldown
+        ):
+            ok = send_message(
+                "⚠️ <b>MESA bot</b> — falha no juiz (modelo×odds)\n<code>%s</code>" % e,
+                dry_run=args.dry_run,
+            )
+            if ok or args.dry_run:
+                mark_infra(state, kind="judge_fail")
+                save_state(state_path, state)
+        else:
+            print("alerta de juiz em cooldown", flush=True)
         return 3
 
     to_send, skipped = filter_new(
@@ -146,12 +173,42 @@ def run(argv=None) -> int:
         odd_rel=float(cfg.get("odd_rel_resend") or 0.02),
         ev_abs=float(cfg.get("ev_abs_resend") or 1.0),
     )
+    n_novos = len(to_send)
+
+    # Partida a frio: estado vazio + backlog acima da guarda → registra sem enviar.
+    # Fail-closed no parse (lição do _ev_min_de do chasing): lixo no config volta
+    # pro default 10, nunca desliga a guarda nem derruba o ciclo.
+    try:
+        seed_guard = int(cfg.get("seed_flood_guard", 10) or 0)
+    except (TypeError, ValueError):
+        print("seed_flood_guard inválido (%r) — usando 10"
+              % (cfg.get("seed_flood_guard"),), flush=True)
+        seed_guard = 10
+    if seed_guard > 0 and not (state.get("sent") or {}) and n_novos > seed_guard:
+        print("SEED: estado vazio + %d sinais no backlog (> guarda %d) — "
+              "registrados sem enviar; novos fluem a partir do próximo ciclo"
+              % (n_novos, seed_guard), flush=True)
+        if args.dry_run:
+            # dry-run NÃO consome a seed: persistir aqui marcaria o backlog como
+            # enviado sem nunca enviar, e os runs reais suprimiriam esses sinais.
+            print("(dry-run: seed NÃO persistida)", flush=True)
+            return 0
+        for sig in to_send:
+            mark_sent(state, sig)
+        save_state(state_path, state)
+        send_message(
+            "🧷 <b>MESA bot armado</b> — %d sinais ativos registrados sem envio "
+            "(partida a frio). Sinais NOVOS chegam a partir de agora." % n_novos,
+            dry_run=args.dry_run,
+        )
+        return 0
+
     limit = args.limit if args.limit is not None else int(cfg.get("max_send_per_cycle") or 25)
     if limit >= 0:
         to_send = to_send[:limit]
 
     print("sinais=%d novos=%d skip_dedup=%d enviar=%d"
-          % (len(signals), len(to_send), len(skipped), len(to_send)), flush=True)
+          % (len(signals), n_novos, len(skipped), len(to_send)), flush=True)
 
     previa_base = cfg.get("previa_base") or DEFAULT_PREVIA_BASE
     n_ok = 0

@@ -16,9 +16,12 @@ on:
 permissions:
   contents: read
 
+# cancel-in-progress FALSE (19/08): cancelar um run que já ENVIOU mas ainda não
+# SALVOU o estado ressuscita os mesmos sinais no ciclo seguinte (duplicata). Com
+# timeout de 10 min e cadência de 15, enfileirar nunca acumula.
 concurrency:
   group: mesa-signals
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   signals:
@@ -33,14 +36,26 @@ jobs:
         with:
           python-version: "3.11"
 
+      # ⚠ restore/save SEPARADOS com chave única por run (19/08). O actions/cache
+      # clássico com chave FIXA ("mesa-bot-sent-v1") NUNCA regrava em cache-hit —
+      # o estado congelou no 1º run e o dedup rodava sempre vazio (skip_dedup=0
+      # em todos os ciclos). Família v2 pra deixar o v1 congelado pra trás.
       - name: Restore dedup state
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: mesa_bot/data/sent.json
-          # chave estável: o estado precisa sobreviver entre crons
-          key: mesa-bot-sent-v1
+          # run_attempt na chave: "Re-run" manual reusa o run_id e daria hit exato
+          # num estado velho (e o save silenciosamente não regrava chave imutável).
+          key: mesa-bot-sent-v2-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            mesa-bot-sent-
+            mesa-bot-sent-v2-
+
+      # Trava de regressão: o juiz tem que reproduzir BOARD.valor 1:1 (ΔEV=0)
+      # sob o MESMO gate. Divergência = bug no bot/contrato → falha o job
+      # (fail-closed: sem sinal até consertar; o e-mail do Actions avisa).
+      - name: Paridade juiz × BOARD.valor
+        run: |
+          python3 audit_mesa_bot_parity.py --url "https://valor-rdu.netlify.app/data/board.js"
 
       - name: Run one cycle
         env:
@@ -62,3 +77,12 @@ jobs:
             --url "https://valor-rdu.netlify.app/data/board.js" \
             --state mesa_bot/data/sent.json \
             "${EXTRA[@]+"${EXTRA[@]}"}"
+
+      # hashFiles vazio = arquivo não existe (run falhou antes do juiz) — não há o
+      # que salvar e o save com path ausente falharia o step à toa.
+      - name: Save dedup state
+        if: ${{ always() && hashFiles('mesa_bot/data/sent.json') != '' }}
+        uses: actions/cache/save@v4
+        with:
+          path: mesa_bot/data/sent.json
+          key: mesa-bot-sent-v2-${{ github.run_id }}-${{ github.run_attempt }}

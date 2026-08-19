@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -14,8 +15,12 @@ def resolve_credentials(
     token: Optional[str] = None,
     chat_id: Optional[str] = None,
 ) -> Tuple[str, str]:
-    tok = (token or os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
-    cid = (chat_id or os.environ.get("TELEGRAM_CHAT_ID") or "").strip()
+    # ⚠ re.sub e não .strip() (19/08): o secret TELEGRAM_BOT_TOKEN do Actions veio
+    # com whitespace NO MEIO (colagem) e TODO envio morria com "URL can't contain
+    # control characters" — 30+ ciclos sem entregar nada, com o run verde. Token e
+    # chat_id jamais contêm whitespace legítimo, então remover é sempre seguro.
+    tok = re.sub(r"\s+", "", token or os.environ.get("TELEGRAM_BOT_TOKEN") or "")
+    cid = re.sub(r"\s+", "", chat_id or os.environ.get("TELEGRAM_CHAT_ID") or "")
     return tok, cid
 
 
