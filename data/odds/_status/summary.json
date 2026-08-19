@@ -1,27 +1,24 @@
 {
- "ts_utc": "2026-08-19T15:08:54Z",
- "ts_brt": "2026-08-19 12:08",
+ "ts_utc": "2026-08-19T15:34:06Z",
+ "ts_brt": "2026-08-19 12:34",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
+  "7k",
   "pinnacle",
   "bet365",
   "betfast"
  ],
  "casas_fail": [
   {
-   "casa": "7k",
-   "error": "0 eventos direto (sem credencial Decodo pra fallback) · 1ª tentativa: Error: BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-he"
-  },
-  {
    "casa": "sportingbet",
    "error": "exit=2"
   }
  ],
- "n_ok": 6,
- "n_fail": 2,
- "total_events": 96,
+ "n_ok": 7,
+ "n_fail": 1,
+ "total_events": 98,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -29,10 +26,10 @@
    "n_markets": 2,
    "market_counts": {
     "Cartões": 1,
-    "Escanteios": 16
+    "Escanteios": 15
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-19_1200.jsonl",
+   "pointer_file": "betano_2026-08-19_1225.jsonl",
    "error": null
   },
   "superbet": {
@@ -44,7 +41,7 @@
     "Escanteios": 17
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-19_1200.jsonl",
+   "pointer_file": "superbet_2026-08-19_1225.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -55,17 +52,20 @@
     "Escanteios": 12
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-08-19_1200.jsonl",
+   "pointer_file": "estrelabet_2026-08-19_1225.jsonl",
    "error": null
   },
   "7k": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 1,
+   "n_markets": 2,
+   "market_counts": {
+    "Escanteios": 1,
+    "Faltas": 1
+   },
    "pointer_valid": true,
-   "pointer_file": null,
-   "error": "0 eventos direto (sem credencial Decodo pra fallback) · 1ª tentativa: Error: BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-he"
+   "pointer_file": "7k_2026-08-19_1232.jsonl",
+   "error": null
   },
   "pinnacle": {
    "ok": true,
@@ -78,13 +78,13 @@
   },
   "bet365": {
    "ok": true,
-   "n_events": 2,
+   "n_events": 3,
    "n_markets": 1,
    "market_counts": {
-    "Escanteios": 2
+    "Escanteios": 3
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-19_1200.jsonl",
+   "pointer_file": "bet365_2026-08-19_1225.jsonl",
    "error": null
   },
   "betfast": {
@@ -96,7 +96,7 @@
     "Escanteios": 5
    },
    "pointer_valid": true,
-   "pointer_file": "betfast_2026-08-19_1201.jsonl",
+   "pointer_file": "betfast_2026-08-19_1225.jsonl",
    "error": null
   },
   "sportingbet": {
@@ -111,30 +111,31 @@
  },
  "market_counts": {
   "Cartões": 8,
-  "Escanteios": 52
+  "Escanteios": 53,
+  "Faltas": 1
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-08-19T15:04:04Z",
-  "ts_brt": "2026-08-19 12:04",
+  "ts_utc": "2026-08-19T15:29:04Z",
+  "ts_brt": "2026-08-19 12:29",
   "n_events": 1023,
   "n_fixtures": 1023,
   "n_markets": 0,
   "min_events": 256,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_f392f6fce8b4dededb56.json",
-  "pointer_at": "2026-08-19T12:04:04-03:00",
+  "pointer_file": "_snapshots/sofa_171e1c10453454ef4eb2.json",
+  "pointer_at": "2026-08-19T12:29:04-03:00",
   "pointer_n": 1023,
   "pointer_age_h": 0.0,
-  "duration_sec": 177.4,
+  "duration_sec": 190.6,
   "error": null,
   "error_class": null,
   "transport": {
-   "requests": 131,
-   "proxy_attempts": 131,
+   "requests": 132,
+   "proxy_attempts": 132,
    "direct_attempts": 0,
    "statuses": {
     "200": 127,
