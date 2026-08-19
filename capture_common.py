@@ -305,6 +305,40 @@ def _cleanup_snapshot_versions(directory, pattern, keep):
         pass
 
 
+def _local_feed_guard_reason(n, prev_meta):
+    """Runner do Actions NÃO rebaixa feed LOCAL fresco e mais rico (19/08).
+
+    A API guest da Pinnacle devolve lista DEGRADADA pro IP de datacenter (medido
+    na madrugada de 19/08: runs do Actions com 6-11 eventos/1 mercado promovidos
+    por cima do feed do Mac com 75 eventos/2 mercados, ciclo após ciclo). O gate
+    de colapso por mercado não pega porque a `oportunidade` que o perdoa é
+    contada NA PRÓPRIA lista degradada — o instrumento quebrado mede a si mesmo.
+
+    Sinal independente: proveniência. O feeder local (IP residencial, ciclo de
+    ~35min) carimba captured_by=local; se o run do Actions tenta promover MENOS
+    eventos por cima de um full local com menos de LOCAL_FEED_GUARD_MIN minutos,
+    é o datacenter enxergando menos que a residência — bloqueia. Feeder morto
+    (>75min) libera: stub do Actions vira melhor que nada, por desenho.
+    """
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return None
+    if not prev_meta or prev_meta.get("captured_by") != "local":
+        return None
+    try:
+        prev_n = int(prev_meta.get("n") or 0)
+        prev_at = datetime.fromisoformat(str(prev_meta.get("at")))
+        if prev_at.tzinfo is None:
+            prev_at = prev_at.replace(tzinfo=BRT)
+        age_min = (datetime.now(BRT) - prev_at).total_seconds() / 60.0
+    except (TypeError, ValueError):
+        return None
+    lim = float(os.environ.get("LOCAL_FEED_GUARD_MIN", "75"))
+    if prev_n > int(n or 0) and 0 <= age_min < lim:
+        return (f"feed local fresco mais rico (n={prev_n} há {age_min:.0f}min "
+                f"> n_novo={int(n or 0)}; guarda {lim:.0f}min)")
+    return None
+
+
 def write_odds_latest(casa, file_name, n, at=None, *, promote_full=None, min_events=1,
                       oportunidade=None):
     """Publica ponteiros somente depois de validar o snapshot completo.
@@ -320,7 +354,9 @@ def write_odds_latest(casa, file_name, n, at=None, *, promote_full=None, min_eve
     n = int(n or 0)
     min_events = max(0, int(min_events or 0))
     mode = "close" if is_close_mode() else "full"
-    payload = {"file": file_name, "n": n, "at": at, "mode": mode}
+    payload = {"file": file_name, "n": n, "at": at, "mode": mode,
+               "captured_by": "actions" if os.environ.get("GITHUB_ACTIONS") == "true"
+               else "local"}
     src = ODDS_DIR / file_name
 
     # Capture o fallback antes de publicar o pointer da rodada atual.
@@ -350,6 +386,9 @@ def write_odds_latest(casa, file_name, n, at=None, *, promote_full=None, min_eve
         old_market_counts = snapshot_market_counts(prev_src, casa=casa)
         promotion_reasons = _market_promotion_reasons(new_market_counts, old_market_counts,
                                                       oportunidade)
+        guard = _local_feed_guard_reason(n, prev_meta)
+        if guard:
+            promotion_reasons = promotion_reasons + [guard]
         if promotion_reasons:
             promote_full = False
             payload["promotion_blocked"] = promotion_reasons
