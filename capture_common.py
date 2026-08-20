@@ -384,8 +384,32 @@ def write_odds_latest(casa, file_name, n, at=None, *, promote_full=None, min_eve
     promotion_reasons = []
     if promote_full and prev_src:
         old_market_counts = snapshot_market_counts(prev_src, casa=casa)
-        promotion_reasons = _market_promotion_reasons(new_market_counts, old_market_counts,
-                                                      oportunidade)
+        collapse = _market_promotion_reasons(new_market_counts, old_market_counts,
+                                             oportunidade)
+        # VÁLVULA DE ESCAPE POR IDADE (20/08): o board (build_board.BOARD_MAX_AGE_H
+        # = 12h) DESCARTA full mais velho que 12h. A guarda anti-colapso, ao
+        # proteger um estoque rico da noite (Escanteios 152 às 19h42), recusa
+        # promover a captura magra do meio-dia (45) — razão 0,30 < 0,35 em 6
+        # mercados — e segura o ponteiro ALÉM das 12h. Resultado medido na Superbet
+        # 20/08: full de 18h, bloqueio a cada ciclo, casa SOME do board inteira.
+        # A proteção que existe pra guardar riqueza acaba fazendo a casa desaparecer.
+        # Regra: se o full ATUAL já passou de STALE_FULL_PROMOTE_H (10h, margem sob
+        # as 12h), o colapso é PERDOADO — um full fresco e fino é melhor que a casa
+        # sumida. Não afrouxa o caso saudável: só age quando o ponteiro já está a
+        # caminho de ser descartado pelo board.
+        stale_h = float(os.environ.get("STALE_FULL_PROMOTE_H", "10"))
+        prev_age = prev_meta.get("_age_h") if isinstance(prev_meta, dict) else None
+        if collapse and isinstance(prev_age, (int, float)) and prev_age >= stale_h:
+            print("[%s] colapso de mercado PERDOADO: full atual tem %.1fh (>= %.0fh, "
+                  "o board descarta em 12h) — promovo fresco. Ignorado: %s"
+                  % (casa, prev_age, stale_h, collapse), flush=True)
+            payload["promotion_forced_stale"] = {
+                "prev_age_h": round(float(prev_age), 1), "ignored": collapse}
+            collapse = []
+        promotion_reasons = collapse
+        # o local-feed guard segue valendo (é sobre fonte MELHOR e fresca, não sobre
+        # ponteiro velho): se há feed local < 75min, prev_age é pequeno e a válvula
+        # acima nem dispara — não há conflito.
         guard = _local_feed_guard_reason(n, prev_meta)
         if guard:
             promotion_reasons = promotion_reasons + [guard]
