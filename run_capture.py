@@ -13,7 +13,12 @@ from capture_common import _atomic_write_text
 
 FETCHERS = [
     ("betano",     "fetch_odds_betano.py",    13 * 60),
-    ("superbet",   "fetch_odds_superbet.py",   8 * 60),
+    # superbet 8→15min (20/08): o full dela TIMEOUTAVA a 480s desde a noite de 19/08
+    # (status: "TIMEOUT após 480s", n=0) — ponteiro full congelou em 19/08 19:42,
+    # passou das 12h do BOARD_MAX_AGE_H e a casa SUMIU do board. Ela é a casa com
+    # mais mercados e em dia de rodada europeia cheia (24 UECL + 12 UEL…) o full
+    # não cabe em 8min. Captura é paralela (pool): o teto só vale pra ela.
+    ("superbet",   "fetch_odds_superbet.py",  15 * 60),
     ("estrelabet", "fetch_odds_estrelabet.py", 10 * 60),
     ("7k",         "fetch_odds_7k.py",        12 * 60),
     ("pinnacle",   "fetch_odds_pinnacle.py",   5 * 60),
