@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """§11 — Operação: contagem por mercado com a MESMA definição do gate (sets jogo/casa/mercado,
-sem dupla contagem, incluindo linhas de time). Betfast presente nas casas/denominadores.
+sem dupla contagem, incluindo linhas de time). Casas da ops = casas ativas no run_capture (Betfast desligada 21/08).
 """
 import unittest
 
@@ -54,9 +54,21 @@ class OpsCoverageTests(unittest.TestCase):
         self.assertEqual(self.houses.get("Betano"), gate["houses"].get("Betano"))
         self.assertEqual(self.houses.get("Betfast"), gate["houses"].get("Betfast"))
 
-    def test_betfast_is_a_known_house(self):
-        self.assertIn("betfast", CASAS)
-        self.assertEqual(DISP["betfast"], "Betfast")
+    def test_casas_da_ops_sao_capturadas(self):
+        # 21/08: a Betfast foi DESLIGADA do pool (decisão do Diego via brief do Cursor) e
+        # saiu de build_ops.CASAS — o teste antigo exigia a presença dela e derrubou o CI
+        # (captura bloqueada por 2h). O invariante real é este: toda casa que a ops lista
+        # nos denominadores tem que ser uma casa ATIVA no run_capture.FETCHERS — casa
+        # listada e não capturada vira denominador fantasma. Religar a Betfast =
+        # descomentar no run_capture E devolver aqui; o teste acompanha sozinho.
+        from run_capture import FETCHERS
+        ativas = {c for c, _, _ in FETCHERS}
+        for c in CASAS:
+            self.assertIn(c, ativas, f"{c} está na ops mas não é capturada")
+            self.assertIn(c, DISP, f"{c} sem nome de exibição")
+        self.assertNotIn("betfast", CASAS)
+        # a fixture ainda carrega linhas 'Betfast' de propósito: casa desligada que
+        # sobrou em snapshot antigo continua sendo CONTADA (não some do histórico).
         self.assertIn("Betfast", self.houses)
 
 
