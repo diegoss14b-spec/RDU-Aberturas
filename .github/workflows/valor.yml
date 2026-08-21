@@ -262,6 +262,13 @@ jobs:
       - name: Montar o board
         id: board
         if: env.MODE == 'full' && steps.capture.outcome == 'success'
+        env:
+          # 21/08: o corte de mercados (opção A do Diego: escanteios fora em TODAS as
+          # casas) é aplicado na NORMALIZAÇÃO do build_board — superbet/7k/estrela
+          # trazem o mercado embutido no payload e o fetch não consegue cortar. A env
+          # só existia no passo de captura → o board continuou com 381 jogos de
+          # escanteios depois do "corte". Mesmo valor/default do passo de captura.
+          MERCADOS_OFF: ${{ vars.MERCADOS_OFF || 'escanteios' }}
         run: python build_board.py
 
       # Painel de Operação (sempre que houver status/histórico — útil mesmo em close)
