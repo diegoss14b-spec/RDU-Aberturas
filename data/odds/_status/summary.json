@@ -1,50 +1,64 @@
 {
- "ts_utc": "2026-08-21T03:06:04Z",
- "ts_brt": "2026-08-21 00:06",
+ "ts_utc": "2026-08-21T03:33:14Z",
+ "ts_brt": "2026-08-21 00:33",
  "casas_ok": [
   "betano",
   "superbet",
   "pinnacle",
-  "betfast"
+  "bet365",
+  "betfast",
+  "sportingbet"
  ],
  "casas_fail": [
   {
    "casa": "estrelabet",
-   "error": "exit=2"
+   "error": "exit=0"
   },
   {
    "casa": "7k",
    "error": "0 eventos direto (sem credencial Decodo pra fallback) · 1ª tentativa: Error: BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1234/chrome-he"
-  },
-  {
-   "casa": "bet365",
-   "error": "exit=2"
-  },
-  {
-   "casa": "sportingbet",
-   "error": "exit=2"
   }
  ],
- "n_ok": 4,
- "n_fail": 4,
- "total_events": 1,
+ "n_ok": 6,
+ "n_fail": 2,
+ "total_events": 363,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 1,
-   "n_markets": 0,
-   "market_counts": {},
+   "n_events": 60,
+   "n_markets": 9,
+   "market_counts": {
+    "Cartões": 12,
+    "Chutes no gol": 6,
+    "Desarmes": 1,
+    "Escanteios": 46,
+    "Faltas": 3,
+    "Finalizações": 6,
+    "Impedimentos": 3,
+    "Laterais": 1,
+    "Tiros de meta": 1
+   },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-21_0002.jsonl",
+   "pointer_file": "betano_2026-08-21_0024.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "n_events": 138,
+   "n_markets": 9,
+   "market_counts": {
+    "Cartões": 34,
+    "Chutes no gol": 21,
+    "Desarmes": 2,
+    "Escanteios": 138,
+    "Faltas": 11,
+    "Finalizações": 22,
+    "Impedimentos": 11,
+    "Laterais": 4,
+    "Tiros de meta": 4
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "superbet_2026-08-21_0024.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -67,59 +81,84 @@
   },
   "pinnacle": {
    "ok": true,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "n_events": 28,
+   "n_markets": 1,
+   "market_counts": {
+    "Cartões": 28
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "pinnacle_2026-08-21_0024.jsonl",
    "error": null
   },
   "bet365": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 34,
+   "n_markets": 6,
+   "market_counts": {
+    "Cartões": 3,
+    "Chutes no gol": 2,
+    "Desarmes": 1,
+    "Escanteios": 34,
+    "Finalizações": 2,
+    "Impedimentos": 1
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "bet365_2026-08-21_0024.jsonl",
    "error": null
   },
   "betfast": {
    "ok": true,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "n_events": 5,
+   "n_markets": 1,
+   "market_counts": {
+    "Escanteios": 5
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "betfast_2026-08-21_0024.jsonl",
    "error": null
   },
   "sportingbet": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 98,
+   "n_markets": 3,
+   "market_counts": {
+    "Cartões": 6,
+    "Escanteios": 98,
+    "Finalizações": 1
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "sportingbet_2026-08-21_0024.jsonl",
    "error": null
   }
  },
- "market_counts": {},
+ "market_counts": {
+  "Cartões": 83,
+  "Chutes no gol": 29,
+  "Desarmes": 4,
+  "Escanteios": 321,
+  "Faltas": 14,
+  "Finalizações": 31,
+  "Impedimentos": 15,
+  "Laterais": 5,
+  "Tiros de meta": 5
+ },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-08-21T03:05:19Z",
-  "ts_brt": "2026-08-21 00:05",
+  "ts_utc": "2026-08-21T03:29:07Z",
+  "ts_brt": "2026-08-21 00:29",
   "n_events": 979,
   "n_fixtures": 979,
   "n_markets": 0,
   "min_events": 245,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_743d7b37b5e35439352b.json",
-  "pointer_at": "2026-08-21T00:05:19-03:00",
+  "pointer_file": "_snapshots/sofa_699291a278318f7e0bd2.json",
+  "pointer_at": "2026-08-21T00:29:07-03:00",
   "pointer_n": 979,
   "pointer_age_h": 0.0,
-  "duration_sec": 185.9,
+  "duration_sec": 194.5,
   "error": null,
   "error_class": null,
   "transport": {
@@ -142,7 +181,7 @@
    ]
   }
  },
- "deploy_allowed": false,
- "reason": "captura insuficiente: 4 casas ok, 1 eventos",
- "mode": "close"
+ "deploy_allowed": true,
+ "reason": "ok",
+ "mode": "full"
 }
