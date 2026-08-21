@@ -170,12 +170,17 @@ jobs:
           python-version: "3.12"
           cache: pip
 
+      # ⚠ 21/08: cache SEM condição de modo e COM a versão na chave. A chave fixa
+      # antiga guardou browsers de um playwright antigo pra sempre (cache do Actions
+      # é imutável por chave) e o install era só no full → ciclo close que caía no
+      # fallback de browser do 7k achava ~/.cache/ms-playwright vazio/errado:
+      # "Executable doesn't exist at .../chromium_headless_shell-1234". A versão
+      # agora está PINADA no requirements — o hash muda a chave junto do bump.
       - name: Cache do navegador (Playwright)
-        if: env.MODE == 'full'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
 
       - name: Instalar dependências
         run: |
@@ -192,9 +197,9 @@ jobs:
       - name: Testes (bloqueia o ciclo se algum falhar)
         run: python -m pytest test_*.py -q
 
-      # Playwright só no full (7k pega JWTs via HTTP puro; browser é só fallback raro)
+      # 21/08: SEMPRE instalar (com cache quente é ~5-10s de verificação). O "só no
+      # full" deixava o close sem browser justo quando o 7k precisava do fallback.
       - name: Instalar Playwright (fallback do 7k)
-        if: env.MODE == 'full'
         run: python -m playwright install --with-deps chromium
 
       # Orquestrador: 5 casas em PARALELO com timeout próprio, grava _status/summary.json.

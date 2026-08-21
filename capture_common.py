@@ -528,6 +528,12 @@ def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, samp
     STATUS_DIR.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
     err_s = (str(error)[:300] if error else None)
+    # FALHA MUDA (21/08, caso EstrelaBet): ok=False sem erro nenhum — n abaixo do
+    # mínimo com error=None deixava o ops sem pista ("ok=false misterioso").
+    # Todo soft-fail ganha um erro legível por padrão.
+    if not ok and err_s is None:
+        err_s = (f"{n_events} eventos < mínimo {min_events} — fonte respondeu "
+                 "vazia/rala sem exceção (manutenção ou rate-limit da fonte?)")
 
     market_counts = {}
     pointer_meta, pointer_src = (None, None)

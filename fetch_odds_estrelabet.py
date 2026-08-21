@@ -246,16 +246,22 @@ if __name__ == "__main__":
     from capture_common import finish, br_proxies
     try:
         _n = main()
-        if _n is None:
-            # lista não veio pela rota primária → tenta a OUTRA rota no MESMO run
-            # (simétrico: direto→proxy se PROXY_OFF lista a casa; proxy→direto se o
-            # Decodo morrer — pane de 09/08: 407 derrubou 5 casas por 10h em silêncio)
+        if not _n:
+            # 21/08: retry também quando a lista RESPONDE mas vem com ZERO jogos
+            # (caso das 00:57: main() devolveu 0 em 5s, finish saía sem erro e o
+            # board ficava com 82 jogos stale sem pista no ops). None = transporte
+            # morto; 0 = fonte vazia — os dois merecem a 2ª rota.
+            _foi_none = _n is None
             _rota2 = "proxy BR" if PROX is None else "DIRETO"
-            print(f"[{CASA}] lista vazia na rota primária — tentando {_rota2} no mesmo run")
+            print(f"[{CASA}] lista {'não veio' if _foi_none else 'veio VAZIA'} na rota primária — tentando {_rota2} no mesmo run")
             globals()["PROX"] = br_proxies(CASA, force=True) if PROX is None else None
-            _n = main()
-        if _n is None:
-            finish(CASA, 0, MIN_EFF, error="lista vazia nas DUAS rotas (direto e proxy)", t0=_t0)
+            _n2 = main()
+            _n = _n2 if _n2 else _n
+        if not _n:
+            _msg = ("lista vazia nas DUAS rotas (transporte morto: direto e proxy)"
+                    if _n is None else
+                    "lista respondeu com 0 eventos nas DUAS rotas (manutenção/rate-limit Altenar?)")
+            finish(CASA, 0, MIN_EFF, error=_msg, t0=_t0)
             sys.exit(2)
         sys.exit(finish(CASA, _n, MIN_EFF, t0=_t0))
     except SystemExit:

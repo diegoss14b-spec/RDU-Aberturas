@@ -2,5 +2,5 @@ curl_cffi>=0.7
 requests>=2.31
 unidecode>=1.3
 rapidfuzz>=3.6
-playwright>=1.44
+playwright==1.60.0  # PINADO 21/08: versão solta desalinhava browsers do cache (chave usa hash deste arquivo)
 pytest

@@ -520,6 +520,8 @@ def main():
     # agrupa por jogo: (1) sofa_id se match, (2) fallback fuzzy entre casas
     jogos = []
     by_sofa = {}  # sofa_id -> j
+    _now_intake = datetime.now(BRT)
+    n_skip_zumbi = 0
     for e in eventos:
         parts = [p.strip() for p in (e.get("name") or "").split(" - ")]
         dt = parse_start(e.get("start"))
@@ -532,6 +534,15 @@ def main():
             day = dt_brt.strftime("%Y-%m-%d")
             ini = dt_brt.strftime("%d/%m %H:%M")
             ini_iso = dt_brt.isoformat(timespec="seconds")
+            # ZUMBI (21/08): ponteiro stale de casa quebrada (7k/Estrela caídas
+            # nesta madrugada) ainda carrega jogos de ONTEM — 8 finished só-7k/
+            # Estrela poluíam o board de aberturas. Kickoff há mais de 3h não
+            # entra: não afeta upcoming nem recém-começados (o stale-keep serve
+            # pra jogo FUTURO com odd velha, nunca pra jogo que já acabou).
+            # Sem data parseável = mantém (fail-open pro caso raro).
+            if dt_brt < _now_intake - timedelta(hours=3):
+                n_skip_zumbi += 1
+                continue
         else:
             day, ini, ini_iso = "?", "?", None
         hn = norm_team(parts[0]) if len(parts) == 2 else norm_team(e["name"])
@@ -855,7 +866,7 @@ def main():
         },
     }
     print(f"[board] valor flags={n_valor} · skip kickoff/started={n_skip_ko} · skip stale casa={n_skip_stale}"
-          f" · skip 3-vias={n_skip_3way} · skip sem sofa_id={n_skip_nosofa} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
+          f" · skip 3-vias={n_skip_3way} · skip zumbi>3h={n_skip_zumbi} · skip sem sofa_id={n_skip_nosofa} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
     if n_skip_nosofa:
         # alto = fixture de liga de MODELO falhando (investigar); baixo = rótulo exótico barrado
         print(f"[board] ⚠ {n_skip_nosofa} flags suprimidas por falta de sofa_id (não liquidáveis)")
