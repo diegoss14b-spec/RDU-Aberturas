@@ -39,7 +39,7 @@ HOUSE_MAP = HIST / "house_event_map.json"
 # a casa aparecia na Mesa e 100% das linhas dela eram descartadas antes do banco —
 # sem histórico, sem abertura/fechamento, sem CLV. Nenhum commit jamais tirou o nome
 # daqui, então não foi decisão, foi esquecimento na hora de plugar a casa.
-CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365", "betfast",
+CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365",  # betfast desligada 21/08
          "sportingbet"]
 
 # métodos fortes o bastante pra FIXAR a identidade no mapa por casa (event_id).

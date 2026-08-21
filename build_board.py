@@ -510,7 +510,6 @@ def main():
                      + load_normalized("EstrelaBet", "estrelabet") \
                      + load_normalized("Pinnacle", "pinnacle") \
                      + load_normalized("bet365", "bet365") \
-                     + load_normalized("Betfast", "betfast") \
                      + load_normalized("Sportingbet", "sportingbet")
     casas_ativas = sorted(set(e["casa"] for e in eventos))
     # SofaScore = base canônica de nomes/horários; casas encaixam por horário + fuzzy
@@ -520,6 +519,8 @@ def main():
     # agrupa por jogo: (1) sofa_id se match, (2) fallback fuzzy entre casas
     jogos = []
     by_sofa = {}  # sofa_id -> j
+    from capture_common import mercados_off as _mk_off_fn
+    _MK_OFF_BOARD = _mk_off_fn()
     _now_intake = datetime.now(BRT)
     n_skip_zumbi = 0
     for e in eventos:
@@ -631,6 +632,10 @@ def main():
             return ok, rej
         for canon, linhas in (e.get("mercados") or {}).items():
             if canon not in MERC_SET: continue
+            # OPÇÃO A do Diego (21/08): MERCADOS_OFF vale pra TODAS as casas —
+            # onde o mercado vem embutido no payload (superbet/7k/estrela) o
+            # fetch não corta, então o corte de verdade é AQUI na normalização.
+            if canon.strip().lower() in _MK_OFF_BOARD: continue
             linhas, rej = _sane(linhas)
             if rej:
                 j.setdefault("_ladder_rej", []).extend(
@@ -640,6 +645,7 @@ def main():
         # totais por time → times[mercado][home|away].casas[casa]
         for canon, by_team in (e.get("mercados_time") or {}).items():
             if canon not in MERC_SET: continue
+            if canon.strip().lower() in _MK_OFF_BOARD: continue
             slot = j["times"].setdefault(canon, {
                 "home": {"nome": j.get("home") or "", "casas": {}},
                 "away": {"nome": j.get("away") or "", "casas": {}},

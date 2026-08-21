@@ -36,7 +36,7 @@ DISP = {
     "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365", "betfast": "Betfast",
     "sofa": "SofaScore",
 }
-CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365", "betfast"]
+CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365"]  # betfast desligada 21/08
 MERCADOS = [
     "Cartões", "Faltas", "Finalizações", "Chutes no gol", "Escanteios",
     "Impedimentos", "Laterais", "Tiros de meta", "Desarmes",
@@ -403,7 +403,7 @@ def fixtures_info():
         "age_min": age_mins(ts),
     }
 def build_avisos(summary, casas, board_cov, hist_h, runs):
-    avisos = []
+    avisos = [{"level": "info", "txt": "Betfast DESLIGADA do pool (21/08, decisão Diego) — religar em run_capture.py"}]
     fails = [c for c in casas if c["id"] in CASAS and not c["ok"]]
     if fails:
         avisos.append({
