@@ -305,12 +305,12 @@ jobs:
         run: bash persist_snapshot.sh
 
       # Só publica o estado que já foi versionado e enviado com sucesso ao repositório.
+      # 22/08: NÃO exige o passo de histórico (best-effort) — timeout dele não congela a Mesa.
       - name: Publicar no Netlify
         id: deploy
         if: >-
           env.MODE == 'full' &&
           steps.capture.outcome == 'success' &&
-          steps.history.outcome == 'success' &&
           steps.board.outcome == 'success' &&
           steps.ops.outcome == 'success' &&
           steps.gate.outcome == 'success' &&
@@ -350,8 +350,11 @@ jobs:
             fail=1
           fi
           if [ "$HISTORY_OUTCOME" != "success" ]; then
-            echo "::error::Pipeline de histórico/liquidação falhou."
-            fail=1
+            # 22/08: histórico é best-effort (continue-on-error + teto de 18min) — o board
+            # sai com o banco da rodada anterior. Dois fulls seguidos estouraram o teto
+            # (keys/ com 531 MB) e a Mesa ficou 2h congelada porque o deploy EXIGIA este
+            # passo. Aviso, não veredito.
+            echo "::warning::Pipeline de histórico/liquidação falhou/estourou o teto — board publicado com o banco anterior."
           fi
           if [ "$OPS_OUTCOME" != "success" ]; then
             echo "::error::Painel operacional não foi atualizado."
