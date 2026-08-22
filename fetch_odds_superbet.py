@@ -39,16 +39,33 @@ def dec(raw):
     except Exception: pass
     return raw.decode("utf-8", "replace")
 
+# 22/08 — DIAGNÓSTICO: o full da CI salvou 134 jogos (kickoff até 15:00) enquanto a
+# mesma captura rodada no Mac (IP BR, direto) salvou 230 (39 com Faltas, noite incluída).
+# O get() engolia 404/erro em silêncio e ninguém sabia ONDE a lista morria. Conta por
+# status e grava em _status/superbet_diag.json (lido no ops/auditoria).
+_DIAG = {"http_200": 0, "http_404": 0, "http_other": 0, "exc": 0, "first_fail": None, "last_fail": None}
+
+
 def get(url, tries=4):
     for _ in range(tries):
         try:
             r = requests.get(url, headers=H, timeout=25, stream=True)
             body = dec(r.raw.read())
             if r.status_code == 200 and body[:1] in "{[":
+                _DIAG["http_200"] += 1
                 return json.loads(body)
-            if r.status_code == 404: return None
-        except Exception:
-            pass
+            if r.status_code == 404:
+                _DIAG["http_404"] += 1
+                _DIAG["first_fail"] = _DIAG["first_fail"] or f"404 {url[-40:]}"
+                _DIAG["last_fail"] = f"404 {url[-40:]}"
+                return None
+            _DIAG["http_other"] += 1
+            _DIAG["first_fail"] = _DIAG["first_fail"] or f"{r.status_code} {url[-40:]}"
+            _DIAG["last_fail"] = f"{r.status_code} {url[-40:]}"
+        except Exception as e:
+            _DIAG["exc"] += 1
+            _DIAG["first_fail"] = _DIAG["first_fail"] or f"exc {type(e).__name__} {url[-40:]}"
+            _DIAG["last_fail"] = f"exc {type(e).__name__} {url[-40:]}"
         time.sleep(1.5)
     return None
 
@@ -240,6 +257,16 @@ def main():
     f.close()
     write_latest(n_out, promote=None)  # auto: full se n>0 e não-close
     print(f"[superbet] {n_det} detalhes buscados · {n_out} jogos com mercado de estatística salvos em {out_path.name}")
+    try:
+        import os as _os
+        _diag = dict(_DIAG, n_list=len(events), n_det=n_det, n_out=n_out, mode=("close" if _wh is not None else "full"),
+                     proxy_br=bool(_os.environ.get("DECODO_USER")) and "superbet" not in (_os.environ.get("PROXY_OFF") or "").lower(),
+                     at=now.isoformat(timespec="seconds"), last_kickoff_saved=None)
+        (OUTDIR / "_status").mkdir(parents=True, exist_ok=True)
+        (OUTDIR / "_status" / "superbet_diag.json").write_text(json.dumps(_diag, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"[superbet] diag: {_diag}")
+    except Exception as _e:
+        print(f"[superbet] diag não gravado: {_e!r}")
     return n_out
 
 if __name__ == "__main__":
