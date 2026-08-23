@@ -28,7 +28,14 @@ H = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0.0.0",
      "Accept": "application/json", "Origin": "https://superbet.bet.br", "Referer": "https://superbet.bet.br/"}
 BRT = timezone(timedelta(hours=-3))
 DAYS = 4          # janela de captura (hoje + N dias)
-MAX_EVENTS = 500  # teto de detalhes por rodada
+MAX_EVENTS = 900  # teto de SEGURANÇA de detalhes por rodada (quem limita de verdade é o horizonte)
+# 23/08 (pedido do Diego: "na aba de cartões da Superbet só mostra jogos até 17:30"): a
+# lista by-date vem ORDENADA por kickoff e num domingo tem 573 jogos só de hoje — o teto
+# antigo de 500 cortava a noite inteira (73 jogos de hoje além do 500º). Agora o recorte é
+# por TEMPO (hoje + HORIZON_H) e os detalhes vão em WORKERS fios paralelos pra caber no
+# timeout de 15min do run_capture (medido: ~0,8s/detalhe local, ~1,5s na nuvem).
+HORIZON_H = float(__import__("os").environ.get("SUPERBET_HORIZON_H", "30"))
+WORKERS = max(1, int(__import__("os").environ.get("SUPERBET_WORKERS", "3")))
 MIN_EVENTS = 10   # mínimo pro finish() (abaixo = exit 2)
 MIN_EFF = MIN_EVENTS  # modo close (ODDS_WINDOW_H) reduz — ver main()
 
@@ -204,12 +211,21 @@ def main():
                           promote_full=promote, min_events=MIN_EFF)
     f = open(out_path, "w", encoding="utf-8")
     n_out = n_det = 0
-    for e in events[:MAX_EVENTS]:
-        eid = e.get("eventId")
-        if not eid: continue
-        det = get(f"{BASE}/events/{eid}")
-        n_det += 1
+    # recorte por horizonte (lista já ordenada por kickoff) + teto de segurança
+    _cut_ms = (now + timedelta(hours=HORIZON_H)).timestamp() * 1000
+    sel = [e for e in events if e.get("eventId") and (e.get("unixDateMillis") or 0) <= _cut_ms][:MAX_EVENTS]
+    print(f"[superbet] detalhes: {len(sel)} de {len(events)} (horizonte {HORIZON_H:g}h, teto {MAX_EVENTS}, {WORKERS} fios)")
+
+    def _fetch(e):
+        det = get(f"{BASE}/events/{e['eventId']}")
         time.sleep(random.uniform(0.2, 0.4))
+        return e, det
+
+    from concurrent.futures import ThreadPoolExecutor
+    _ex = ThreadPoolExecutor(max_workers=WORKERS)
+    for e, det in _ex.map(_fetch, sel):     # map preserva a ordem (kickoff)
+        eid = e.get("eventId")
+        n_det += 1
         if not det or not det.get("data"): continue
         ev = det["data"][0]
         odds = ev.get("odds") or []
@@ -254,6 +270,7 @@ def main():
         if merc_t: rec["mercados_time"] = merc_t
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
+    _ex.shutdown(wait=True)
     f.close()
     write_latest(n_out, promote=None)  # auto: full se n>0 e não-close
     print(f"[superbet] {n_det} detalhes buscados · {n_out} jogos com mercado de estatística salvos em {out_path.name}")
