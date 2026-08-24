@@ -14,8 +14,12 @@ while true; do
   if [ "${N:-0}" -gt 0 ]; then
     git add data/odds/pinnacle_latest*.json data/odds/_snapshots/pinnacle_full_*.jsonl data/odds/_status/pinnacle.json 2>>"$LOG"
     git commit -q -m "pinnacle: feed local $TS ($N eventos) [skip ci]" 2>>"$LOG"
-    git push -q origin HEAD:main 2>>"$LOG" || { git pull --rebase -q origin main && git push -q origin HEAD:main; } >>"$LOG" 2>&1
-    echo "[$TS] feed ok: $N eventos, pushed" >>"$LOG"
+    if git push -q origin HEAD:main 2>>"$LOG" || { git pull --rebase -q origin main && git push -q origin HEAD:main; } >>"$LOG" 2>&1; then
+      echo "[$TS] feed ok: $N eventos, pushed" >>"$LOG"
+    else
+      echo "[$TS] PUSH_FALHOU pinnacle ($N eventos) — reset pra origin/main, recaptura no próximo ciclo" >>"$LOG"
+      git rebase --abort 2>/dev/null; git reset -q --hard origin/main >>"$LOG" 2>&1
+    fi
   else
     echo "[$TS] fetch local devolveu 0 — nada pushed" >>"$LOG"
   fi
@@ -32,8 +36,12 @@ while true; do
   if [ "${NS:-0}" -gt 0 ]; then
     git add data/odds/superbet_latest*.json data/odds/_snapshots/superbet_full_*.jsonl data/odds/_status/superbet.json data/odds/_status/superbet_diag.json 2>>"$LOG"
     git commit -q -m "superbet: feed local $TS ($NS eventos) [skip ci]" 2>>"$LOG"
-    git push -q origin HEAD:main 2>>"$LOG" || { git pull --rebase -q origin main && git push -q origin HEAD:main; } >>"$LOG" 2>&1
-    echo "[$TS] superbet feed ok: $NS eventos, pushed" >>"$LOG"
+    if git push -q origin HEAD:main 2>>"$LOG" || { git pull --rebase -q origin main && git push -q origin HEAD:main; } >>"$LOG" 2>&1; then
+      echo "[$TS] superbet feed ok: $NS eventos, pushed" >>"$LOG"
+    else
+      echo "[$TS] PUSH_FALHOU superbet ($NS eventos) — reset pra origin/main, recaptura no próximo ciclo" >>"$LOG"
+      git rebase --abort 2>/dev/null; git reset -q --hard origin/main >>"$LOG" 2>&1
+    fi
   else
     echo "[$TS] superbet local devolveu 0 — nada pushed" >>"$LOG"
   fi
