@@ -1,41 +1,38 @@
 {
- "ts_utc": "2026-08-24T03:59:05Z",
- "ts_brt": "2026-08-24 00:59",
+ "ts_utc": "2026-08-24T04:33:47Z",
+ "ts_brt": "2026-08-24 01:33",
  "casas_ok": [
+  "betano",
   "superbet",
+  "estrelabet",
   "7k",
-  "bet365"
+  "pinnacle",
+  "bet365",
+  "sportingbet"
  ],
- "casas_fail": [
-  {
-   "casa": "betano",
-   "error": "lista vazia nas DUAS rotas (direto e proxy)"
-  },
-  {
-   "casa": "estrelabet",
-   "error": "lista respondeu com 0 eventos nas DUAS rotas (manutenção/rate-limit Altenar?)"
-  },
-  {
-   "casa": "pinnacle",
-   "error": "lista vazia nas rotas direta e proxy"
-  },
-  {
-   "casa": "sportingbet",
-   "error": "lista vazia nas DUAS rotas (direto e proxy)"
-  }
- ],
- "n_ok": 3,
- "n_fail": 4,
- "total_events": 98,
+ "casas_fail": [],
+ "n_ok": 7,
+ "n_fail": 0,
+ "total_events": 417,
  "per_casa": {
   "betano": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 60,
+   "n_markets": 9,
+   "market_counts": {
+    "Cartões": 19,
+    "Chutes no gol": 15,
+    "Desarmes": 2,
+    "Escanteios": 53,
+    "Faltas": 6,
+    "Finalizações": 15,
+    "Impedimentos": 8,
+    "Laterais": 2,
+    "Tiros de meta": 2
+   },
    "pointer_valid": true,
-   "pointer_file": null,
-   "error": "lista vazia nas DUAS rotas (direto e proxy)"
+   "pointer_file": "betano_2026-08-24_0126.jsonl",
+   "error": null
   },
   "superbet": {
    "ok": true,
@@ -53,37 +50,50 @@
     "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-24_0056.jsonl",
+   "pointer_file": "superbet_2026-08-24_0126.jsonl",
    "error": null
   },
   "estrelabet": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 103,
+   "n_markets": 7,
+   "market_counts": {
+    "Cartões": 34,
+    "Chutes no gol": 23,
+    "Desarmes": 1,
+    "Escanteios": 103,
+    "Faltas": 6,
+    "Finalizações": 23,
+    "Impedimentos": 6
+   },
    "pointer_valid": true,
-   "pointer_file": null,
-   "error": "lista respondeu com 0 eventos nas DUAS rotas (manutenção/rate-limit Altenar?)"
+   "pointer_file": "estrelabet_2026-08-24_0126.jsonl",
+   "error": null
   },
   "7k": {
    "ok": true,
-   "n_events": 1,
-   "n_markets": 1,
+   "n_events": 118,
+   "n_markets": 4,
    "market_counts": {
-    "Escanteios": 1
+    "Cartões": 26,
+    "Desarmes": 2,
+    "Escanteios": 118,
+    "Faltas": 5
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-08-23_2219.jsonl",
+   "pointer_file": "7k_2026-08-24_0126.jsonl",
    "error": null
   },
   "pinnacle": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 3,
+   "n_markets": 1,
+   "market_counts": {
+    "Cartões": 3
+   },
    "pointer_valid": true,
-   "pointer_file": null,
-   "error": "lista vazia nas rotas direta e proxy"
+   "pointer_file": "pinnacle_2026-08-24_0126.jsonl",
+   "error": null
   },
   "bet365": {
    "ok": true,
@@ -98,123 +108,71 @@
     "Impedimentos": 1
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-24_0056.jsonl",
+   "pointer_file": "bet365_2026-08-24_0126.jsonl",
    "error": null
   },
   "sportingbet": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 36,
+   "n_markets": 3,
+   "market_counts": {
+    "Cartões": 9,
+    "Escanteios": 34,
+    "Finalizações": 1
+   },
    "pointer_valid": true,
-   "pointer_file": null,
-   "error": "lista vazia nas DUAS rotas (direto e proxy)"
+   "pointer_file": "sportingbet_2026-08-24_0126.jsonl",
+   "error": null
   }
  },
  "market_counts": {
-  "Cartões": 39,
-  "Chutes no gol": 33,
-  "Desarmes": 2,
-  "Escanteios": 98,
-  "Faltas": 11,
-  "Finalizações": 34,
-  "Impedimentos": 12,
-  "Laterais": 1,
-  "Tiros de meta": 1
+  "Cartões": 130,
+  "Chutes no gol": 71,
+  "Desarmes": 7,
+  "Escanteios": 405,
+  "Faltas": 28,
+  "Finalizações": 73,
+  "Impedimentos": 26,
+  "Laterais": 3,
+  "Tiros de meta": 3
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
-  "ok": false,
-  "ts_utc": "2026-08-24T03:57:31Z",
-  "ts_brt": "2026-08-24 00:57",
-  "n_events": 0,
-  "n_fixtures": 0,
+  "ok": true,
+  "ts_utc": "2026-08-24T04:29:54Z",
+  "ts_brt": "2026-08-24 01:29",
+  "n_events": 717,
+  "n_fixtures": 717,
   "n_markets": 0,
   "min_events": 181,
-  "promoted": false,
+  "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_47e1880b810b739323e6.json",
-  "pointer_at": "2026-08-23T20:45:42-03:00",
-  "pointer_n": 721,
-  "pointer_age_h": 4.197,
-  "duration_sec": 41.8,
-  "error": "snapshot não saudável: n=0, mínimo=181; fallback preservado n=721; transporte req=8 proxy=8 direto=0 http=nenhum ultimo=ConnectionError via proxy; circuit open circuito=1 falhas=BR-A,BR-B,BR-CdB,WC,UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Elite",
-  "error_class": "Other",
+  "pointer_file": "_snapshots/sofa_9f49f3a00771730a4fa1.json",
+  "pointer_at": "2026-08-24T01:29:54-03:00",
+  "pointer_n": 717,
+  "pointer_age_h": 0.0,
+  "duration_sec": 196.1,
+  "error": null,
+  "error_class": null,
   "transport": {
-   "requests": 8,
-   "proxy_attempts": 8,
+   "requests": 127,
+   "proxy_attempts": 127,
    "direct_attempts": 0,
-   "statuses": {},
-   "last_error": "ConnectionError via proxy; circuit open",
-   "consecutive_failures": 4,
-   "circuit_open": true,
-   "failed_tournaments": [
-    "BR-A",
-    "BR-B",
-    "BR-CdB",
+   "statuses": {
+    "200": 122,
+    "404": 4
+   },
+   "last_error": "HTTP 404 via proxy",
+   "consecutive_failures": 0,
+   "circuit_open": false,
+   "failed_tournaments": [],
+   "inactive_tournaments": [
     "WC",
-    "UCL",
-    "UEL",
-    "EPL",
-    "LaLiga",
-    "SerieA",
-    "Bundesliga",
-    "Ligue1",
-    "MLS",
-    "Argentina",
-    "CSL",
-    "Allsvenskan",
-    "Uruguay",
-    "Ecuador",
-    "Russia",
-    "Eliteserien",
-    "Libertadores",
-    "Sudamericana",
-    "LigaMX",
-    "BOL",
-    "CHI",
-    "PER",
-    "COL",
-    "COL2",
-    "ARG2",
-    "CZE",
-    "ROU",
-    "DEN",
-    "SUI",
-    "CDA",
-    "MEXE",
-    "EFLC",
-    "ECL",
-    "NED",
-    "GER2",
-    "SCO",
-    "ENG2",
-    "BEL",
-    "POR",
-    "ITA2",
-    "JPN",
-    "AUT",
-    "POL",
-    "TUR",
-    "GRE",
-    "SAU",
-    "UKR",
-    "CRO",
-    "SRB",
-    "BUL",
-    "VEN",
-    "PAR",
-    "AUS",
-    "ESP2",
-    "FRA2",
     "CDF",
-    "CDI",
     "CDR",
-    "DFB",
     "FAC"
-   ],
-   "inactive_tournaments": []
+   ]
   }
  },
  "deploy_allowed": true,
