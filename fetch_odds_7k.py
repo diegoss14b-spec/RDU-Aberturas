@@ -54,6 +54,11 @@ def canon(nm):
     if "impedi" in m and "total" in m: return "Impedimentos"
     if ("lateral" in m or "arremesso" in m) and "total" in m: return "Laterais"
     if "tiro de meta" in m and "total" in m: return "Tiros de meta"
+    # "Total de Desarmes" (jogo inteiro) existia e era descartado — só o time-level tinha
+    # regra (varredura 25/08: 5 jogos, ex. Valencia×Betis O/U 30.5). Exigir "total" é a
+    # trava contra o falso amigo "Chutes no Gol": nome de JOGO mas Selections de JOGADOR
+    # ("Fulano Acima 1.5", Points=None) — sem "total" no nome, não entra.
+    if "desarme" in m and ("total" in m or "partida" in m): return "Desarmes"
     if "escanteio" in m or "canto" in m:
         if "total" in m or "mais/menos" in m or "mais" in m: return "Escanteios"
     return None

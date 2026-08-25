@@ -307,6 +307,21 @@ class TestFetch7kFamily(unittest.TestCase):
         self.assertEqual(canon("Total de Cartões"), "Cartões")
         self.assertEqual(canon("Escanteios Mais/Menos"), "Escanteios")
 
+    def test_canon_desarmes_de_jogo(self):
+        """'Total de Desarmes' é O/U de jogo inteiro na 7k (varredura 25/08) e era
+        descartado — só o formato time-level ('Cruzeiro: Total de Desarmes') tinha regra."""
+        from fetch_odds_7k import canon, canon_team
+        self.assertEqual(canon("Total de Desarmes"), "Desarmes")
+        self.assertIsNone(canon("Desarmes do Jogador Mais/Menos"))   # prop de jogador
+        self.assertEqual(canon_team("Cruzeiro: Total de Desarmes"), ("Desarmes", "Cruzeiro"))
+
+    def test_canon_chutes_no_gol_sem_total_e_prop_de_jogador(self):
+        """'Chutes no Gol' (sem 'total') tem nome de mercado de JOGO mas as Selections
+        são de jogador ('Fulano Acima 1.5', Points=None) — mapear pelo nome criaria
+        mercado falso. A exigência de 'total' no canon é a trava; não relaxar."""
+        from fetch_odds_7k import canon
+        self.assertIsNone(canon("Chutes no Gol"))
+
     def test_pick_family_prefers_more_lines(self):
         # chama a função REAL (antes este teste replicava a lógica numa cópia — e por
         # isso não pegaria um bug de índice na tupla de score)
