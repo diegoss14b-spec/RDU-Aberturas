@@ -3,9 +3,11 @@ name: Mesa sinais → Telegram
 # Poll do board.js público → flags novos no Telegram.
 # Secrets: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 on:
-  schedule:
-    # a cada 15 min (fora do :00/:30 pra não colidir com valor.yml)
-    - cron: "7,22,37,52 * * * *"
+  # 25/08: DESLIGADO a pedido do Diego ("não estou usando ele mais") — o bot Telegram
+  # 'RDU Prévia do Jogo' é este workflow (juiz Mesa×modelos). Religar = descomentar.
+  # schedule:
+  #   # a cada 15 min (fora do :00/:30 pra não colidir com valor.yml)
+  #   - cron: "7,22,37,52 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
