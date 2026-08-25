@@ -318,9 +318,66 @@ class TestFetch7kFamily(unittest.TestCase):
     def test_canon_chutes_no_gol_sem_total_e_prop_de_jogador(self):
         """'Chutes no Gol' (sem 'total') tem nome de mercado de JOGO mas as Selections
         são de jogador ('Fulano Acima 1.5', Points=None) — mapear pelo nome criaria
-        mercado falso. A exigência de 'total' no canon é a trava; não relaxar."""
+        mercado falso. A exigência de 'total' no canon é a trava; não relaxar.
+        O O/U de jogo homônimo ('Chutes no gol', OU121) entra pelo CODE_MATCH."""
         from fetch_odds_7k import canon
         self.assertIsNone(canon("Chutes no Gol"))
+
+    def test_canon_gaps_do_print_do_diego_2508(self):
+        """Nomes reais do eventpage (Valencia×Betis): plural 'tiroS de meta' não continha
+        a substring 'tiro de meta', e 'Impedimentos Mais/Menos' vem sem 'total'."""
+        from fetch_odds_7k import canon
+        self.assertEqual(canon("Total de tiros de meta"), "Tiros de meta")
+        self.assertEqual(canon("Impedimentos Mais/Menos"), "Impedimentos")
+        self.assertEqual(canon("Total de Arremessos Laterais Mais/Menos"), "Laterais")
+        # períodos continuam fora
+        self.assertIsNone(canon("Primeiro Tempo Total de tiros de meta"))
+        self.assertIsNone(canon("Total de arremessos no 1º tempo Mais/Menos"))
+
+    def test_code_match_e_o_mapa_de_jogo_inteiro(self):
+        """CODE_MATCH cobre as 8 famílias FT e NÃO contém prop de jogador (QA*) nem
+        3-vias de time (ML5098/ML5099) nem variantes de 1º tempo (OU5121/OU5542)."""
+        from fetch_odds_7k import CODE_MATCH
+        self.assertEqual(CODE_MATCH["OU121"], "Chutes no gol")
+        self.assertEqual(CODE_MATCH["OU5119"], "Tiros de meta")
+        self.assertEqual(CODE_MATCH["OU5115"], "Laterais")
+        self.assertEqual(CODE_MATCH["OU5518"], "Desarmes")
+        for proibido in ("QA5402", "QA5401", "ML5098", "ML5099", "OU5121", "OU5542"):
+            self.assertNotIn(proibido, CODE_MATCH)
+
+    def test_eventpage_adapter_converte_e_falha_fechado(self):
+        """_eventpage_markets: converte o formato posicional real pro shape do
+        markets/all; formato inesperado devolve None (chamador cai no :ALL)."""
+        from fetch_odds_7k import _eventpage_markets
+        # recorte REAL (Impedimentos Mais/Menos do Valencia×Betis 25/08, encurtado)
+        sel_over = ["0OUxOMM", "Mais de 4.5", "Mais de", "Offside FT O/U", None, False,
+                    1.96, False, [], 1, 3, "Acima", "0OUx", False, "", "eid", 4.5, None]
+        sel_under = ["0OUxUMM", "Menos de 4.5", "Menos de", "Offside FT O/U", None, False,
+                     1.65, False, [], 3, 3, "Abaixo", "0OUx", False, "", "eid", 4.5, None]
+        mkt = ["0OUx", "Impedimentos Mais/Menos", None, "Impedimentos Mais/Menos", None,
+               ["OU2086", "Impedimentos Mais/Menos", None, 3, "Offside FT O/U"],
+               "eid", "lid", "1", "2026-08-25T19:00:00Z", 7, None, "",
+               [sel_over, sel_under], False]
+        # prop de jogador: linha embutida no nome, sem 'Mais/Menos de' → Points None
+        sel_pl = ["0QAx1", "Junior Firpo Acima 1.5", "Acima", "Player", None, False,
+                  3.29, False, [], 3, 3, "Acima", "0QAx", False, "", "eid", None, None]
+        mkt_pl = ["0QAx", "Chutes no Gol", None, "Chutes no Gol", None,
+                  ["QA5402", "Chutes no Gol", None, 3, "Player Over Shots on Target"],
+                  "eid", "lid", "1", "2026-08-25T19:00:00Z", 7, None, "",
+                  [sel_pl], False]
+        page = {"data": [["eid", "lid", "Liga", "1", "Futebol", [], mkt and None,
+                          [mkt, mkt_pl, mkt]]]}
+        out = _eventpage_markets(lambda p: page, "eid")
+        self.assertIsNotNone(out)
+        imp = [m for m in out if m["MarketType"]["_id"] == "OU2086"][0]
+        self.assertEqual(imp["Selections"][0]["Points"], 4.5)
+        self.assertEqual(imp["Selections"][0]["DisplayOdds"]["Decimal"], 1.96)
+        self.assertEqual(imp["Selections"][0]["Side"], 1)
+        pl = [m for m in out if m["MarketType"]["_id"] == "QA5402"][0]
+        self.assertIsNone(pl["Selections"][0]["Points"])   # morre na régua O/U do main
+        # formato inesperado → None (fallback :ALL)
+        self.assertIsNone(_eventpage_markets(lambda p: {"data": ["stringzona"]}, "eid"))
+        self.assertIsNone(_eventpage_markets(lambda p: None, "eid"))
 
     def test_pick_family_prefers_more_lines(self):
         # chama a função REAL (antes este teste replicava a lógica numa cópia — e por

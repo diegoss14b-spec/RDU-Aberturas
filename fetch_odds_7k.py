@@ -8,9 +8,11 @@ Fluxo (FSSB "pulse"):
     ('internalToken'/'sessionToken' inline no <script> do SPA — SEM browser; expiram em
     ~1 dia → frescos a cada run; Playwright virou só fallback se o HTTP puro falhar)
  3. /api/pulse/snapshot/events?lang=BR-PT -> eventos (filtra futebol+prematch+muitos mercados)
- 4. por evento: markets/all?markets=<eid>:ALL descobre os MarketType._id dos mercados de
-    estatística; depois markets/all?markets=<eid>:<codes> traz Selections COM preço
-    (Points=linha, Name=Mais/Menos, DisplayOdds.Decimal=odd).
+ 4. por evento: /api/eventpage/events/<eid> traz o cardápio COMPLETO (formato posicional
+    compacto; _eventpage_markets converte pro shape do markets/all). ⚠ O antigo
+    markets/all?markets=<eid>:ALL TRUNCA ~30% (medido 25/08: 109 de 155 no Valencia×Betis
+    — faltavam laterais, tiros de meta, impedimentos e chutes; achado do Diego). Ele
+    ficou como FALLBACK quando o formato do eventpage mudar.
 Saída: data/odds/7k_{stamp}.jsonl + 7k_latest.json (formato normalizado do board)."""
 import sys, os, json, re, time, random
 from pathlib import Path
@@ -39,7 +41,24 @@ MAX_EVENTS = 120
 MIN_EVENTS = 8    # mínimo pro finish() (abaixo = exit 2)
 MIN_EFF = MIN_EVENTS  # modo close (ODDS_WINDOW_H) reduz — ver main()
 
-# Jogo inteiro (sem nome de time no market)
+# Mapa por CÓDIGO do MarketType (25/08) — via PRIMÁRIA de reconhecimento. O código é o
+# nome inglês estável da plataforma FSSB ('OU121' = Shots On Target O/U) e é imune a
+# renomeação PT e a homônimo: 'Chutes no gol' O/U (OU121) vs 'Chutes no Gol' prop de
+# jogador (QA5402) têm o MESMO nome em lowercase — só o código separa. Todos são de
+# jogo inteiro de propósito (o 1ºT tem código próprio, ex. OU5121, e fica FORA).
+# Props de jogador (QA*) e 3-vias de time (ML5098/ML5099) ficam FORA de propósito.
+CODE_MATCH = {
+    "OU22": "Faltas",            # Total Match Fouls
+    "OU10": "Cartões",           # Cards FT O/U
+    "OU2083": "Finalizações",    # Total Match Shots O/U
+    "OU121": "Chutes no gol",    # Shots On Target O/U
+    "OU2086": "Impedimentos",    # Offside FT O/U
+    "OU5115": "Laterais",        # Total Throw-ins O/U
+    "OU5119": "Tiros de meta",   # Total Goal Kicks O/U
+    "OU5518": "Desarmes",        # Total Tackles
+}
+
+# Jogo inteiro (sem nome de time no market) — fallback quando o código não está no mapa
 def canon(nm):
     m = (nm or "").lower()
     if "tempo" in m or "jogador" in m or "primeiro" in m or "antes" in m: return None
@@ -51,9 +70,11 @@ def canon(nm):
     if "falta" in m and ("total" in m or "partida" in m): return "Faltas"
     if ("chute" in m or "finaliza" in m or "remate" in m) and "total" in m and "gol" not in m: return "Finalizações"
     if "chute" in m and "gol" in m and "total" in m: return "Chutes no gol"
-    if "impedi" in m and "total" in m: return "Impedimentos"
+    # 'Impedimentos Mais/Menos' vem SEM a palavra 'total' (print do Diego 25/08)
+    if "impedi" in m and ("total" in m or "mais/menos" in m): return "Impedimentos"
     if ("lateral" in m or "arremesso" in m) and "total" in m: return "Laterais"
-    if "tiro de meta" in m and "total" in m: return "Tiros de meta"
+    # plural: 'Total de tiroS de meta' — 'tiro de meta' não é substring dele
+    if ("tiro de meta" in m or "tiros de meta" in m) and "total" in m: return "Tiros de meta"
     # "Total de Desarmes" (jogo inteiro) existia e era descartado — só o time-level tinha
     # regra (varredura 25/08: 5 jogos, ex. Valencia×Betis O/U 30.5). Exigir "total" é a
     # trava contra o falso amigo "Chutes no Gol": nome de JOGO mas Selections de JOGADOR
@@ -75,7 +96,7 @@ _TEAM_STAT_RX = [
     (re.compile(r"escanteio|cantos?", re.I), "Escanteios"),
     (re.compile(r"impedi", re.I), "Impedimentos"),
     (re.compile(r"lateral|arremesso", re.I), "Laterais"),
-    (re.compile(r"tiro de meta", re.I), "Tiros de meta"),
+    (re.compile(r"tiros? de meta", re.I), "Tiros de meta"),
     (re.compile(r"desarme", re.I), "Desarmes"),
 ]
 
@@ -93,6 +114,59 @@ def canon_team(nm):
         if rx.search(rest):
             return c, team
     return None
+
+def _eventpage_markets(gj, eid):
+    """Converte /api/eventpage/events/{eid} (posicional compacto) pro shape de mercado do
+    markets/all que o loop do main() já entende. Estrutura observada 25/08: mercado =
+    [id, nome, _, nome, _, [código, nomePT, _, _, nomeEN, ...], ..., [seleções], ...];
+    seleção = [id, 'Mais de 4.5', 'Mais de', ..., odd@6, ..., side@9, 'Acima'@11, ...,
+    pts@16, ...]. A localização de mercados e seleções é por FORMA (maior lista de listas
+    com a cara certa), não por índice fixo — e qualquer coisa fora do esperado devolve
+    None pra o chamador cair no markets/all :ALL (fallback, truncado mas conhecido).
+    Prop de jogador sobrevive à conversão mas morre na régua O/U do main(): Points=None
+    ('Junior Firpo Acima 1.5' não tem 'Mais/Menos de X') e nunca fecha par over+under."""
+    d = gj(f"/api/eventpage/events/{eid}?hideX25X75Selections=false")
+    try:
+        ev = (d or {}).get("data", [None])[0]
+    except Exception:
+        return None
+    if not isinstance(ev, list):
+        return None
+    best = None
+    for x in ev:
+        if (isinstance(x, list) and len(x) >= 3
+                and all(isinstance(i, list) and len(i) > 6 and isinstance(i[0], str) for i in x[:3])):
+            if best is None or len(x) > len(best):
+                best = x
+    if not best:
+        return None
+    out = []
+    for m in best:
+        try:
+            mname = (m[1] if isinstance(m[1], str) else None) or (m[3] if isinstance(m[3], str) else "") or ""
+            mt = m[5] if len(m) > 5 and isinstance(m[5], list) and m[5] else []
+            code = str(mt[0]) if mt and isinstance(mt[0], str) else ""
+            sels_raw = next((x for x in m[6:] if isinstance(x, list) and x
+                             and isinstance(x[0], list) and len(x[0]) > 12), [])
+        except Exception:
+            continue
+        sels = []
+        for s in sels_raw:
+            try:
+                snm = s[1] if isinstance(s[1], str) else ""
+                od = s[6]
+                side = s[9] if len(s) > 9 else None
+                pts = s[16] if len(s) > 16 and isinstance(s[16], (int, float)) and not isinstance(s[16], bool) else None
+                if pts is None:
+                    mo = re.search(r"(?:mais|menos)\s+de\s+(\d+(?:[.,]\d+)?)", snm, re.I)
+                    pts = float(mo.group(1).replace(",", ".")) if mo else None
+                sels.append({"Name": snm, "Points": pts, "Side": side,
+                             "DisplayOdds": {"Decimal": od}})
+            except Exception:
+                continue
+        out.append({"Name": mname, "Selections": sels,
+                    "MarketType": {"_id": code or mname, "Name": mname}})
+    return out or None
 
 def get_host():
     try:
@@ -250,12 +324,16 @@ def main():
                           at=now.isoformat(timespec="seconds"), promote_full=promote, min_events=MIN_EFF)
     f = open(out_path, "w", encoding="utf-8")
     n_out = 0
+    n_fallback = 0
     for e in cand:
         eid = e["_id"]
-        allm = gj(f"/api/eventlist/eu/markets/all?markets={eid}:ALL")
+        # eventpage = cardápio completo; :ALL trunca ~30% (ver docstring do módulo)
+        allm = _eventpage_markets(gj, eid)
+        if allm is None:
+            allm = gj(f"/api/eventlist/eu/markets/all?markets={eid}:ALL")
+            n_fallback += 1
         time.sleep(random.uniform(0.15, 0.3))
         if not allm: continue
-        # :ALL já traz Selections com preço — não precisa 2ª ida (e cobre nomes com time no MarketType)
         # Famílias por (canon, market_type_id) — NÃO mesclar MarketTypes diferentes
         # só porque canon(name) colidiu (brief §4 auditoria 2026-07-14).
         families = {}       # canon -> {family_key: {meta, lines_by_L}}
@@ -264,7 +342,8 @@ def main():
             mt = m.get("MarketType") or {}
             mname = mt.get("Name") or m.get("Name") or ""
             mt_id = mt.get("_id") or mt.get("Id") or mt.get("id") or mname
-            c = canon(mname)
+            # código primeiro (inequívoco), nome como fallback — ver CODE_MATCH
+            c = CODE_MATCH.get(str(mt_id)) or canon(mname)
             ct = None if c else canon_team(mname)
             if not c and not ct: continue
             lines = {}
@@ -338,7 +417,8 @@ def main():
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
     f.close(); write_latest(n_out, promote=None)
-    print(f"[7k] {n_out} jogos com mercado de estatística salvos em {out_path.name}")
+    print(f"[7k] {n_out} jogos com mercado de estatística salvos em {out_path.name}"
+          + (f" · ⚠ {n_fallback} eventos caíram no fallback :ALL (formato do eventpage mudou?)" if n_fallback else ""))
     return n_out
 
 if __name__ == "__main__":
