@@ -302,6 +302,10 @@ jobs:
         if: always()
         env:
           GATE_OUTCOME: ${{ steps.gate.outcome }}
+          # 25/08: a reconciliação re-roda build_board.py — sem isto o corte de mercados
+          # evaporava SÓ nas rodadas com corrida de git (boards com escanteios às 06:44,
+          # 18:13, 23:33 de 24/08 enquanto o resto saía cortado). Gotcha 46a, 3ª porta.
+          MERCADOS_OFF: ${{ vars.MERCADOS_OFF || 'escanteios' }}
         run: bash persist_snapshot.sh
 
       # Só publica o estado que já foi versionado e enviado com sucesso ao repositório.

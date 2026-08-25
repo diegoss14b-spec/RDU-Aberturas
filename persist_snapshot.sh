@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# 25/08: a reconciliação re-roda build_board — o corte de mercados NUNCA pode depender
+# só do env do chamador (3ª porta do gotcha 46a). Default = o mesmo do valor.yml.
+export MERCADOS_OFF="${MERCADOS_OFF:-escanteios}"
 # Persistência resiliente do snapshot de odds + histórico (Mesa de Aberturas).
 #
 # Substitui o antigo "aborta se main avançou" (que congelava a Mesa) por um laço
