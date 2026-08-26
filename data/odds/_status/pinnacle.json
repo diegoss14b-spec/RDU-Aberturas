@@ -1,23 +1,20 @@
 {
  "casa": "pinnacle",
- "ok": true,
- "ts_utc": "2026-08-26T07:42:10Z",
- "ts_brt": "2026-08-26 04:42",
- "n_events": 83,
- "n_markets": 2,
- "market_counts": {
-  "Cartões": 1,
-  "Escanteios": 83
- },
+ "ok": false,
+ "ts_utc": "2026-08-26T07:14:35Z",
+ "ts_brt": "2026-08-26 04:14",
+ "n_events": 0,
+ "n_markets": 0,
+ "market_counts": {},
  "min_events": 3,
- "duration_sec": 126.1,
- "error": null,
- "error_class": null,
+ "duration_sec": 27.9,
+ "error": "0 eventos < mínimo 3 — fonte respondeu vazia/rala sem exceção (manutenção ou rate-limit da fonte?)",
+ "error_class": "HTTP429",
  "mode": "full",
  "sample_events": [],
- "proxy_br": false,
+ "proxy_br": true,
  "pointer_valid": true,
- "pointer_file": "pinnacle_2026-08-26_0440.jsonl",
- "pointer_at": "2026-08-26T04:40:04-03:00",
- "pointer_age_h": 0.035
+ "pointer_file": null,
+ "pointer_at": null,
+ "pointer_age_h": null
 }
