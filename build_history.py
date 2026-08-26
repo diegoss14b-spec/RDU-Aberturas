@@ -170,7 +170,14 @@ def select_main_signals(rows):
 
 def main():
     keys = {}
-    for f in sorted(glob.glob(str(HIST / "keys" / "*.json"))):
+    # 26/08 (fix C): os meses liquidados são movidos p/ keys/../_archive/keys pelo
+    # archive_odds_history.py (aliviar o I/O do CI). O build_history é o ÚNICO leitor
+    # que precisa da janela COMPLETA do estudo, então lê o quente + o arquivo. Os outros
+    # (close/settle/moves/model_ledger) globam só o quente de propósito (jogo velho já
+    # foi fechado/liquidado/ledgerado). Sem cross-collision: meses ≠ têm chaves ≠.
+    _hot = glob.glob(str(HIST / "keys" / "*.json"))
+    _arc = glob.glob(str(HIST / "_archive" / "keys" / "*.json"))
+    for f in sorted(_hot) + sorted(_arc):
         try:
             raw = json.loads(Path(f).read_text(encoding="utf-8"))
             for kk, vv in raw.items():

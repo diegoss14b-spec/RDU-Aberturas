@@ -235,8 +235,20 @@ jobs:
         # rodam em ~3min local) e o preso segurava a fila inteira via concurrency.
         # Teto: estourou => o board sai com o banco da rodada anterior (degradação
         # limpa), a Mesa NUNCA congela por causa dele.
-        timeout-minutes: 18
+        # 26/08 (fix A): 18min voltou a estourar (odds_history cresceu p/ 1,1GB; o
+        # I/O do runner sobre os shards mensais passou do teto) e, ao estourar, deixava
+        # o histórico stale → o manifesto atômico bloqueava o deploy → a Mesa CONGELOU
+        # 2h+ (a "degradação limpa" de 15/08 era furada: o manifesto acopla histórico
+        # ao deploy). Teto 18→45 dá folga p/ o I/O lento do runner terminar dentro do
+        # budget de 75min do job. Alívio; a raiz (fix C) é o odds_history não crescer
+        # sem teto — ver archive_odds_history.py.
+        timeout-minutes: 45
         run: |
+          # fix C (26/08): tira meses JÁ LIQUIDADOS (keys+ticks) do caminho quente pro
+          # _archive/ ANTES dos scripts — close/settle/moves/model_ledger deixam de
+          # re-ler 100+MB/ciclo à toa (só build_history lê o _archive, p/ o CLV manter a
+          # janela do estudo). Idempotente e no-op enquanto não há mês liquidado novo.
+          python archive_odds_history.py
           python migrate_history_keys.py
           python history_ingest.py
           python history_close.py
