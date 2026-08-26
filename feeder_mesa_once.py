@@ -46,25 +46,55 @@ def git(*args, timeout=GIT_TIMEOUT):
     return run(["git"] + list(args), timeout=timeout)
 
 
-def sync_repo():
-    rc, out = git("pull", "--rebase", "-q", "origin", "main")
-    if rc != 0:
-        log(f"pull --rebase falhou ({out.strip()[:200]}) — reset pra origin/main")
+def limpa_estado_git():
+    """Desarma rebase/merge preso e lock órfão — a raiz do feeder travado de
+    26/08: um `pull --rebase` que estourou o timeout no meio deixou
+    `.git/rebase-merge` + arquivos UU, e todo ciclo seguinte falhava no commit."""
+    gitdir = os.path.join(ROOT, ".git")
+    if os.path.isdir(os.path.join(gitdir, "rebase-merge")) or \
+       os.path.isdir(os.path.join(gitdir, "rebase-apply")):
         git("rebase", "--abort")
-        rc2, out2 = git("reset", "--hard", "origin/main")
-        if rc2 != 0:
-            log(f"ABORTA: reset --hard falhou: {out2.strip()[:200]}")
-            return False
+        log("estado de rebase preso — abortado no arranque")
+    if os.path.exists(os.path.join(gitdir, "MERGE_HEAD")):
+        git("merge", "--abort")
+        log("merge preso — abortado no arranque")
+    lock = os.path.join(gitdir, "index.lock")
+    if os.path.exists(lock):
+        try:
+            if time.time() - os.path.getmtime(lock) > 120:  # só se claramente órfão
+                os.remove(lock)
+                log("index.lock órfão removido")
+        except OSError:
+            pass
+
+
+def sync_repo():
+    """Base limpa = origin/main, SEM rebase. O feeder só ADICIONA arquivos de
+    dados e re-captura tudo a cada ciclo, então commit local não-enviado é
+    descartável (design do .sh do Mac) — `fetch`+`reset --hard` nunca conflita,
+    ao contrário do `pull --rebase` que replayava commit preso e travava."""
+    limpa_estado_git()
+    git("fetch", "-q", "origin", "main", timeout=GIT_TIMEOUT)
+    rc, out = git("reset", "-q", "--hard", "origin/main")
+    if rc != 0:
+        log(f"ABORTA: reset --hard origin/main falhou: {out.strip()[:200]}")
+        return False
     return True
 
 
-def push_verificado():
-    """True só se HEAD local está contido em origin/main após o push."""
+def push_verificado(commit_msg):
+    """True só se HEAD local está contido em origin/main após o push. Se o push
+    for rejeitado (origin andou entre o fetch e o push), re-parenteia o commit
+    sobre o origin novo via `reset --soft` — NUNCA `pull --rebase` (o trap)."""
     rc, _ = git("push", "-q", "origin", "HEAD:main")
     if rc != 0:
-        git("pull", "--rebase", "-q", "origin", "main")
+        git("fetch", "-q", "origin", "main", timeout=GIT_TIMEOUT)
+        # HEAD volta pro origin novo mas as MINHAS mudanças ficam no index →
+        # re-commita por cima, sem replay/conflito (last-writer nos feeds latest).
+        git("reset", "--soft", "origin/main")
+        git("commit", "-q", "-m", commit_msg)
         rc, _ = git("push", "-q", "origin", "HEAD:main")
-    git("fetch", "-q", "origin", "main")
+    git("fetch", "-q", "origin", "main", timeout=GIT_TIMEOUT)
     rc_v, _ = git("merge-base", "--is-ancestor", "HEAD", "origin/main")
     return rc_v == 0
 
@@ -87,20 +117,23 @@ def ciclo_casa(casa, fetch_script, status_rel, add_paths):
         log(f"{casa}: fetch local devolveu 0 — nada pushed")
         return
 
+    msg = f"{casa}: feed local {ts} ({n} eventos) [skip ci]"
     git("add", *add_paths)
-    rc_c, out_c = git("commit", "-q", "-m", f"{casa}: feed local {ts} ({n} eventos) [skip ci]")
+    rc_c, out_c = git("commit", "-q", "-m", msg)
     if rc_c != 0:
         if "nothing to commit" in out_c or "nada" in out_c:
             log(f"{casa}: {n} eventos mas sem mudança nos arquivos — nada a commitar")
         else:
             log(f"{casa}: commit falhou ({out_c.strip()[:200]})")
+            limpa_estado_git()
+            git("reset", "-q", "--hard", "origin/main")
         return
 
-    if push_verificado():
+    if push_verificado(msg):
         log(f"{casa}: feed ok: {n} eventos, push CONFIRMADO em origin/main")
     else:
         log(f"PUSH_FALHOU {casa} ({n} eventos) — reset pra origin/main, recaptura no próximo ciclo")
-        git("rebase", "--abort")
+        limpa_estado_git()
         git("reset", "-q", "--hard", "origin/main")
 
 
