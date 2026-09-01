@@ -1,23 +1,19 @@
 {
- "ts_utc": "2026-09-01T02:58:29Z",
- "ts_brt": "2026-08-31 23:58",
+ "ts_utc": "2026-09-01T03:46:07Z",
+ "ts_brt": "2026-09-01 00:46",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
   "7k",
+  "pinnacle",
   "bet365",
   "sportingbet"
  ],
- "casas_fail": [
-  {
-   "casa": "pinnacle",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=65 há 28min > n_novo=5; guarda 75min)"
-  }
- ],
- "n_ok": 6,
- "n_fail": 1,
- "total_events": 392,
+ "casas_fail": [],
+ "n_ok": 7,
+ "n_fail": 0,
+ "total_events": 397,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -35,7 +31,7 @@
     "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-31_2350.jsonl",
+   "pointer_file": "betano_2026-09-01_0037.jsonl",
    "error": null
   },
   "superbet": {
@@ -54,7 +50,7 @@
     "Tiros de meta": 2
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-31_2350.jsonl",
+   "pointer_file": "superbet_2026-09-01_0037.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -92,15 +88,15 @@
    "error": null
   },
   "pinnacle": {
-   "ok": false,
+   "ok": true,
    "n_events": 5,
    "n_markets": 1,
    "market_counts": {
     "Cartões": 5
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-08-31_2357.jsonl",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=65 há 28min > n_novo=5; guarda 75min)"
+   "pointer_file": "pinnacle_2026-09-01_0045.jsonl",
+   "error": null
   },
   "bet365": {
    "ok": true,
@@ -113,7 +109,7 @@
     "Finalizações": 4
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-31_2350.jsonl",
+   "pointer_file": "bet365_2026-09-01_0037.jsonl",
    "error": null
   },
   "sportingbet": {
@@ -126,12 +122,12 @@
     "Finalizações": 4
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-08-31_2350.jsonl",
+   "pointer_file": "sportingbet_2026-09-01_0037.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 100,
+  "Cartões": 105,
   "Chutes no gol": 134,
   "Desarmes": 8,
   "Escanteios": 375,
@@ -145,19 +141,19 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-09-01T02:53:43Z",
-  "ts_brt": "2026-08-31 23:53",
-  "n_events": 938,
-  "n_fixtures": 938,
+  "ts_utc": "2026-09-01T03:40:27Z",
+  "ts_brt": "2026-09-01 00:40",
+  "n_events": 939,
+  "n_fixtures": 939,
   "n_markets": 0,
-  "min_events": 233,
+  "min_events": 235,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_c891e156c679d8623f29.json",
-  "pointer_at": "2026-08-31T23:53:43-03:00",
-  "pointer_n": 938,
+  "pointer_file": "_snapshots/sofa_692c03c1ed7114fffd7b.json",
+  "pointer_at": "2026-09-01T00:40:27-03:00",
+  "pointer_n": 939,
   "pointer_age_h": 0.0,
-  "duration_sec": 182.7,
+  "duration_sec": 205.5,
   "error": null,
   "error_class": null,
   "transport": {
