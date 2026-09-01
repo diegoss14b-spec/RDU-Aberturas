@@ -1,42 +1,60 @@
 {
- "ts_utc": "2026-09-01T00:53:38Z",
- "ts_brt": "2026-08-31 21:53",
+ "ts_utc": "2026-09-01T01:58:57Z",
+ "ts_brt": "2026-08-31 22:58",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
   "7k",
-  "pinnacle",
   "bet365",
   "sportingbet"
  ],
- "casas_fail": [],
- "n_ok": 7,
- "n_fail": 0,
- "total_events": 15,
+ "casas_fail": [
+  {
+   "casa": "pinnacle",
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=68 há 39min > n_novo=5; guarda 75min)"
+  }
+ ],
+ "n_ok": 6,
+ "n_fail": 1,
+ "total_events": 235,
  "per_casa": {
   "betano": {
    "ok": true,
-   "n_events": 4,
-   "n_markets": 2,
+   "n_events": 60,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 1,
-    "Escanteios": 4
+    "Cartões": 14,
+    "Chutes no gol": 13,
+    "Desarmes": 1,
+    "Escanteios": 48,
+    "Faltas": 2,
+    "Finalizações": 13,
+    "Impedimentos": 2,
+    "Laterais": 1,
+    "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-08-31_2150.jsonl",
+   "pointer_file": "betano_2026-08-31_2249.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 4,
-   "n_markets": 2,
+   "n_events": 82,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 1,
-    "Escanteios": 4
+    "Cartões": 24,
+    "Chutes no gol": 14,
+    "Desarmes": 2,
+    "Escanteios": 82,
+    "Faltas": 12,
+    "Finalizações": 19,
+    "Impedimentos": 13,
+    "Laterais": 2,
+    "Tiros de meta": 2
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-08-31_2150.jsonl",
+   "pointer_file": "superbet_2026-08-31_2249.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -65,60 +83,72 @@
    "error": null
   },
   "pinnacle": {
-   "ok": true,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": false,
+   "n_events": 5,
+   "n_markets": 1,
+   "market_counts": {
+    "Cartões": 5
+   },
    "pointer_valid": true,
-   "pointer_file": null,
-   "error": null
+   "pointer_file": "pinnacle_2026-08-31_2257.jsonl",
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=68 há 39min > n_novo=5; guarda 75min)"
   },
   "bet365": {
    "ok": true,
-   "n_events": 4,
-   "n_markets": 1,
+   "n_events": 36,
+   "n_markets": 4,
    "market_counts": {
-    "Escanteios": 4
+    "Cartões": 3,
+    "Chutes no gol": 4,
+    "Escanteios": 36,
+    "Finalizações": 4
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-08-31_2150.jsonl",
+   "pointer_file": "bet365_2026-08-31_2249.jsonl",
    "error": null
   },
   "sportingbet": {
    "ok": true,
-   "n_events": 1,
-   "n_markets": 1,
+   "n_events": 55,
+   "n_markets": 3,
    "market_counts": {
-    "Escanteios": 1
+    "Cartões": 8,
+    "Escanteios": 55,
+    "Finalizações": 4
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-08-31_2150.jsonl",
+   "pointer_file": "sportingbet_2026-08-31_2249.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 3,
-  "Chutes no gol": 1,
-  "Escanteios": 15,
-  "Finalizações": 1
+  "Cartões": 50,
+  "Chutes no gol": 32,
+  "Desarmes": 3,
+  "Escanteios": 223,
+  "Faltas": 14,
+  "Finalizações": 41,
+  "Impedimentos": 15,
+  "Laterais": 3,
+  "Tiros de meta": 3
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-09-01T00:53:38Z",
-  "ts_brt": "2026-08-31 21:53",
-  "n_events": 926,
-  "n_fixtures": 926,
+  "ts_utc": "2026-09-01T01:52:55Z",
+  "ts_brt": "2026-08-31 22:52",
+  "n_events": 931,
+  "n_fixtures": 931,
   "n_markets": 0,
-  "min_events": 232,
+  "min_events": 231,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_004240aaeae2e80949bb.json",
-  "pointer_at": "2026-08-31T21:53:38-03:00",
-  "pointer_n": 926,
+  "pointer_file": "_snapshots/sofa_0500b8388dcd9a630466.json",
+  "pointer_at": "2026-08-31T22:52:54-03:00",
+  "pointer_n": 931,
   "pointer_age_h": 0.0,
-  "duration_sec": 179.1,
+  "duration_sec": 186.9,
   "error": null,
   "error_class": null,
   "transport": {
@@ -142,5 +172,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "close"
+ "mode": "full"
 }
