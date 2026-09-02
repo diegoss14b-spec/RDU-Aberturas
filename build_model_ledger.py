@@ -100,6 +100,11 @@ LABEL2COMP = {
     "UKR": "UKR", "CRO": "CRO", "SRB": "SRB", "BUL": "BUL", "VEN": "VEN",
     "PAR": "PAR", "AUS": "AUS", "ESP2": "ESP2", "FRA2": "FRA2",
     "CDF": "CDF", "CDI": "CDI", "CDR": "CDR", "DFB": "DFB", "FAC": "FAC",
+    # ── 01/09/2026 (trilha A9): 9 ligas novas nas fixtures — mesmo código da base.
+    # É o guard test_label2comp_cobre_todas_as_fixtures que exige esta linha: sem
+    # ela o torneio buscado cai em `label_fora_do_mapa` e some do ledger de CLV.
+    "BR-C": "BR-C", "POL2": "POL2", "ROU2": "ROU2", "RSA": "RSA", "KOR": "KOR",
+    "NED2": "NED2", "HUN": "HUN", "FIN": "FIN", "CYP": "CYP",
 }
 
 # B3 — semântica de liquidação da CASA em linha inteira (medida, não presumida).

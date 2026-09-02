@@ -101,6 +101,24 @@ FIXTURE_LABEL_COMP = {
     "CRO": "CRO", "SRB": "SRB", "BUL": "BUL", "VEN": "VEN",
     "PAR": "PAR", "AUS": "AUS", "ESP2": "ESP2", "FRA2": "FRA2",
     "CDF": "CDF", "CDI": "CDI", "CDR": "CDR", "DFB": "DFB", "FAC": "FAC",
+    # ── 01/09/2026 (trilha A9): as 9 ligas que entraram nas fixtures nesta data.
+    # Rótulo == código da base == nome do lookup em
+    # netlify-deploy/data/candidates/<VERSION>/<mercado>/<código>.json (conferido
+    # nos 73 lookups de 2026-08-29). Sem colisão de sigla (o único caso é o CDA
+    # acima; nenhum destes 9 existe com outro significado no bundle).
+    # ⚠ HONESTO: o bundle da Mesa de 2026-08-29 (candidate_pricer_data.json) ainda
+    # NÃO traz `pairs` destes comps — o export_candidate_board_bundle.py só exporta
+    # XWALK ∪ _EXTRA e os 9 não estão em _EXTRA. Até o bundle ser re-exportado com
+    # eles, candidate_pricer.price devolve None e o jogo fica SEM flag (fail-closed,
+    # nenhum preço errado). O que ESTA linha já entrega: identidade certa (sofa_id
+    # + ids dos times + comp) no board e no ledger de CLV.
+    # ⚠ BR-C: o veto LEAGUE_FORA ("serie c") continua derrubando o fx_comp quando o
+    # rótulo da casa diz "Série C" (build_board: fx_comp=None). Fica assim de
+    # propósito: tirar "serie c" do LEAGUE_FORA reabriria a regra legada
+    # "brasileir…" do classify_league e precificaria a Série C com o modelo da
+    # Série A. Exceção dirigida é mudança de PRODUTO (board + juiz) — pendente.
+    "BR-C": "BR-C", "POL2": "POL2", "ROU2": "ROU2", "RSA": "RSA", "KOR": "KOR",
+    "NED2": "NED2", "HUN": "HUN", "FIN": "FIN", "CYP": "CYP",
 }
 
 

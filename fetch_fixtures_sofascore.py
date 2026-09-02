@@ -69,6 +69,26 @@ TOURNAMENTS = [
     (170, "CRO"), (210, "SRB"), (247, "BUL"), (231, "VEN"),
     (11541, "PAR"), (136, "AUS"), (54, "ESP2"), (182, "FRA2"),
     (335, "CDF"), (328, "CDI"), (329, "CDR"), (217, "DFB"), (19, "FAC"),
+    # ── 01/09/2026 (trilha A9): 9 ligas que JÁ estão na base e nos 73 lookups de
+    # 2026-08-29 (cards/fouls/shots/corners), cotadas com cartões na Superbet
+    # (varredura 24/07-14/08, capture_superbet_leagues.py) e capturadas toda semana
+    # pelo capture_week.LEAGUES — mas SEM fixture aqui o jogo não ganha sofa_id, e é
+    # a fixture que dá identidade (comp + ids dos times) pro preço e pro ledger.
+    # utid = o MESMO do capture_week (é dele que nasce data/raw/backfill/{code}_{sid});
+    # rótulo = o MESMO código de competição da base (o lookup é por código).
+    # PROVA (offline, snapshot data/analysis/snapshots/matches_post_A1.json de 01/09):
+    # cada código tem temporada corrente com jogos até 26-31/08/2026, e o jsonl dessa
+    # temporada foi baixado pelo capture_week entre 27/08 e 01/09 com o mesmo utid
+    # (tid vivo, temporada ativa). ⚠ NÃO houve chamada ao vivo em /seasons nesta
+    # rodada (trilha sem rede) — se quiser a prova de produção, é 1 GET por utid.
+    # Colisão de sigla (lição do CDA): nenhum dos 9 rótulos existe em outro lugar
+    # desta lista nem no bundle com outro significado.
+    #   1281 Brasileirão Série C · 229 Betclic 1. Liga (2ª div POL) · 562 Liga 2
+    #   (2ª div ROU) · 358 Betway Premiership (RSA) · 410 K League 1 · 131 Eerste
+    #   Divisie (2ª div NED) · 187 NB I (HUN) · 41 Veikkausliiga (FIN) · 171 Cyprus
+    #   League by Stoiximan (CYP).
+    (1281, "BR-C"), (229, "POL2"), (562, "ROU2"), (358, "RSA"), (410, "KOR"),
+    (131, "NED2"), (187, "HUN"), (41, "FIN"), (171, "CYP"),
 ]
 # ⚠ 7 → 12 (30/07/2026): a janela de FIXTURES era mais curta que o horizonte do
 # BOARD, e isso derrubou o deploy da Mesa duas vezes seguidas às 13:43/13:45.
