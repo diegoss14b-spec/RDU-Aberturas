@@ -42,6 +42,7 @@ sys.path.insert(0, str(ROOT))
 from canonical import flags_compatible, norm_team, parse_history_key  # noqa: E402
 from history_merge import atomic_write_text, merge_records  # noqa: E402
 from history_quality import parse_iso_flex  # noqa: E402  (parser único §10)
+from jsonl_shard import append_jsonl_month  # noqa: E402  (GH001: clv mensal fatiado)
 
 HIST = ROOT / "data" / "odds_history"
 RES_AUTO = HIST / "results" / "results_auto.json"
@@ -655,18 +656,19 @@ def build_settlement_status(records, results, now):
 
 
 def _append_clv(rows):
+    """Registro imutável do estudo (append-only). GH001 (02/09): o arquivo do mês
+    é FATIADO via jsonl_shard — o feed de resultados chega em cadência ~semanal e
+    liquida dias de backlog de uma vez; o append da rajada estourava os 100 MB do
+    GitHub no monólito mensal e derrubava o persist da Mesa em loop."""
     if not rows:
         return
-    (HIST / "clv").mkdir(parents=True, exist_ok=True)
     by_month = defaultdict(list)
     for row in rows:
         kickoff = str(row.get("kickoff") or "")
         month = kickoff[:7] if len(kickoff) >= 7 else datetime.now(BRT).strftime("%Y-%m")
         by_month[month].append(row)
     for month, month_rows in by_month.items():
-        with (HIST / "clv" / f"{month}.jsonl").open("a", encoding="utf-8") as handle:
-            for row in month_rows:
-                handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+        append_jsonl_month(HIST / "clv", month, month_rows)
 
 
 def main():

@@ -50,6 +50,31 @@ stage() {
   fi
 }
 
+# ── GH001 (02/09): rejeição por ARQUIVO GRANDE é estrutural — retry não resolve. ──
+# O pre-receive do GitHub recusa blob >100 MB e o laço antigo tratava QUALQUER push
+# rejeitado como "main avançou", gastando 5 tentativas × ~6min subindo ~700 MB de pack
+# pra nada (ledger/2026-08.jsonl chegou a 149,92 MB quando o feed de resultados de
+# 01/09 liquidou 10 dias de backlog de uma vez). Duas defesas fail-closed:
+#  1) antes do commit: arquivo staged ≥95 MB aborta AGORA, com nome e tamanho no log
+#     (os writers fatiam via jsonl_shard.py — se isto disparar, algum arquivo NOVO
+#     passou a crescer sem teto e precisa do mesmo tratamento);
+#  2) depois do push: rejeição mencionando GH001/pre-receive/file size aborta sem
+#     re-tentar (só non-fast-forward continua no laço de reconciliação).
+GH_LIMITE_BYTES=95000000
+
+checa_tamanho_staged() {
+  local estourou=0 f sz
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    sz=$(wc -c < "$f")
+    if [ "$sz" -ge "$GH_LIMITE_BYTES" ]; then
+      echo "::error::persist: '$f' tem $((sz / 1048576)) MB (limite do GitHub: 100 MB) — abortado ANTES do push; fatiar o arquivo (ver jsonl_shard.py)"
+      estourou=1
+    fi
+  done < <(git diff --cached --name-only)
+  return "$estourou"
+}
+
 # reconcilia sobre a base nova sem perder tick: reset -> restaura captura -> re-ingest
 reingest_on_new_base() {
   echo ">> main avançou: reconciliando o histórico sobre a base nova (merge por chave, sem perda)"
@@ -85,10 +110,17 @@ for attempt in 1 2 3 4 5; do
     echo "Sem artefatos novos para commitar."
     exit 0
   fi
+  checa_tamanho_staged || exit 1
   git commit -m "odds: snapshot $(date -u +%Y%m%d_%H%M) [$MODE] [skip ci]"
-  if git push origin HEAD:main; then
+  push_out="$(git push origin HEAD:main 2>&1)"; push_rc=$?
+  printf '%s\n' "$push_out"
+  if [ "$push_rc" -eq 0 ]; then
     echo "Snapshot persistido e enviado (tentativa $attempt)."
     exit 0
+  fi
+  if printf '%s' "$push_out" | grep -qiE 'GH001|pre-receive hook declined|exceeds GitHub'; then
+    echo "::error::push rejeitado pelo PRE-RECEIVE (arquivo grande/GH001) — estrutural, retry não resolve; ver o arquivo apontado acima"
+    exit 1
   fi
   echo ">> push rejeitado (tentativa $attempt) — main avançou de novo; desfaço o commit e re-tento sobre a base nova"
   git reset --soft HEAD~1

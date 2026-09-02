@@ -236,3 +236,35 @@ def test_label2comp_cobre_todas_as_fixtures():
 def test_is_integer_line():
     assert is_integer_line(4.0) and is_integer_line("5")
     assert not is_integer_line(4.5) and not is_integer_line("x") and not is_integer_line(None)
+
+
+def test_emit_rola_fatia_no_teto_e_dedupa_entre_fatias(monkeypatch):
+    """GH001 (02/09): rajada de emissão maior que o teto rola pra fatias pNNN e o
+    dedupe pós-crash cobre TODAS as fatias do mês, não só o monólito."""
+    import jsonl_shard
+    from jsonl_shard import month_jsonl_paths
+
+    monkeypatch.setattr(jsonl_shard, "MAX_BYTES", 900)   # ~1 linha de ledger por fatia
+    push = load_push_semantics()
+    keys = [f"betano|sofa:555|Cartões|{l}.5|over" for l in range(3, 9)]
+    with tempfile.TemporaryDirectory() as tmp:
+        merged = {k: carimbada_settled() for k in keys}
+        n1 = emit_ledger(merged, fixidx(), push, {}, NOW, ledger_dir=tmp)
+        assert n1["emitidas"] == len(keys)
+        month = FUTURO[:7]
+        paths = month_jsonl_paths(Path(tmp), month)
+        assert len(paths) > 1, "era pra ter rolado fatia com o teto de teste"
+        rows = [json.loads(l) for p in paths
+                for l in p.read_text(encoding="utf-8").splitlines()]
+        assert sorted(r["key"] for r in rows) == sorted(keys)
+
+        # crash entre append e mark (marks perdidos): a releitura dedupa contra
+        # a UNIÃO das fatias — nada é re-emitido nem duplicado
+        for k in keys:
+            merged[k].pop("m_emitted")
+        n2 = emit_ledger(merged, fixidx(), push, {}, NOW, ledger_dir=tmp)
+        assert n2.get("emitidas", 0) == 0
+        assert n2["ja_no_arquivo_so_marcadas"] == len(keys)
+        rows2 = [l for p in month_jsonl_paths(Path(tmp), month)
+                 for l in p.read_text(encoding="utf-8").splitlines()]
+        assert len(rows2) == len(rows)

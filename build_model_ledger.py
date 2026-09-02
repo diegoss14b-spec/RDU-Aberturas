@@ -62,6 +62,7 @@ sys.path.insert(0, str(ROOT))
 from canonical import load_sofa_fixtures, parse_history_key  # noqa: E402
 from history_merge import atomic_write_text  # noqa: E402
 from history_quality import parse_iso_flex  # noqa: E402
+from jsonl_shard import append_jsonl_month, month_jsonl_paths  # noqa: E402
 
 HIST = ROOT / "data" / "odds_history"
 LEDGER_DIR = HIST / "ledger"
@@ -373,24 +374,30 @@ def emit_ledger(merged, fixidx, push_map, ref_policy, now, ledger_dir=None):
         return n
     ledger_dir.mkdir(parents=True, exist_ok=True)
     for month, items in sorted(by_month.items()):
-        path = ledger_dir / f"{month}.jsonl"
+        # GH001 (02/09): o mês é FATIADO (jsonl_shard) — o monólito congelou no
+        # teto e o append rola pra {month}.pNNN.jsonl. O dedupe pós-crash
+        # (append sem mark) precisa ler TODAS as fatias do mês.
         seen = set()
-        if path.is_file():                     # dedupe pós-crash: append sem mark
+        for path in month_jsonl_paths(ledger_dir, month):
             with path.open(encoding="utf-8") as handle:
                 for raw in handle:
                     try:
                         seen.add(json.loads(raw).get("key"))
                     except ValueError:
                         continue
-        with path.open("a", encoding="utf-8") as handle:
-            for key, rec, line in items:
-                if key in seen:
-                    rec["m_emitted"] = now.isoformat(timespec="seconds")
-                    n["ja_no_arquivo_so_marcadas"] += 1
-                    continue
-                handle.write(json.dumps(line, ensure_ascii=False) + "\n")
+        novas = []
+        for key, rec, line in items:
+            if key in seen:
                 rec["m_emitted"] = now.isoformat(timespec="seconds")
-                n["emitidas"] += 1
+                n["ja_no_arquivo_so_marcadas"] += 1
+                continue
+            novas.append((key, rec, json.dumps(line, ensure_ascii=False)))
+        # grava primeiro, marca depois: crash entre os dois deixa a linha no
+        # arquivo e o record sem mark — exatamente o caso que o dedupe cobre.
+        append_jsonl_month(ledger_dir, month, [texto for _, _, texto in novas])
+        for key, rec, _texto in novas:
+            rec["m_emitted"] = now.isoformat(timespec="seconds")
+            n["emitidas"] += 1
     return n
 
 
