@@ -82,17 +82,85 @@ def sync_repo():
     return True
 
 
-def push_verificado(commit_msg):
-    """True só se HEAD local está contido em origin/main após o push. Se o push
-    for rejeitado (origin andou entre o fetch e o push), re-parenteia o commit
-    sobre o origin novo via `reset --soft` — NUNCA `pull --rebase` (o trap)."""
-    rc, _ = git("push", "-q", "origin", "HEAD:main")
+PUSH_RETRIES = 3  # rejeições seguidas toleradas (main avançando de novo no meio)
+
+
+def _delta_do_feeder(commit, add_paths):
+    """(alterados, apagados) que `commit` fez em relação ao PAI dele, restrito
+    aos caminhos do feeder. É exatamente o que o ciclo mudou — inclusive o
+    snapshot antigo que a rotação de 2 gerações apaga. None se o git falhar."""
+    args = ["diff", "--name-status", "--no-renames", "-z", f"{commit}~1", commit]
+    if add_paths:
+        args += ["--", *add_paths]
+    rc, out = git(*args)
     if rc != 0:
+        return None
+    alterados, apagados = [], []
+    campos = out.split("\0")  # STATUS \0 path \0 STATUS \0 path \0 ...
+    for status, path in zip(campos[0::2], campos[1::2]):
+        if not status or not path:
+            break
+        (apagados if status.startswith("D") else alterados).append(path)
+    return alterados, apagados
+
+
+def push_verificado(commit_msg, add_paths=()):
+    """True só se HEAD local está contido em origin/main após o push.
+
+    Push rejeitado = origin/main avançou entre o sync e o push (snapshot da
+    Mesa, outro feeder). Auditoria de 05/09/2026: a versão antiga fazia
+    `fetch` + `reset --soft origin/main` + `commit`, mas o INDEX ainda era a
+    árvore inteira do ciclo (avô + arquivos do feeder) → o commit novo REVERTIA
+    tudo que o main tinha ganhado no meio (ticks/, keys/, ledger/, valor/data,
+    snapshots das outras casas: 4 casos reais, ~10 mil linhas de ticks apagadas).
+    Agora: guarda o sha do commit local (old), `reset --hard origin/main` (base
+    = o main NOVO, inteiro) e traz de `old` SÓ o delta do feeder — arquivos que
+    o ciclo alterou/criou (checkout old -- …) e os que apagou (git rm) — dentro
+    dos `add_paths`. Commit e push de novo; se o main andar outra vez, repete
+    com fetch fresco até PUSH_RETRIES. NUNCA `pull --rebase` (o trap de 26/08),
+    NUNCA `reset --soft` de árvore inteira."""
+    rc, _ = git("push", "-q", "origin", "HEAD:main")
+    tentativa = 0
+    while rc != 0 and tentativa < PUSH_RETRIES:
+        tentativa += 1
+        rc_h, old = git("rev-parse", "HEAD")
+        old = old.strip()
         git("fetch", "-q", "origin", "main", timeout=GIT_TIMEOUT)
-        # HEAD volta pro origin novo mas as MINHAS mudanças ficam no index →
-        # re-commita por cima, sem replay/conflito (last-writer nos feeds latest).
-        git("reset", "--soft", "origin/main")
-        git("commit", "-q", "-m", commit_msg)
+        delta = _delta_do_feeder(old, add_paths) if rc_h == 0 else None
+        if delta is None:
+            log(f"push rejeitado e não deu pra isolar o delta do feeder em {old[:9]} — desisto")
+            return False
+        alterados, apagados = delta
+        log(f"push rejeitado (main avançou) — reconciliando só os caminhos do feeder: "
+            f"{len(alterados)} alterados, {len(apagados)} apagados (tentativa {tentativa}/{PUSH_RETRIES})")
+        # ⚠️ daqui em diante HEAD == origin/main, então a verificação final
+        # (is-ancestor) passaria de graça: toda falha tem que devolver False
+        # explicitamente, senão o ciclo loga "CONFIRMADO" sem ter empurrado nada.
+        rc_r, out = git("reset", "-q", "--hard", "origin/main")
+        if rc_r != 0:
+            log(f"reset --hard origin/main falhou: {out.strip()[:200]}")
+            return False
+        ok = True
+        if alterados:
+            # só arquivos que EXISTEM em old (A/M) — caminho sem arquivo novo nem entra
+            rc_c, out = git("checkout", old, "--", *alterados)
+            ok = rc_c == 0
+        if ok and apagados:
+            # deleção do feeder respeitada SÓ no que ele mesmo apagou; se o main
+            # já não tem o arquivo, --ignore-unmatch deixa passar
+            rc_d, out = git("rm", "-q", "-r", "--ignore-unmatch", "--", *apagados)
+            ok = rc_d == 0
+        if not ok:
+            log(f"reconciliação falhou: {out.strip()[:200]}")
+            return False
+        rc_c, out_c = git("commit", "-q", "-m", commit_msg)
+        if rc_c != 0:
+            # "nothing to commit" = o main novo já traz byte a byte o que o
+            # feeder fez; aí HEAD == origin/main é o resultado certo.
+            if "nothing to commit" in out_c or "nada" in out_c:
+                break
+            log(f"commit da reconciliação falhou: {out_c.strip()[:200]}")
+            return False
         rc, _ = git("push", "-q", "origin", "HEAD:main")
     git("fetch", "-q", "origin", "main", timeout=GIT_TIMEOUT)
     rc_v, _ = git("merge-base", "--is-ancestor", "HEAD", "origin/main")
@@ -129,7 +197,7 @@ def ciclo_casa(casa, fetch_script, status_rel, add_paths):
             git("reset", "-q", "--hard", "origin/main")
         return
 
-    if push_verificado(msg):
+    if push_verificado(msg, add_paths):
         log(f"{casa}: feed ok: {n} eventos, push CONFIRMADO em origin/main")
     else:
         log(f"PUSH_FALHOU {casa} ({n} eventos) — reset pra origin/main, recaptura no próximo ciclo")
