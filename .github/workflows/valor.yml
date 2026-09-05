@@ -154,6 +154,11 @@ jobs:
     # (a cada ~20min) — com 45 o job morria na 2a tentativa do persist, DEPOIS do banco
     # e ANTES do commit, e a Mesa congelava (medido 15/08: banco 17min ok, persist
     # morto aos 45min sem snapshot). O teto do banco (18min) segue por baixo.
+    # 05/09: o avanço SÓ do feeder (o caso comum, a cada ~23 min) passou a reconciliar em
+    # segundos (persist_reconcile.py: checkout dos caminhos do feeder por cima da árvore
+    # local, sem re-rodar o pipeline) — a auditoria de 05/09 contou 11 de 48 runs mortos
+    # neste teto dentro do persist. O reingest de ~15 min fica só pra avanço que toca
+    # caminho FORA do feeder (outra rodada, feed de resultados); 75 segue por causa dele.
     timeout-minutes: 75
     env:
       MODE: ${{ needs.gate.outputs.mode }}

@@ -11,6 +11,8 @@ export MERCADOS_OFF="${MERCADOS_OFF:-escanteios}"
 # histórico. O ingest é upsert idempotente por chave (une A⊎B: contadores somados,
 # abertura mais antiga, fechamento mais recente), então nenhuma variação de odds
 # é perdida — e o board sempre chega ao deploy. Ver análise 2026-07-18.
+# 05/09/2026: esse re-ingest virou o caminho CARO (caso B); o avanço só do feeder local
+# (caso A, o comum) reconcilia em segundos via persist_reconcile.py — ver bloco abaixo.
 #
 # Lê MODE e GATE_OUTCOME do ambiente (setados pelo workflow).
 set -uo pipefail
@@ -100,10 +102,53 @@ reingest_on_new_base() {
   return 0
 }
 
-for attempt in 1 2 3 4 5; do
+# ── Corrida com o FEEDER LOCAL (05/09/2026): avanço "só do feeder" reconcilia BARATO. ──
+# Auditoria de 05/09: 11 de 48 runs morreram no teto de 75 min do job DENTRO deste passo.
+# Causa: cada avanço do main durante o persist re-rodava o pipeline inteiro (~15-18 min
+# no runner), e o feeder local da Pinnacle/Superbet avança o main a cada ~23 min tocando
+# SÓ os caminhos dele (data/odds/{pinnacle,superbet}_latest*, _snapshots/{pinnacle,
+# superbet}_full_*, _status/{pinnacle,superbet}*.json) — nada que o pipeline precise
+# re-processar. Agora o avanço é CLASSIFICADO (persist_reconcile.py, `git diff base→main`):
+#   A) só caminhos do feeder → reconciliação barata: reset --soft pro main novo + checkout
+#      desses caminhos por cima da árvore local (apagado lá = apagado aqui); ticks/keys/
+#      ledger/valor/data/*.js desta rodada ficam intactos. Segundos, sem re-rodar nada.
+#   B) qualquer outro arquivo (outra rodada da Mesa, feed de resultados, código) →
+#      reingest_on_new_base como antes. Dúvida (helper falhou, force-push) = B, porque o
+#      reset --hard do reingest é o único caminho garantidamente seguro.
+# O laço ganhou voltas (5 → 12) porque em A cada volta custa segundos; o nº de reingests
+# COMPLETOS continua limitado em 5, como era. Sentinela de 95 MB e abort GH001 intactos.
+PERSIST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MAX_TENTATIVAS=12
+MAX_REINGEST=5
+n_reingest=0
+
+reconcilia_com_main() {
+  local t0=$SECONDS rc resumo
+  python "$PERSIST_DIR/persist_reconcile.py" classifica HEAD origin/main; rc=$?
+  if [ "$rc" -eq 0 ]; then
+    resumo="$(python "$PERSIST_DIR/persist_reconcile.py" aplica HEAD origin/main)"; rc=$?
+    if [ "$rc" -eq 0 ]; then
+      echo ">> ${resumo}, reconciliado em $((SECONDS - t0))s — sem re-rodar o pipeline"
+      return 0
+    fi
+    echo "::warning::reconciliação barata falhou (rc=$rc) — caio no reingest completo"
+  elif [ "$rc" -ne 3 ]; then
+    echo "::warning::classificação do avanço do main falhou (rc=$rc) — assumo caso B (reingest completo)"
+  fi
+  n_reingest=$((n_reingest + 1))
+  if [ "$n_reingest" -gt "$MAX_REINGEST" ]; then
+    echo "::error::persist: $MAX_REINGEST reingests completos e o main segue avançando fora dos caminhos do feeder"
+    return 1
+  fi
+  reingest_on_new_base || { echo "::error::re-ingest sobre a base nova falhou"; return 1; }
+}
+
+attempt=0
+while [ "$attempt" -lt "$MAX_TENTATIVAS" ]; do
+  attempt=$((attempt + 1))
   git fetch origin main
   if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
-    reingest_on_new_base || { echo "::error::re-ingest sobre a base nova falhou"; exit 1; }
+    reconcilia_com_main || exit 1
   fi
   stage
   if git diff --cached --quiet; then
@@ -127,5 +172,5 @@ for attempt in 1 2 3 4 5; do
   sleep 3
 done
 
-echo "::error::persist falhou após 5 tentativas — não deu pra reconciliar com main"
+echo "::error::persist falhou após $MAX_TENTATIVAS tentativas ($n_reingest reingests completos) — não deu pra reconciliar com main"
 exit 1
