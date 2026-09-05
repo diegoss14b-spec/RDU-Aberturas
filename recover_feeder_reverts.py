@@ -47,12 +47,20 @@ from capture_common import _parse_pointer_at        # noqa: E402  (ISO ou legado
 from history_merge import atomic_write_text         # noqa: E402
 from migrate_history_keys import _tick_signature    # noqa: E402  (a régua de "tick idêntico" do migrate)
 
-# Os 4 pares provados na auditoria de 05/09/2026 (feeder_sha, snapshot_sha).
+# Os pares provados na auditoria de 05/09/2026 (feeder_sha, snapshot_sha).
+# 4 da auditoria + 2 achados pelo revisor no mesmo dia (o feeder velho seguiu rodando
+# até o conserto subir): 85c7925ad desfez 1b56b71fd (05/09 10:52) e 4df728732 desfez
+# 33b01599c (05/09 12:02) — juntos, +19.843 linhas de ticks de 05/09 e 2 ponteiros
+# (7k/estrelabet *_latest_full.json presos num full 6 h mais velho). ⚠️ Lista fixa
+# envelhece: antes de aplicar em produção, varrer `git log origin/main` de novo
+# (feeder commit cuja árvore vs avô não muda caminho fora de FEEDER_PATHS).
 PARES_0509 = [
     ("6939350", "8f8b7a2"),
     ("c308815", "7af90eb"),
     ("54371aa", "fbdb82a"),
     ("864e629", "426fd27"),
+    ("85c7925ad", "1b56b71fd"),
+    ("4df728732", "33b01599c"),
 ]
 
 # Tupla SEM identidade de jogo (nem gid, nem home/away, nem sofa_id). É o 3º nível
@@ -61,7 +69,10 @@ PARES_0509 = [
 # mudam junto). O snapshot revertido pode carregar a forma canônica e o main a forma
 # legada da MESMA observação — e, com o fixture já fora do sofa_latest, o pipeline
 # não junta mais as duas. Medido em 05/09: 14 ticks do estrelabet nessa situação.
-_LIVRE = ("ts", "kind", "casa", "mercado", "linha", "lado", "odd", "linha_from", "linha_to")
+# 05/09 (revisão): "kickoff" e "djogo" entram na tupla livre — sem eles, dois jogos com a mesma
+# odd/linha no mesmo ts colidiam e o nível 3 podia admitir a duplicata de identidade divergente e
+# descartar o jogo novo. Pior caso residual (mesmo kickoff, mesma linha e odd, mesmo ts) fica por ordem.
+_LIVRE = ("ts", "kind", "casa", "kickoff", "djogo", "mercado", "linha", "lado", "odd", "linha_from", "linha_to")
 
 
 def _tupla_livre(row):

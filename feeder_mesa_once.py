@@ -131,6 +131,12 @@ def push_verificado(commit_msg, add_paths=()):
             log(f"push rejeitado e não deu pra isolar o delta do feeder em {old[:9]} — desisto")
             return False
         alterados, apagados = delta
+        if not alterados and not apagados:
+            # 05/09/2026 (revisão): o commit do ciclo nasce de `git add <add_paths>`,
+            # então delta vazio = parse quebrado ou add_paths errado. Seguir daria
+            # reset --hard + "nothing to commit" + CONFIRMADO sem ter empurrado nada.
+            log(f"push rejeitado e o delta do feeder em {old[:9]} veio VAZIO — desisto")
+            return False
         log(f"push rejeitado (main avançou) — reconciliando só os caminhos do feeder: "
             f"{len(alterados)} alterados, {len(apagados)} apagados (tentativa {tentativa}/{PUSH_RETRIES})")
         # ⚠️ daqui em diante HEAD == origin/main, então a verificação final

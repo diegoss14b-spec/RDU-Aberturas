@@ -361,3 +361,27 @@ def test_delta_do_feeder_isola_add_paths(repos):
     assert apagados == [SNAP_VELHO]
     # commit inexistente → None (o chamador desiste, nunca reset --soft de árvore)
     assert feeder._delta_do_feeder("0" * 40, ADD_PATHS_PINNACLE) is None
+
+
+def test_nova_delta_vazio_desiste(monkeypatch):
+    """05/09 (revisão): delta vazio após push rejeitado = parse quebrado ou add_paths
+    errado. Sem a guarda, seguia pra reset --hard + "nothing to commit" e devolvia True
+    (CONFIRMADO) sem ter empurrado nada — fail-open. Agora desiste com False e NÃO
+    toca no repo (nenhum reset/checkout/rm/commit)."""
+    import feeder_mesa_once as feeder
+    chamadas = []
+
+    def fake_git(*a, **k):
+        chamadas.append(a[0])
+        if a[0] == "push":
+            return 1, "! [rejected] HEAD -> main (fetch first)"
+        if a[0] == "rev-parse":
+            return 0, "0123456789abcdef\n"
+        return 0, ""
+
+    monkeypatch.setattr(feeder, "git", fake_git)
+    monkeypatch.setattr(feeder, "log", lambda *a, **k: None)
+    monkeypatch.setattr(feeder, "_delta_do_feeder", lambda commit, add_paths: ([], []))
+    assert feeder.push_verificado("msg", ("data/odds/pinnacle_latest.json",)) is False
+    assert not any(c in ("reset", "checkout", "rm", "commit") for c in chamadas)
+    assert chamadas.count("push") == 1
