@@ -43,7 +43,11 @@ from mesa_shared import (  # contrato compartilhado com o mesa_bot (review 19/08
 from canonical import (
     norm_team, gscore as _gscore, side_hit as _side_hit, match_to_sofa,
     load_sofa_fixtures, parse_start, n as _n, SOFA_TOKEN_MIN,
-    flags_compatible, _day_delta,
+    flags_compatible, _day_delta, fixture_scoped_alias_pair,
+)
+from bookmaker_contracts import (
+    BETANO_MK, betano_team as _betano_team, betano_market, event_participants,
+    normalize_7k_event_name,
 )
 
 BRT = timezone(timedelta(hours=-3))
@@ -188,33 +192,7 @@ def classify_league(lg):
             pass
     return None
 
-# Betano: nome do mercado cru -> mercado canônico do board (só jogo inteiro)
-BETANO_MK = {
-    "Total de Cartões": "Cartões", "Total de Faltas": "Faltas", "Total de chutes": "Finalizações",
-    "Escanteios": "Escanteios",
-    "Chutes no gol": "Chutes no gol", "Total de Impedimentos": "Impedimentos",
-    "Total de laterais": "Laterais", "Total de tiros de meta": "Tiros de meta",
-}
-# Betano time: "América-MG Total de Cartões" / "Londrina-PR Total de chutes"
-_BETANO_TEAM = re.compile(
-    r"^(.+?)\s+Total de\s+(Cart[oõ]es|Faltas|chutes|Escanteios|Impedimentos|laterais|tiros de meta|Chutes no gol)$",
-    re.I,
-)
-_BETANO_STAT = {
-    "cartões": "Cartões", "cartoes": "Cartões", "faltas": "Faltas", "chutes": "Finalizações",
-    "escanteios": "Escanteios", "impedimentos": "Impedimentos", "laterais": "Laterais",
-    "tiros de meta": "Tiros de meta", "chutes no gol": "Chutes no gol",
-}
-
-def _betano_team(name):
-    mo = _BETANO_TEAM.match((name or "").strip())
-    if not mo: return None
-    team, stat = mo.group(1).strip(), mo.group(2).strip().lower()
-    for k, v in _BETANO_STAT.items():
-        if stat == k or unidecode(stat) == unidecode(k):
-            return v, team
-    return None
-
+# Betano name contracts live in bookmaker_contracts (also history + counters).
 # board SEMPRE prefere inventário full (close não encolhe a mesa)
 # stale-keep: aceita full de até 12h se a rodada atual falhou
 BOARD_MAX_AGE_H = 12
@@ -232,18 +210,20 @@ def load_betano():
         if not ln.strip(): continue
         e = json.loads(ln)
         mk, mk_t = {}, {}
+        participants = event_participants(e.get("name"))
         for aba in ("cartoes", "estatisticas", "principais_ou", "escanteios"):
             for m in (e.get("markets", {}).get(aba) or []):
                 mname = m.get("market") or ""
                 L = m.get("line")
                 if not (m.get("over") and m.get("under") and L is not None): continue
                 row = {"linha": L, "over": round(m["over"], 2), "under": round(m["under"], 2)}
-                canon = BETANO_MK.get(mname)
-                if canon:
+                parsed = betano_market(mname, participants, e.get("league") or "")
+                if not parsed: continue
+                canon, team = parsed
+                if team is None:
                     lst = mk.setdefault(canon, {})
                     if L not in lst: lst[L] = row
                     continue
-                parsed = _betano_team(mname)
                 if parsed and parsed[0]:
                     c, team = parsed
                     lst = mk_t.setdefault(c, {}).setdefault(team, {})
@@ -275,6 +255,8 @@ def load_normalized(book, casa_id):
     for ln in src.read_text(encoding="utf-8").strip().split("\n"):
         if not ln.strip(): continue
         e = json.loads(ln)
+        if casa_id == "7k":
+            e["name"] = normalize_7k_event_name(e.get("name"))
         if e.get("mercados") or e.get("mercados_time"):
             rec = {"casa": e.get("casa", book), "name": e.get("name"), "league": e.get("league"),
                    "start": e.get("start"), "captured": e.get("captured_at"),
@@ -285,10 +267,11 @@ def load_normalized(book, casa_id):
     return out
 
 
-def _assign_side(team_name, home, away):
+def _assign_side(team_name, home, away, league=""):
     """Casa/fora por fuzzy/token; retorna 'home' | 'away' | None."""
     if not team_name: return None
-    tn = norm_team(team_name)
+    tn = norm_team(team_name, league=league)
+    home, away = norm_team(home, league=league), norm_team(away, league=league)
     rh = _side_hit(tn, home) if home else 0
     ra = _side_hit(tn, away) if away else 0
     if rh >= 68 and rh >= ra: return "home"
@@ -546,8 +529,10 @@ def main():
                 continue
         else:
             day, ini, ini_iso = "?", "?", None
-        hn = norm_team(parts[0]) if len(parts) == 2 else norm_team(e["name"])
-        an = norm_team(parts[1]) if len(parts) == 2 else ""
+        hn = norm_team(parts[0], league=e.get("league") or "") if len(parts) == 2 else norm_team(e["name"])
+        an = norm_team(parts[1], league=e.get("league") or "") if len(parts) == 2 else ""
+        hn, an, team_context = fixture_scoped_alias_pair(
+            hn, an, e.get("league") or "", day, dt, sofa_fx)
 
         j = None
         fx, sc, method = (None, 0, None)
@@ -651,7 +636,7 @@ def main():
                 "away": {"nome": j.get("away") or "", "casas": {}},
             })
             for tname, linhas in by_team.items():
-                side = _assign_side(tname, hn, an)
+                side = _assign_side(tname, hn, an, league=team_context)
                 if not side: continue
                 linhas, _rej = _sane(linhas)
                 if not linhas: continue

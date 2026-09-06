@@ -29,7 +29,8 @@ from history_shard import load_month, save_month
 from migrate_history_keys import migrate_keys_dict, migrate_tick_file, unify_keys_dict
 # uma régua só pro lado do time: a MESMA que o board usa pra montar times[mercado][home|away].
 # Duas implementações do "de quem é esta linha" divergiriam e o banco discordaria da tela.
-from build_board import _assign_side, _betano_team
+from build_board import _assign_side
+from bookmaker_contracts import BETANO_MK, betano_market, event_participants, normalize_7k_event_name
 
 ODDS = ROOT / "data" / "odds"
 HIST = ROOT / "data" / "odds_history"
@@ -47,14 +48,6 @@ CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365",  # betf
 PIN_METHODS = {"pair"}
 HOUSE_MAP_TTL_DAYS = 30
 
-BETANO_MK = {
-    "Total de Cartões": "Cartões", "Total de Faltas": "Faltas", "Total de chutes": "Finalizações",
-    "Total de Impedimentos": "Impedimentos", "Total de laterais": "Laterais",
-    "Total de tiros de meta": "Tiros de meta", "Escanteios": "Escanteios",
-    "Chutes no gol": "Chutes no gol",
-}
-
-
 def load_events(casa):
     ptr = ODDS / f"{casa}_latest.json"
     if not ptr.exists():
@@ -69,21 +62,25 @@ def load_events(casa):
             if not ln.strip():
                 continue
             e = json.loads(ln)
+            if casa == "7k":
+                e["name"] = normalize_7k_event_name(e.get("name"))
             merc_t = {}
             if casa == "betano":
                 mk, mk_t = {}, {}
+                participants = event_participants(e.get("name"))
                 for aba in ("cartoes", "estatisticas", "principais_ou", "escanteios"):
                     for m in (e.get("markets", {}).get(aba) or []):
                         if not (m.get("over") and m.get("under") and m.get("line") is not None):
                             continue
                         row = {"linha": m["line"], "over": m["over"], "under": m["under"]}
-                        canon = BETANO_MK.get(m.get("market"))
-                        if canon:
+                        par = betano_market(m.get("market"), participants, e.get("league") or "")
+                        if not par: continue
+                        canon, team = par
+                        if team is None:
                             mk.setdefault(canon, {})[m["line"]] = row
                             continue
                         # a Betano não tem campo `mercados_time`: o time vem DENTRO do
                         # nome ('Athletico-PR Total de Cartões'). Mesmo parser do board.
-                        par = _betano_team(m.get("market") or "")
                         if par and par[0]:
                             c, team = par
                             mk_t.setdefault(c, {}).setdefault(team, {})[m["line"]] = row
@@ -151,7 +148,8 @@ def resolve_identity(casa, ev, fixtures, hmap, now_iso):
     ev_id = ev.get("event_id")
     map_key = f"{casa}:{ev_id}" if ev_id not in (None, "") else None
     pinned = hmap.get(map_key) if map_key else None
-    hn_now, an_now = norm_team(ev.get("home_raw")), norm_team(ev.get("away_raw"))
+    hn_now = norm_team(ev.get("home_raw"), league=ev.get("league") or "")
+    an_now = norm_team(ev.get("away_raw"), league=ev.get("league") or "")
 
     if pinned:
         same_names = gscore(hn_now, an_now, pinned.get("hn") or "", pinned.get("an") or "") >= 80
@@ -177,6 +175,7 @@ def resolve_identity(casa, ev, fixtures, hmap, now_iso):
                 "match_confidence": pinned.get("confidence") or 90,
                 "match_evidence": {"method": "house_map", "pinned_by": pinned.get("method")},
                 "league": ev.get("league") or "",
+                "alias_context": idt.get("alias_context") if idt.get("sofa_id") == pinned["sofa_id"] else None,
             }
         if idt.get("sofa_id") and idt.get("match_method") in PIN_METHODS:
             hmap[map_key] = _pin_from_idt(idt, now_iso)   # promove legado → sofa
@@ -276,7 +275,8 @@ def main():
                 if not isinstance(por_time, dict):
                     continue
                 for time_nome, linhas_t in por_time.items():
-                    lado_t = _assign_side(time_nome, h, a)
+                    lado_t = _assign_side(time_nome, h, a,
+                                          league=idt.get("alias_context") or ev.get("league") or "")
                     if lado_t not in ("home", "away") or not linhas_t:
                         n_time_sem_lado += 1
                         continue

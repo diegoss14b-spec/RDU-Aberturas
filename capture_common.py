@@ -192,6 +192,7 @@ def _jsonl_count(path):
 
 def snapshot_market_counts(path, casa=None):
     """Conta eventos por família de mercado em snapshots normalizados ou da Betano."""
+    from bookmaker_contracts import betano_market, event_participants
     aliases = {
         "cartoes": "Cartões", "faltas": "Faltas", "chutes": "Finalizações",
         "finalizacoes": "Finalizações", "chutes no gol": "Chutes no gol",
@@ -224,7 +225,12 @@ def snapshot_market_counts(path, casa=None):
                 if not isinstance(rows, list):
                     continue
                 for row in rows:
-                    c = canon((row or {}).get("market"))
+                    # Shared name contract. This remains a raw inventory counter,
+                    # not a claim that every row has a valid price pair.
+                    participants = event_participants(rec.get("name")) if rec.get("name") else None
+                    parsed = betano_market((row or {}).get("market"), participants,
+                                           rec.get("league") or "")
+                    c = parsed[0] if parsed else None
                     if c:
                         present.add(c)
             for market in present:

@@ -282,7 +282,7 @@ PAREN_COUNTRY = re.compile(
 )
 
 
-def norm_team(name: str) -> str:
+def _norm_team_base(name: str) -> str:
     s = n(name).strip()
     # 24/07 (Sportingbet/Entain): tira o código de país entre parênteses ANTES do
     # punctuation-strip — senão "(ARG)" virava o token solto "arg" e "CA Platense (ARG)"
@@ -310,6 +310,42 @@ def norm_team(name: str) -> str:
     toks = [t for t in s.split() if t not in STOP]
     key = " ".join(toks) or s
     return ALIASES.get(key, key)
+
+
+# Reviewed against event + opponent + kickoff in the 2026-09-06 snapshots.
+# Do not add these to the unscoped ALIASES table: 'Wolves' / 'ASA' can be
+# unrelated clubs outside their country. Category suffixes are never stripped.
+_CONTEXT_ALIASES = (
+    (re.compile(r"^(?:inglaterra|england|english)\b"), {
+        "man utd": "manchester united", "wolves": "wolverhampton",
+    }),
+    (re.compile(r"^(?:franca|france|french)\b"), {
+        "rennes": "stade rennais", "stade rennes": "stade rennais",
+        "marselha": "olympique de marseille",
+    }),
+    (re.compile(r"^(?:dinamarca|denmark|danish)\b"), {
+        "copenhagen": "kobenhavn", "copenhague": "kobenhavn",
+    }),
+    (re.compile(r"^(?:brasil|brasileirao|brasileiro|brazil)\b"), {
+        "asa al": "as arapiraquense",
+    }),
+)
+
+
+def norm_team(name: str, league: str = "") -> str:
+    """Legacy identity unless a reviewed alias has explicit country context.
+
+    This does not relax fixture time, competition, opponent or category guards.
+    Callers with no context retain exactly their existing normalization.
+    """
+    base = _norm_team_base(name)
+    if not league:
+        return base
+    raw_key = " ".join(re.sub(r"[^a-z0-9 ]", " ", n(name)).split())
+    for pattern, aliases in _CONTEXT_ALIASES:
+        if pattern.search(n(league).strip()):
+            return aliases.get(raw_key, aliases.get(base, base))
+    return base
 
 
 def gscore(ah, aa, bh, ba) -> float:
@@ -440,8 +476,8 @@ def load_sofa_fixtures(root: Path | None = None):
     out = []
     for f in data.get("fixtures") or []:
         f = dict(f)
-        f["_hn"] = norm_team(f.get("home"))
-        f["_an"] = norm_team(f.get("away"))
+        f["_hn"] = norm_team(f.get("home"), league=f.get("league") or "")
+        f["_an"] = norm_team(f.get("away"), league=f.get("league") or "")
         f["_lfp"] = league_fp(f.get("league") or "") or league_fp(f.get("label") or "")
         out.append(f)
     return out
@@ -459,6 +495,37 @@ def _kickoff_delta_min(start_dt, fixture) -> float:
         return abs((sdt - fs).total_seconds()) / 60.0
     except Exception:
         return 9999.0
+
+
+def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures):
+    """Country omitted by a provider: require an exact, unique Sofa context.
+
+    Narrow observed case: Sportingbet 'Ligue 1', Angers x Rennes. A bare league
+    label never enables global aliases. France's fixture must have league_id=34,
+    the same day/kickoff, exact corrected opponents, an unchanged anchor team,
+    matching category flags and no second candidate. No fuzzy threshold changes.
+    """
+    if n(league).strip() != "ligue 1" or not hn or not an or start_dt is None:
+        return hn, an, league
+    nh, na = norm_team(hn, "France"), norm_team(an, "France")
+    if (nh, na) == (hn, an):
+        return hn, an, league
+    matches = []
+    for f in fixtures:
+        if f.get("day_brt") != day or f.get("league_id") != 34 or f.get("label") != "Ligue1":
+            continue
+        if _kickoff_delta_min(start_dt, f) > SOFA_TIME_TOL_MIN:
+            continue
+        fh, fa = f.get("_hn"), f.get("_an")
+        if not flags_compatible(hn, an, fh, fa):
+            continue
+        direct = (nh, na) == (fh, fa) and (hn == fh or an == fa)
+        reverse = (nh, na) == (fa, fh) and (hn == fa or an == fh)
+        if direct or reverse:
+            matches.append(f.get("sofa_id"))
+    if len(set(matches)) == 1:
+        return nh, na, "France - Ligue 1"
+    return hn, an, league
 
 
 def match_to_sofa(hn, an, day_brt, start_dt, fixtures, book_league="", _lfp=None,
@@ -611,7 +678,7 @@ def resolve_fixture(home_raw, away_raw, start, league="", fixtures=None):
     """
     if fixtures is None:
         fixtures = load_sofa_fixtures()
-    hn, an = norm_team(home_raw), norm_team(away_raw)
+    hn, an = norm_team(home_raw, league=league), norm_team(away_raw, league=league)
     dt = parse_start(start)
     if dt is not None:
         day = dt.strftime("%Y-%m-%d")
@@ -619,6 +686,7 @@ def resolve_fixture(home_raw, away_raw, start, league="", fixtures=None):
     else:
         day = "?"
         kick_iso = None
+    hn, an, alias_context = fixture_scoped_alias_pair(hn, an, league, day, dt, fixtures)
     fx, sc, method, info = match_to_sofa(hn, an, day, dt, fixtures, book_league=league or "")
     if fx is not None:
         cap = _METHOD_CONF_CAP.get(method or "", 90)
@@ -649,6 +717,7 @@ def resolve_fixture(home_raw, away_raw, start, league="", fixtures=None):
             "match_confidence": conf,
             "match_evidence": evidence,
             "league": fx.get("league") or league,
+            "alias_context": alias_context,
         }
     out = {
         "home": (home_raw or "").strip(),
