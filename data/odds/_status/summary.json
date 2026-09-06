@@ -1,52 +1,56 @@
 {
- "ts_utc": "2026-09-06T09:16:03Z",
- "ts_brt": "2026-09-06 06:16",
+ "ts_utc": "2026-09-06T09:40:18Z",
+ "ts_brt": "2026-09-06 06:40",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
   "7k",
+  "pinnacle",
   "bet365",
   "sportingbet"
  ],
- "casas_fail": [
-  {
-   "casa": "pinnacle",
-   "error": "0 eventos < mínimo 1 — fonte respondeu vazia/rala sem exceção (manutenção ou rate-limit da fonte?)"
-  }
- ],
- "n_ok": 6,
- "n_fail": 1,
- "total_events": 184,
+ "casas_fail": [],
+ "n_ok": 7,
+ "n_fail": 0,
+ "total_events": 620,
  "per_casa": {
   "betano": {
    "ok": true,
    "n_events": 60,
-   "n_markets": 4,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 2,
-    "Chutes no gol": 2,
-    "Escanteios": 26,
-    "Finalizações": 2
+    "Cartões": 23,
+    "Chutes no gol": 20,
+    "Desarmes": 11,
+    "Escanteios": 30,
+    "Faltas": 19,
+    "Finalizações": 20,
+    "Impedimentos": 19,
+    "Laterais": 8,
+    "Tiros de meta": 8
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-06_0607.jsonl",
+   "pointer_file": "betano_2026-09-06_0633.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 48,
-   "n_markets": 6,
+   "n_events": 329,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 9,
-    "Chutes no gol": 3,
-    "Escanteios": 48,
-    "Faltas": 2,
-    "Finalizações": 3,
-    "Impedimentos": 2
+    "Cartões": 120,
+    "Chutes no gol": 71,
+    "Desarmes": 11,
+    "Escanteios": 328,
+    "Faltas": 36,
+    "Finalizações": 72,
+    "Impedimentos": 36,
+    "Laterais": 17,
+    "Tiros de meta": 17
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-06_0607.jsonl",
+   "pointer_file": "superbet_2026-09-06_0633.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -78,63 +82,74 @@
    "error": null
   },
   "pinnacle": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 26,
+   "n_markets": 1,
+   "market_counts": {
+    "Cartões": 26
+   },
    "pointer_valid": true,
-   "pointer_file": null,
-   "error": "0 eventos < mínimo 1 — fonte respondeu vazia/rala sem exceção (manutenção ou rate-limit da fonte?)"
+   "pointer_file": "pinnacle_2026-09-06_0633.jsonl",
+   "error": null
   },
   "bet365": {
    "ok": true,
-   "n_events": 3,
-   "n_markets": 1,
+   "n_events": 46,
+   "n_markets": 6,
    "market_counts": {
-    "Escanteios": 3
+    "Cartões": 11,
+    "Chutes no gol": 11,
+    "Desarmes": 2,
+    "Escanteios": 46,
+    "Finalizações": 11,
+    "Impedimentos": 2
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-09-06_0607.jsonl",
+   "pointer_file": "bet365_2026-09-06_0633.jsonl",
    "error": null
   },
   "sportingbet": {
    "ok": true,
-   "n_events": 13,
-   "n_markets": 2,
+   "n_events": 99,
+   "n_markets": 3,
    "market_counts": {
-    "Cartões": 1,
-    "Escanteios": 13
+    "Cartões": 32,
+    "Escanteios": 97,
+    "Finalizações": 3
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-09-06_0607.jsonl",
+   "pointer_file": "sportingbet_2026-09-06_0633.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 20,
-  "Chutes no gol": 12,
-  "Escanteios": 150,
-  "Faltas": 4,
-  "Finalizações": 12,
-  "Impedimentos": 6
+  "Cartões": 220,
+  "Chutes no gol": 109,
+  "Desarmes": 24,
+  "Escanteios": 561,
+  "Faltas": 57,
+  "Finalizações": 113,
+  "Impedimentos": 61,
+  "Laterais": 25,
+  "Tiros de meta": 25
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-09-06T09:11:59Z",
-  "ts_brt": "2026-09-06 06:11",
-  "n_events": 901,
-  "n_fixtures": 901,
+  "ts_utc": "2026-09-06T09:36:11Z",
+  "ts_brt": "2026-09-06 06:36",
+  "n_events": 900,
+  "n_fixtures": 900,
   "n_markets": 0,
   "min_events": 227,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_e39c701fd73e61a77195.json",
-  "pointer_at": "2026-09-06T06:11:59-03:00",
-  "pointer_n": 901,
+  "pointer_file": "_snapshots/sofa_e8ac87ea7987b7fae85b.json",
+  "pointer_at": "2026-09-06T06:36:11-03:00",
+  "pointer_n": 900,
   "pointer_age_h": 0.0,
-  "duration_sec": 238.0,
+  "duration_sec": 185.9,
   "error": null,
   "error_class": null,
   "transport": {
@@ -158,5 +173,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "close"
+ "mode": "full"
 }
