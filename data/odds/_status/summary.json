@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-09-06T16:31:55Z",
- "ts_brt": "2026-09-06 13:31",
+ "ts_utc": "2026-09-06T17:07:25Z",
+ "ts_brt": "2026-09-06 14:07",
  "casas_ok": [
   "betano",
   "superbet",
@@ -13,42 +13,44 @@
  "casas_fail": [],
  "n_ok": 7,
  "n_fail": 0,
- "total_events": 203,
+ "total_events": 393,
  "per_casa": {
   "betano": {
    "ok": true,
    "n_events": 60,
-   "n_markets": 7,
+   "n_markets": 9,
    "market_counts": {
-    "Cartões": 8,
-    "Chutes no gol": 6,
-    "Desarmes": 4,
-    "Escanteios": 27,
-    "Faltas": 4,
-    "Finalizações": 6,
-    "Impedimentos": 4
+    "Cartões": 16,
+    "Chutes no gol": 11,
+    "Desarmes": 8,
+    "Escanteios": 34,
+    "Faltas": 10,
+    "Finalizações": 11,
+    "Impedimentos": 10,
+    "Laterais": 5,
+    "Tiros de meta": 5
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-06_1324.jsonl",
+   "pointer_file": "betano_2026-09-06_1400.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 56,
+   "n_events": 152,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 23,
-    "Chutes no gol": 17,
-    "Desarmes": 1,
-    "Escanteios": 56,
-    "Faltas": 6,
-    "Finalizações": 17,
-    "Impedimentos": 6,
-    "Laterais": 2,
-    "Tiros de meta": 2
+    "Cartões": 70,
+    "Chutes no gol": 42,
+    "Desarmes": 6,
+    "Escanteios": 151,
+    "Faltas": 21,
+    "Finalizações": 43,
+    "Impedimentos": 21,
+    "Laterais": 12,
+    "Tiros de meta": 12
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-06_1324.jsonl",
+   "pointer_file": "superbet_2026-09-06_1400.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -84,70 +86,70 @@
   },
   "pinnacle": {
    "ok": true,
-   "n_events": 2,
+   "n_events": 16,
    "n_markets": 1,
    "market_counts": {
-    "Cartões": 2
+    "Cartões": 16
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-09-06_1324.jsonl",
+   "pointer_file": "pinnacle_2026-09-06_1400.jsonl",
    "error": null
   },
   "bet365": {
    "ok": true,
-   "n_events": 7,
+   "n_events": 46,
    "n_markets": 4,
    "market_counts": {
-    "Cartões": 4,
-    "Chutes no gol": 2,
-    "Escanteios": 7,
-    "Finalizações": 2
+    "Cartões": 15,
+    "Chutes no gol": 15,
+    "Escanteios": 46,
+    "Finalizações": 15
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-09-06_1324.jsonl",
+   "pointer_file": "bet365_2026-09-06_1400.jsonl",
    "error": null
   },
   "sportingbet": {
    "ok": true,
-   "n_events": 16,
+   "n_events": 57,
    "n_markets": 2,
    "market_counts": {
-    "Cartões": 5,
-    "Escanteios": 16
+    "Cartões": 18,
+    "Escanteios": 57
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-09-06_1324.jsonl",
+   "pointer_file": "sportingbet_2026-09-06_1400.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 74,
-  "Chutes no gol": 43,
-  "Desarmes": 9,
-  "Escanteios": 168,
-  "Faltas": 26,
-  "Finalizações": 43,
-  "Impedimentos": 23,
-  "Laterais": 5,
-  "Tiros de meta": 2
+  "Cartões": 167,
+  "Chutes no gol": 86,
+  "Desarmes": 18,
+  "Escanteios": 350,
+  "Faltas": 47,
+  "Finalizações": 87,
+  "Impedimentos": 44,
+  "Laterais": 20,
+  "Tiros de meta": 17
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-09-06T16:27:53Z",
-  "ts_brt": "2026-09-06 13:27",
-  "n_events": 820,
-  "n_fixtures": 820,
+  "ts_utc": "2026-09-06T17:03:31Z",
+  "ts_brt": "2026-09-06 14:03",
+  "n_events": 814,
+  "n_fixtures": 814,
   "n_markets": 0,
   "min_events": 209,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_df54f3f0c2cbe06d5ab8.json",
-  "pointer_at": "2026-09-06T13:27:53-03:00",
-  "pointer_n": 820,
+  "pointer_file": "_snapshots/sofa_cfad487e3f9a69c8e3ef.json",
+  "pointer_at": "2026-09-06T14:03:31-03:00",
+  "pointer_n": 814,
   "pointer_age_h": 0.0,
-  "duration_sec": 194.8,
+  "duration_sec": 195.8,
   "error": null,
   "error_class": null,
   "transport": {
@@ -172,5 +174,5 @@
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "close"
+ "mode": "full"
 }

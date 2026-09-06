@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-06T13:38:53.191856-03:00",
+  "generated_at": "2026-09-06T14:13:19.861296-03:00",
   "results_rows": 4450,
   "result_field_coverage": {
     "cards": {
@@ -41,9 +41,9 @@
   },
   "totals_by_status": {
     "settled": 246772,
-    "unavailable": 359899,
-    "pending_result": 74736,
-    "open": 18874
+    "unavailable": 360680,
+    "pending_result": 75512,
+    "open": 18447
   },
   "settled_date_offsets": {
     "-1": 24,
@@ -52,88 +52,90 @@
   },
   "by_market": {
     "Cartões": {
-      "total": 43812,
+      "total": 43898,
       "status": {
         "settled": 33497,
         "unavailable": 1819,
-        "pending_result": 7235,
-        "open": 1261
+        "pending_result": 7315,
+        "open": 1267
       },
       "pending_age": {
         "30d+": 136,
-        "7-30d": 724,
-        "3-7d": 629,
-        "1-3d": 2733,
-        "0-24h": 3013
+        "7-30d": 730,
+        "3-7d": 625,
+        "1-3d": 2793,
+        "0-24h": 3021,
+        "not_started": 10
       },
       "pending_reasons": {
         "stat_missing:cards": 322,
-        "game_not_in_results": 6913
+        "game_not_in_results": 6993
       }
     },
     "Cartões@away": {
-      "total": 19748,
+      "total": 19772,
       "status": {
-        "unavailable": 19136,
-        "open": 612
+        "unavailable": 19174,
+        "open": 598
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Cartões@home": {
-      "total": 19726,
+      "total": 19754,
       "status": {
-        "unavailable": 19110,
-        "open": 616
+        "unavailable": 19146,
+        "open": 608
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Chutes no gol": {
-      "total": 29166,
+      "total": 29209,
       "status": {
         "settled": 21080,
         "unavailable": 575,
-        "pending_result": 6376,
-        "open": 1135
+        "pending_result": 6492,
+        "open": 1062
       },
       "pending_age": {
         "30d+": 28,
         "7-30d": 318,
-        "1-3d": 2549,
-        "3-7d": 467,
-        "0-24h": 3014
+        "1-3d": 2668,
+        "3-7d": 477,
+        "0-24h": 2987,
+        "not_started": 14
       },
       "pending_reasons": {
         "stat_missing:shots_on_goal": 42,
-        "game_not_in_results": 6334
+        "game_not_in_results": 6450
       }
     },
     "Chutes no gol@away": {
-      "total": 19493,
+      "total": 19516,
       "status": {
-        "unavailable": 18524,
-        "open": 969
+        "unavailable": 18612,
+        "open": 904
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Chutes no gol@home": {
-      "total": 19872,
+      "total": 19896,
       "status": {
-        "unavailable": 18882,
-        "open": 990
+        "unavailable": 18969,
+        "open": 927
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Desarmes": {
-      "total": 1708,
+      "total": 1740,
       "status": {
         "settled": 1136,
         "pending_result": 426,
         "unavailable": 86,
-        "open": 60
+        "open": 92
       },
       "pending_age": {
         "30d+": 14,
@@ -147,217 +149,221 @@
       }
     },
     "Desarmes@away": {
-      "total": 1618,
+      "total": 1634,
       "status": {
         "unavailable": 1568,
-        "open": 50
+        "open": 66
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Desarmes@home": {
-      "total": 1622,
+      "total": 1638,
       "status": {
         "unavailable": 1572,
-        "open": 50
+        "open": 66
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Escanteios": {
-      "total": 272622,
+      "total": 273037,
       "status": {
         "settled": 146603,
         "unavailable": 72359,
-        "pending_result": 48857,
-        "open": 4803
+        "pending_result": 49283,
+        "open": 4792
       },
       "pending_age": {
         "30d+": 226,
-        "7-30d": 13020,
-        "1-3d": 13757,
-        "3-7d": 7955,
-        "0-24h": 13899
+        "7-30d": 13202,
+        "1-3d": 14183,
+        "3-7d": 7909,
+        "0-24h": 13645,
+        "not_started": 118
       },
       "pending_reasons": {
         "stat_missing:corners": 986,
-        "game_not_in_results": 47871
+        "game_not_in_results": 48297
       }
     },
     "Escanteios@away": {
-      "total": 63677,
+      "total": 63741,
       "status": {
-        "unavailable": 62112,
-        "open": 1565
+        "unavailable": 62252,
+        "open": 1489
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Escanteios@home": {
-      "total": 63914,
+      "total": 63975,
       "status": {
-        "unavailable": 62343,
-        "open": 1571
+        "unavailable": 62475,
+        "open": 1500
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Faltas": {
-      "total": 10024,
+      "total": 10034,
       "status": {
         "settled": 8122,
         "unavailable": 350,
-        "pending_result": 1308,
-        "open": 244
+        "pending_result": 1322,
+        "open": 240
       },
       "pending_age": {
         "30d+": 20,
         "7-30d": 118,
         "3-7d": 36,
-        "1-3d": 472,
-        "0-24h": 662
+        "1-3d": 480,
+        "0-24h": 662,
+        "not_started": 6
       },
       "pending_reasons": {
         "stat_missing:fouls": 34,
-        "game_not_in_results": 1274
+        "game_not_in_results": 1288
       }
     },
     "Faltas@away": {
-      "total": 8095,
+      "total": 8103,
       "status": {
-        "unavailable": 7877,
-        "open": 218
+        "unavailable": 7897,
+        "open": 206
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Faltas@home": {
-      "total": 8068,
+      "total": 8076,
       "status": {
-        "unavailable": 7846,
-        "open": 222
+        "unavailable": 7866,
+        "open": 210
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Finalizações": {
-      "total": 32832,
+      "total": 32896,
       "status": {
         "settled": 23628,
         "unavailable": 578,
-        "pending_result": 7496,
-        "open": 1130
+        "pending_result": 7604,
+        "open": 1086
       },
       "pending_age": {
         "30d+": 132,
         "7-30d": 718,
-        "3-7d": 576,
-        "1-3d": 2860,
-        "0-24h": 3210
+        "3-7d": 586,
+        "1-3d": 3004,
+        "0-24h": 3158,
+        "not_started": 6
       },
       "pending_reasons": {
         "stat_missing:shots": 492,
-        "game_not_in_results": 7004
+        "game_not_in_results": 7112
       }
     },
     "Finalizações@away": {
-      "total": 22104,
+      "total": 22126,
       "status": {
-        "unavailable": 21132,
-        "open": 972
+        "unavailable": 21220,
+        "open": 906
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Finalizações@home": {
-      "total": 22410,
+      "total": 22436,
       "status": {
-        "unavailable": 21428,
-        "open": 982
+        "unavailable": 21516,
+        "open": 920
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Handicap de Cartões": {
-      "total": 3428,
+      "total": 3452,
       "status": {
         "unavailable": 3328,
-        "open": 100
+        "open": 124
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Impedimentos": {
-      "total": 9470,
+      "total": 9474,
       "status": {
         "settled": 7324,
         "unavailable": 224,
-        "pending_result": 1658,
-        "open": 264
+        "pending_result": 1672,
+        "open": 254
       },
       "pending_age": {
         "30d+": 18,
         "7-30d": 98,
         "3-7d": 90,
-        "1-3d": 648,
-        "0-24h": 804
+        "1-3d": 662,
+        "0-24h": 798,
+        "not_started": 6
       },
       "pending_reasons": {
         "stat_missing:offsides": 20,
-        "game_not_in_results": 1638
+        "game_not_in_results": 1652
       }
     },
     "Impedimentos@away": {
-      "total": 5740,
+      "total": 5744,
       "status": {
-        "unavailable": 5550,
-        "open": 190
+        "unavailable": 5558,
+        "open": 186
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Impedimentos@home": {
-      "total": 5693,
+      "total": 5697,
       "status": {
-        "unavailable": 5509,
-        "open": 184
+        "unavailable": 5517,
+        "open": 180
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Laterais": {
-      "total": 3938,
+      "total": 3988,
       "status": {
         "settled": 2944,
         "unavailable": 130,
-        "pending_result": 744,
-        "open": 120
+        "pending_result": 762,
+        "open": 152
       },
       "pending_age": {
         "7-30d": 32,
         "1-3d": 330,
         "3-7d": 2,
-        "0-24h": 380
+        "0-24h": 398
       },
       "pending_reasons": {
         "stat_missing:throw_ins": 16,
-        "game_not_in_results": 728
+        "game_not_in_results": 746
       }
     },
     "Laterais@away": {
-      "total": 2512,
+      "total": 2548,
       "status": {
-        "unavailable": 2416,
-        "open": 96
+        "unavailable": 2430,
+        "open": 118
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Laterais@home": {
-      "total": 1396,
+      "total": 1430,
       "status": {
-        "unavailable": 1328,
-        "open": 68
+        "unavailable": 1342,
+        "open": 88
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -381,32 +387,33 @@
       }
     },
     "Tiros de meta@away": {
-      "total": 2134,
+      "total": 2136,
       "status": {
         "unavailable": 2008,
-        "open": 126
+        "open": 128
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Tiros de meta@home": {
-      "total": 2150,
+      "total": 2152,
       "status": {
         "unavailable": 2028,
-        "open": 122
+        "open": 124
       },
       "pending_age": {},
       "pending_reasons": {}
     }
   },
   "backlog": {
-    "total": 74736,
+    "total": 75512,
     "age": {
       "30d+": 574,
-      "7-30d": 15120,
-      "1-3d": 23869,
-      "3-7d": 9757,
-      "0-24h": 25416
+      "7-30d": 15308,
+      "1-3d": 24640,
+      "3-7d": 9727,
+      "0-24h": 25103,
+      "not_started": 160
     },
     "age_unknown": 0,
     "reasons": {
@@ -418,14 +425,14 @@
       "stat_missing:offsides": 20,
       "stat_missing:tackles": 56,
       "stat_missing:throw_ins": 16,
-      "game_not_in_results": 72768
+      "game_not_in_results": 73544
     },
     "oldest_samples": [
       {
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|7.5|over",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -433,7 +440,7 @@
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|7.5|under",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -441,7 +448,7 @@
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|8.5|over",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -449,7 +456,7 @@
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|8.5|under",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -457,7 +464,7 @@
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|9.5|over",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -465,7 +472,7 @@
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|9.5|under",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -473,7 +480,7 @@
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|10.5|over",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -481,7 +488,7 @@
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|10.5|under",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -489,7 +496,7 @@
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|11.5|over",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -497,7 +504,7 @@
         "key": "superbet|2026-08-01|csm resita|asa targu mures|Escanteios|11.5|under",
         "market": "Escanteios",
         "kickoff": "2026-08-01T05:00:00-0300",
-        "age_days": 36.36,
+        "age_days": 36.38,
         "reason": "stat_missing:corners",
         "attempts": 130
       },
@@ -505,7 +512,7 @@
         "key": "superbet|2026-08-01|arka gdynia|stal rzeszow|Cartões|3.5|over",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -513,7 +520,7 @@
         "key": "superbet|2026-08-01|arka gdynia|stal rzeszow|Cartões|3.5|under",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -521,7 +528,7 @@
         "key": "superbet|2026-08-01|arka gdynia|stal rzeszow|Cartões|4.5|over",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -529,7 +536,7 @@
         "key": "superbet|2026-08-01|arka gdynia|stal rzeszow|Cartões|4.5|under",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -537,7 +544,7 @@
         "key": "superbet|2026-08-01|arka gdynia|stal rzeszow|Cartões|5.5|over",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -545,7 +552,7 @@
         "key": "superbet|2026-08-01|arka gdynia|stal rzeszow|Cartões|5.5|under",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -553,7 +560,7 @@
         "key": "superbet|2026-08-01|polonia warszawa|unia skierniewice|Cartões|2.5|over",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -561,7 +568,7 @@
         "key": "superbet|2026-08-01|polonia warszawa|unia skierniewice|Cartões|2.5|under",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -569,7 +576,7 @@
         "key": "superbet|2026-08-01|polonia warszawa|unia skierniewice|Cartões|3.5|over",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -577,7 +584,7 @@
         "key": "superbet|2026-08-01|polonia warszawa|unia skierniewice|Cartões|3.5|under",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -585,7 +592,7 @@
         "key": "superbet|2026-08-01|polonia warszawa|unia skierniewice|Cartões|4.5|over",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -593,7 +600,7 @@
         "key": "superbet|2026-08-01|polonia warszawa|unia skierniewice|Cartões|4.5|under",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -601,7 +608,7 @@
         "key": "superbet|2026-08-01|pogon siedlce|termalica nieciecza|Cartões|3.5|over",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -609,7 +616,7 @@
         "key": "superbet|2026-08-01|pogon siedlce|termalica nieciecza|Cartões|3.5|under",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       },
@@ -617,7 +624,7 @@
         "key": "superbet|2026-08-01|pogon siedlce|termalica nieciecza|Cartões|4.5|over",
         "market": "Cartões",
         "kickoff": "2026-08-01T10:30:00-0300",
-        "age_days": 36.13,
+        "age_days": 36.16,
         "reason": "stat_missing:cards",
         "attempts": 129
       }
