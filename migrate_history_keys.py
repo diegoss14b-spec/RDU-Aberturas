@@ -137,14 +137,19 @@ def migrate_keys_dict(keys, fixtures):
             home = rec.get("home_raw") or meta.get("hn") or ""
             away = rec.get("away_raw") or meta.get("an") or ""
             day = meta.get("day") or (rec.get("kickoff") or "")[:10]
+            # Conserto 06/09 (cético): a chave guarda a liga em `league_raw` (nunca em
+            # `league`), então o alias por país do canonical nunca chegava aqui e a
+            # órfã em voo virava chave NOVA (open resetado). Só promove com contexto
+            # quando o resultado tem Sofa; sem Sofa mantém os nomes antigos (não
+            # renomeia órfã de jogo passado — ticks/moves seguem casando por gid).
             identity = _resolve_legacy(
-                home,
-                away,
-                rec.get("kickoff"),
-                day,
-                rec.get("league") or "",
-                fixtures,
+                home, away, rec.get("kickoff"), day,
+                rec.get("league") or rec.get("league_raw") or "", fixtures,
             )
+            if not identity.get("sofa_id"):
+                identity = _resolve_legacy(
+                    home, away, rec.get("kickoff"), day, rec.get("league") or "", fixtures,
+                )
             resolved_day = identity["day"] if identity.get("day") != "?" else day
             new_key = history_key(
                 casa,
