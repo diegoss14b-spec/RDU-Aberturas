@@ -1,8 +1,9 @@
 {
- "ts_utc": "2026-09-07T21:49:03Z",
- "ts_brt": "2026-09-07 18:49",
+ "ts_utc": "2026-09-07T22:47:17Z",
+ "ts_brt": "2026-09-07 19:47",
  "casas_ok": [
   "betano",
+  "superbet",
   "estrelabet",
   "7k",
   "bet365",
@@ -10,89 +11,85 @@
  ],
  "casas_fail": [
   {
-   "casa": "superbet",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=101 há 29min > n_novo=98; guarda 75min)"
-  },
-  {
    "casa": "pinnacle",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=74 há 34min > n_novo=23; guarda 75min)"
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=74 há 22min > n_novo=23; guarda 75min)"
   }
  ],
- "n_ok": 5,
- "n_fail": 2,
- "total_events": 173,
+ "n_ok": 6,
+ "n_fail": 1,
+ "total_events": 447,
  "per_casa": {
   "betano": {
    "ok": true,
    "n_events": 60,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 19,
-    "Chutes no gol": 19,
-    "Desarmes": 7,
-    "Escanteios": 42,
-    "Faltas": 7,
-    "Finalizações": 19,
-    "Impedimentos": 7,
-    "Laterais": 7,
-    "Tiros de meta": 6
+    "Cartões": 20,
+    "Chutes no gol": 20,
+    "Desarmes": 8,
+    "Escanteios": 43,
+    "Faltas": 9,
+    "Finalizações": 20,
+    "Impedimentos": 9,
+    "Laterais": 8,
+    "Tiros de meta": 7
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-07_1838.jsonl",
+   "pointer_file": "betano_2026-09-07_1937.jsonl",
    "error": null
   },
   "superbet": {
-   "ok": false,
-   "n_events": 98,
+   "ok": true,
+   "n_events": 97,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 35,
-    "Chutes no gol": 30,
+    "Cartões": 34,
+    "Chutes no gol": 29,
     "Desarmes": 9,
-    "Escanteios": 96,
-    "Faltas": 21,
-    "Finalizações": 32,
-    "Impedimentos": 22,
-    "Laterais": 12,
-    "Tiros de meta": 12
+    "Escanteios": 95,
+    "Faltas": 20,
+    "Finalizações": 31,
+    "Impedimentos": 21,
+    "Laterais": 11,
+    "Tiros de meta": 11
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-07_1847.jsonl",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=101 há 29min > n_novo=98; guarda 75min)"
+   "pointer_file": "superbet_2026-09-07_1937.jsonl",
+   "error": null
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 5,
+   "n_events": 67,
    "n_markets": 6,
    "market_counts": {
-    "Cartões": 3,
-    "Chutes no gol": 4,
-    "Escanteios": 5,
-    "Faltas": 2,
-    "Finalizações": 4,
-    "Impedimentos": 3
+    "Cartões": 50,
+    "Chutes no gol": 46,
+    "Escanteios": 65,
+    "Faltas": 7,
+    "Finalizações": 46,
+    "Impedimentos": 13
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-09-07_1811.jsonl",
+   "pointer_file": "estrelabet_2026-09-07_1937.jsonl",
    "error": null
   },
   "7k": {
    "ok": true,
-   "n_events": 5,
+   "n_events": 120,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 2,
-    "Chutes no gol": 1,
-    "Desarmes": 1,
-    "Escanteios": 5,
-    "Faltas": 1,
-    "Finalizações": 1,
-    "Impedimentos": 1,
-    "Laterais": 1,
-    "Tiros de meta": 1
+    "Cartões": 68,
+    "Chutes no gol": 79,
+    "Desarmes": 22,
+    "Escanteios": 120,
+    "Faltas": 26,
+    "Finalizações": 37,
+    "Impedimentos": 26,
+    "Laterais": 24,
+    "Tiros de meta": 24
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-09-07_1811.jsonl",
+   "pointer_file": "7k_2026-09-07_1937.jsonl",
    "error": null
   },
   "pinnacle": {
@@ -103,85 +100,61 @@
     "Cartões": 23
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-09-07_1847.jsonl",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=74 há 34min > n_novo=23; guarda 75min)"
+   "pointer_file": "pinnacle_2026-09-07_1945.jsonl",
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=74 há 22min > n_novo=23; guarda 75min)"
   },
   "bet365": {
    "ok": true,
-   "n_events": 39,
+   "n_events": 40,
    "n_markets": 4,
    "market_counts": {
     "Cartões": 10,
-    "Chutes no gol": 5,
-    "Escanteios": 39,
-    "Finalizações": 5
+    "Chutes no gol": 7,
+    "Escanteios": 40,
+    "Finalizações": 7
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-09-07_1838.jsonl",
+   "pointer_file": "bet365_2026-09-07_1937.jsonl",
    "error": null
   },
   "sportingbet": {
    "ok": true,
-   "n_events": 64,
+   "n_events": 63,
    "n_markets": 3,
    "market_counts": {
-    "Cartões": 19,
-    "Escanteios": 60,
+    "Cartões": 18,
+    "Escanteios": 59,
     "Finalizações": 18
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-09-07_1838.jsonl",
+   "pointer_file": "sportingbet_2026-09-07_1937.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 53,
-  "Chutes no gol": 29,
-  "Desarmes": 8,
-  "Escanteios": 151,
-  "Faltas": 10,
-  "Finalizações": 47,
-  "Impedimentos": 11,
-  "Laterais": 8,
-  "Tiros de meta": 7
+  "Cartões": 200,
+  "Chutes no gol": 181,
+  "Desarmes": 39,
+  "Escanteios": 422,
+  "Faltas": 62,
+  "Finalizações": 159,
+  "Impedimentos": 69,
+  "Laterais": 43,
+  "Tiros de meta": 42
  },
  "fixtures": {
   "casa": "sofa",
-  "kind": "fixture",
-  "ok": true,
-  "ts_utc": "2026-09-07T21:42:08Z",
-  "ts_brt": "2026-09-07 18:42",
-  "n_events": 977,
-  "n_fixtures": 977,
+  "ok": false,
+  "ts_utc": "2026-09-07T22:41:59Z",
+  "ts_brt": "2026-09-07 19:41",
+  "n_events": 0,
   "n_markets": 0,
-  "min_events": 244,
-  "promoted": true,
-  "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_deefc3b74248a9d2c36b.json",
-  "pointer_at": "2026-09-07T18:42:08-03:00",
-  "pointer_n": 977,
-  "pointer_age_h": 0.0,
-  "duration_sec": 223.7,
-  "error": null,
-  "error_class": null,
-  "transport": {
-   "requests": 147,
-   "proxy_attempts": 147,
-   "direct_attempts": 0,
-   "statuses": {
-    "200": 144,
-    "404": 3
-   },
-   "last_error": null,
-   "consecutive_failures": 0,
-   "circuit_open": false,
-   "failed_tournaments": [],
-   "inactive_tournaments": [
-    "WC",
-    "CDF",
-    "CDR"
-   ]
-  }
+  "market_counts": {},
+  "pointer_valid": false,
+  "duration_sec": 240.0,
+  "error": "TIMEOUT após 240s",
+  "error_class": "Timeout",
+  "mode": "full"
  },
  "deploy_allowed": true,
  "reason": "ok",
