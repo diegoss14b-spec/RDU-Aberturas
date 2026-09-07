@@ -1,15 +1,15 @@
 {
- "http_200": 166,
+ "http_200": 168,
  "http_404": 0,
  "http_other": 0,
- "exc": 0,
- "first_fail": null,
- "last_fail": null,
+ "exc": 5,
+ "first_fail": "exc ReadTimeout etls.fastly.net/v2/pt-BR/events/13992783",
+ "last_fail": "exc ReadTimeoutError etls.fastly.net/v2/pt-BR/events/14812190",
  "n_list": 340,
- "n_det": 164,
- "n_out": 98,
+ "n_det": 166,
+ "n_out": 100,
  "mode": "full",
  "proxy_br": false,
- "at": "2026-09-07T06:42:11-03:00",
+ "at": "2026-09-07T07:18:35-03:00",
  "last_kickoff_saved": null
 }
