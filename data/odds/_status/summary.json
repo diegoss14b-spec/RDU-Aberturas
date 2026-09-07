@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-09-07T12:21:06Z",
- "ts_brt": "2026-09-07 09:21",
+ "ts_utc": "2026-09-07T13:17:23Z",
+ "ts_brt": "2026-09-07 10:17",
  "casas_ok": [
   "betano",
   "superbet",
@@ -12,12 +12,12 @@
  "casas_fail": [
   {
    "casa": "pinnacle",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=83 há 26min > n_novo=18; guarda 75min)"
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=82 há 47min > n_novo=18; guarda 75min)"
   }
  ],
  "n_ok": 6,
  "n_fail": 1,
- "total_events": 438,
+ "total_events": 462,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -35,26 +35,26 @@
     "Tiros de meta": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-07_0912.jsonl",
+   "pointer_file": "betano_2026-09-07_1008.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 107,
+   "n_events": 127,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 47,
-    "Chutes no gol": 26,
-    "Desarmes": 3,
-    "Escanteios": 107,
-    "Faltas": 10,
-    "Finalizações": 25,
-    "Impedimentos": 10,
-    "Laterais": 5,
-    "Tiros de meta": 5
+    "Cartões": 68,
+    "Chutes no gol": 30,
+    "Desarmes": 7,
+    "Escanteios": 127,
+    "Faltas": 14,
+    "Finalizações": 40,
+    "Impedimentos": 14,
+    "Laterais": 9,
+    "Tiros de meta": 9
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-07_0912.jsonl",
+   "pointer_file": "superbet_2026-09-07_1008.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -100,12 +100,12 @@
     "Cartões": 18
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-09-07_0919.jsonl",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=83 há 26min > n_novo=18; guarda 75min)"
+   "pointer_file": "pinnacle_2026-09-07_1016.jsonl",
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=82 há 47min > n_novo=18; guarda 75min)"
   },
   "bet365": {
    "ok": true,
-   "n_events": 31,
+   "n_events": 30,
    "n_markets": 4,
    "market_counts": {
     "Cartões": 14,
@@ -114,47 +114,71 @@
     "Finalizações": 9
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-09-07_0912.jsonl",
+   "pointer_file": "bet365_2026-09-07_1008.jsonl",
    "error": null
   },
   "sportingbet": {
    "ok": true,
-   "n_events": 65,
+   "n_events": 70,
    "n_markets": 3,
    "market_counts": {
     "Cartões": 18,
-    "Escanteios": 61,
+    "Escanteios": 66,
     "Finalizações": 18
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-09-07_0913.jsonl",
+   "pointer_file": "sportingbet_2026-09-07_1008.jsonl",
    "error": null
   }
  },
  "market_counts": {
-  "Cartões": 217,
-  "Chutes no gol": 158,
-  "Desarmes": 23,
-  "Escanteios": 412,
-  "Faltas": 38,
-  "Finalizações": 141,
-  "Impedimentos": 39,
-  "Laterais": 26,
-  "Tiros de meta": 26
+  "Cartões": 238,
+  "Chutes no gol": 162,
+  "Desarmes": 27,
+  "Escanteios": 437,
+  "Faltas": 42,
+  "Finalizações": 156,
+  "Impedimentos": 43,
+  "Laterais": 30,
+  "Tiros de meta": 30
  },
  "fixtures": {
   "casa": "sofa",
-  "ok": false,
-  "ts_utc": "2026-09-07T12:17:33Z",
-  "ts_brt": "2026-09-07 09:17",
-  "n_events": 0,
+  "kind": "fixture",
+  "ok": true,
+  "ts_utc": "2026-09-07T13:12:04Z",
+  "ts_brt": "2026-09-07 10:12",
+  "n_events": 872,
+  "n_fixtures": 872,
   "n_markets": 0,
-  "market_counts": {},
-  "pointer_valid": false,
-  "duration_sec": 240.0,
-  "error": "TIMEOUT após 240s",
-  "error_class": "Timeout",
-  "mode": "full"
+  "min_events": 212,
+  "promoted": true,
+  "pointer_valid": true,
+  "pointer_file": "_snapshots/sofa_5140d207f775f311cdaf.json",
+  "pointer_at": "2026-09-07T10:12:04-03:00",
+  "pointer_n": 872,
+  "pointer_age_h": 0.0,
+  "duration_sec": 215.9,
+  "error": null,
+  "error_class": null,
+  "transport": {
+   "requests": 145,
+   "proxy_attempts": 145,
+   "direct_attempts": 0,
+   "statuses": {
+    "200": 142,
+    "404": 3
+   },
+   "last_error": null,
+   "consecutive_failures": 0,
+   "circuit_open": false,
+   "failed_tournaments": [],
+   "inactive_tournaments": [
+    "WC",
+    "CDF",
+    "CDR"
+   ]
+  }
  },
  "deploy_allowed": true,
  "reason": "ok",
