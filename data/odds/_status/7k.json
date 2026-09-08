@@ -1,32 +1,33 @@
 {
  "casa": "7k",
- "ok": true,
- "ts_utc": "2026-09-08T06:43:42Z",
- "ts_brt": "2026-09-08 03:43",
+ "ok": false,
+ "ts_utc": "2026-09-08T08:25:39Z",
+ "ts_brt": "2026-09-08 05:25",
  "n_events": 120,
- "n_markets": 9,
+ "n_markets": 4,
  "market_counts": {
-  "Cartões": 67,
-  "Chutes no gol": 78,
+  "Cartões": 63,
   "Desarmes": 21,
   "Escanteios": 120,
-  "Faltas": 25,
-  "Finalizações": 36,
-  "Impedimentos": 25,
-  "Laterais": 23,
-  "Tiros de meta": 23
+  "Faltas": 32
  },
  "min_events": 8,
- "duration_sec": 282.5,
- "error": null,
- "error_class": null,
+ "duration_sec": 406.2,
+ "error": "promoção full bloqueada: mercado Chutes no gol caiu >65%: 78 → 0 eventos; mercado Finalizações caiu >65%: 36 → 0 eventos; mercado Impedimentos caiu >65%: 25 → 0 eventos; mercado Laterais caiu >65%: 23 → 0 eventos; mercado Tiros de meta caiu >65%: 23 → 0 eventos",
+ "error_class": "Other",
  "mode": "full",
  "sample_events": [],
  "proxy_br": true,
  "pointer_valid": true,
- "pointer_file": "7k_2026-09-08_0338.jsonl",
- "pointer_at": "2026-09-08T03:38:59-03:00",
- "pointer_age_h": 0.079,
- "promotion_blocked": [],
- "source_state": "ok"
+ "pointer_file": "7k_2026-09-08_0518.jsonl",
+ "pointer_at": "2026-09-08T05:18:53-03:00",
+ "pointer_age_h": 0.113,
+ "promotion_blocked": [
+  "mercado Chutes no gol caiu >65%: 78 → 0 eventos",
+  "mercado Finalizações caiu >65%: 36 → 0 eventos",
+  "mercado Impedimentos caiu >65%: 25 → 0 eventos",
+  "mercado Laterais caiu >65%: 23 → 0 eventos",
+  "mercado Tiros de meta caiu >65%: 23 → 0 eventos"
+ ],
+ "source_state": "failed"
 }
