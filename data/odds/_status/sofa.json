@@ -1,14 +1,38 @@
 {
  "casa": "sofa",
- "ok": false,
- "ts_utc": "2026-09-08T15:46:07Z",
- "ts_brt": "2026-09-08 12:46",
- "n_events": 0,
+ "kind": "fixture",
+ "ok": true,
+ "ts_utc": "2026-09-08T16:13:28Z",
+ "ts_brt": "2026-09-08 13:13",
+ "n_events": 1111,
+ "n_fixtures": 1111,
  "n_markets": 0,
- "market_counts": {},
- "pointer_valid": false,
- "duration_sec": 240.0,
- "error": "TIMEOUT após 240s",
- "error_class": "Timeout",
- "mode": "full"
+ "min_events": 250,
+ "promoted": true,
+ "pointer_valid": true,
+ "pointer_file": "_snapshots/sofa_09b9cd8414664dfc3ae0.json",
+ "pointer_at": "2026-09-08T13:13:28-03:00",
+ "pointer_n": 1111,
+ "pointer_age_h": 0.0,
+ "duration_sec": 216.5,
+ "error": null,
+ "error_class": null,
+ "transport": {
+  "requests": 149,
+  "proxy_attempts": 149,
+  "direct_attempts": 0,
+  "statuses": {
+   "200": 146,
+   "404": 3
+  },
+  "last_error": null,
+  "consecutive_failures": 0,
+  "circuit_open": false,
+  "failed_tournaments": [],
+  "inactive_tournaments": [
+   "WC",
+   "CDF",
+   "CDR"
+  ]
+ }
 }
