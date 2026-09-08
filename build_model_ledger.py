@@ -113,6 +113,9 @@ PUSH_SEMANTICS_DEFAULT = {
     "bet365": "counts_against",        # over-round 0,992 nas inteiras (backtest 30/07)
     "pinnacle": "conditional_no_push",  # over-round 1,068 — preço condicionado no-push
 }
+PRICE_CONTEXT_FIELDS = ("math_version", "settlement_rule", "contract_source", "ref_applied",
+                        "ref_reason", "referee", "ref_source", "ref_observed_at", "model_version",
+                        "model_data_through", "model_age_days")
 
 
 def log(msg):
@@ -275,7 +278,14 @@ def stamp_records(merged, fixidx, pricers, version, sha8, now):
                 n["pos_ko_bloqueado_pela_versao"] += 1
                 continue
         pr = pricers.get(market)
-        res = pr.price(comp, fx.get("h"), fx.get("a"), line) if pr else None
+        fixture = None
+        if pre_ko and ko_dt:
+            fixture = {"eid":sid_eff,"comp":comp,"home_id":fx.get("h"),"away_id":fx.get("a"),
+                       "date":ko_dt.astimezone(BRT).date().isoformat(),"kickoff_ts":int(ko_dt.timestamp())}
+        # Match the live board's bookmaker contract and exact fixture. Historical
+        # late stamping never imports a referee observed after the match.
+        res = pr.price(comp, fx.get("h"), fx.get("a"), line, fixture=fixture,
+                       bookmaker=meta.get("casa") or key.split("|")[0], now=now) if pr else None
         if res is None and rec.get("m_ts") and rec.get("m_ver") == version:
             continue        # buraco já registrado NESTE bundle — não re-grava à toa
         rec["m_ver"] = version
@@ -284,6 +294,9 @@ def stamp_records(merged, fixidx, pricers, version, sha8, now):
         rec["m_ts"] = now.isoformat(timespec="seconds")
         rec["m_pre_ko"] = pre_ko
         if res:
+            rec["m_price_context"] = {field:res.get(field) for field in PRICE_CONTEXT_FIELDS}
+            if not pre_ko:
+                rec["m_price_context"].update(ref_applied=False,ref_reason="late_stamp_referee_not_reconstructed")
             rec["m_p_over"] = round(float(res["p_over_win"]), 4)
             rec["m_p_push"] = round(float(res["p_push"]), 4)
             rec["m_mu"] = round(float(res["mu_cal"]), 3)
@@ -303,6 +316,7 @@ def _ledger_line(key, rec, meta, market, sid, sid_settle, fx, push_map, ref_poli
     casa = meta.get("casa") or key.split("|")[0]
     kickoff = rec.get("kickoff") or (fx or {}).get("ko")
     int_line = is_integer_line(line)
+    context = rec.get("m_price_context") or {}
     return {
         "key": key,
         "date": (str(kickoff)[:10] if kickoff else "") or meta.get("day"),
@@ -343,6 +357,11 @@ def _ledger_line(key, rec, meta, market, sid, sid_settle, fx, push_map, ref_poli
         "model_version": rec.get("m_ver"),
         "bundle_sha8": rec.get("m_sha8"),
         "ref_policy": ref_policy.get(market, "neutral"),
+        "pricing_context": rec.get("m_price_context"),
+        "ref_applied": context.get("ref_applied"),
+        "ref_reason": context.get("ref_reason") or "legacy_context_unrecorded",
+        "model_settlement_rule": context.get("settlement_rule"),
+        "math_version": context.get("math_version"),
         "priced_pre_ko": rec.get("m_pre_ko"),
         "result": rec.get("result"),
         "won": rec.get("won"),

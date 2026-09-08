@@ -22,14 +22,14 @@ FUTURO = "2026-08-05T16:00:00-03:00"
 class StubPricer:
     ok = True
 
-    def price(self, comp, hid, aid, line):
+    def price(self, comp, hid, aid, line, **context):
         return {"mu": 4.2, "mu_cal": 4.2, "mu_raw": 4.0,
                 "p_over_win": 0.55, "p_under_win": 0.4, "p_push": 0.05,
                 "p_over": 0.55, "p_under": 0.4}
 
 
 class NonePricer(StubPricer):
-    def price(self, comp, hid, aid, line):
+    def price(self, comp, hid, aid, line, **context):
         return None                      # par fora do bundle
 
 
