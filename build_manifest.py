@@ -31,6 +31,7 @@ except Exception:
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from history_quality import parse_iso_flex  # parser único §10
+from history_policy import contract as history_contract
 from manifest_common import (
     ARTIFACTS, MANIFEST_PREFIX, MANIFEST_REL, MANIFEST_VERSION,
     artifact_count, artifact_gerado, artifact_valid_count, sha256_bytes, strip_window,
@@ -109,6 +110,13 @@ def main():
             "ts": ts.isoformat(timespec="seconds"),
             "max_source_ts": _max_source_ts(name, data),
         }
+        if name == "history":
+            try:
+                contract = history_contract(data, sha256_bytes(raw))
+                if contract is not None:
+                    artifacts[rel]["history_contract"] = contract
+            except (ValueError, TypeError) as exc:
+                problems.append("history policy invalid: " + str(exc))
 
     if problems:
         for p in problems:

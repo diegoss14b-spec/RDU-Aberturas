@@ -76,7 +76,9 @@ def artifact_valid_count(name: str, data) -> int | None:
     if name == "history":
         banco = data.get("banco") or {}
         # sinais/clv válidos é a métrica que não pode encolher em silêncio
-        return int(banco.get("clv_validas") or (data.get("head") or {}).get("n_valid") or 0)
+        # Zero is a real strict-policy count, not a missing legacy field.
+        value = banco["clv_validas"] if "clv_validas" in banco else (data.get("head") or {}).get("n_valid", 0)
+        return int(value or 0)
     return artifact_count(name, data)
 
 

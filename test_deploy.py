@@ -48,6 +48,8 @@ class DeployTests(unittest.TestCase):
             "<!doctype html><html><body>" + ("<!-- app da Mesa -->" * 1200)
             + 'js/board.js js/valor.js js/history.js js/ops.js</body></html>',
             encoding="utf-8")
+        # The policy gate parses history as well as checking its bytes.
+        (self.site / "data/history.js").write_text("window.HIST={};", encoding="utf-8")
         # manifesto atômico válido (por último — depende dos hashes dos artefatos acima)
         self._write_valid_manifest()
         self.token = patch.object(deploy, "TOKEN", "test-token")

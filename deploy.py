@@ -9,6 +9,7 @@ except Exception: pass
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from history_quality import parse_iso_flex  # parser único §10
+from history_policy import contract as history_contract, counts as history_counts, transition_report, validate_preservation
 from manifest_common import (
     MANIFEST_PREFIX, MANIFEST_REL, parse_manifest_text, sha256_bytes, strip_window,
 )
@@ -76,6 +77,19 @@ def manifest_gate(dirpath):
         if got != meta.get("sha256"):
             return (f"hash divergente em {rel} — artefato de OUTRO build "
                     f"(manifesto {str(meta.get('sha256'))[:12]} ≠ arquivo {got[:12]})")
+        if rel == "/data/history.js":
+            try:
+                history = strip_window(f.read_text(encoding="utf-8"), "window.HIST=")
+                contract = history_contract(history, got)
+                if meta.get("history_contract") != contract:
+                    return "contrato da política CLV diverge do artefato vinculado"
+                if contract is not None and (meta.get("valid_count") != contract["counts"]["clv_validas"] or
+                                             meta.get("count") != contract["counts"]["liquidadas"]):
+                    return "contagens do manifesto divergem do contrato CLV"
+                if contract is not None:
+                    validate_preservation(contract.get("preservation"))
+            except (OSError, ValueError, TypeError, KeyError) as exc:
+                return "política CLV inválida: " + str(exc)
     shrink = _shrink_reason(man)
     if shrink:
         return shrink
@@ -85,16 +99,45 @@ def manifest_gate(dirpath):
 
 
 def _shrink_reason(man):
-    """Trava anti-encolhimento do histórico válido vs produção AO VIVO (best-effort).
-    Só age quando DEPLOY_LIVE_BASE está setado e o manifesto ao vivo é legível. Um encolhimento
-    legítimo (migração aprovada) é liberado por data/odds/_status/history_shrink_approved.json."""
+    """Preserve raw history; one closed legacy→v1 eligibility transition only.
+
+    The legacy approval-file bypass is intentionally no longer recognized.
+    New-policy deployments fail closed if the live baseline cannot be verified.
+    """
     if not DEPLOY_LIVE_BASE:
         return None
+    target = ((man.get("artifacts") or {}).get("/data/history.js") or {}).get("history_contract")
     try:
-        live = parse_manifest_text(_fetch_text(DEPLOY_LIVE_BASE.rstrip("/") + MANIFEST_REL))
+        live_raw = _fetch_text(DEPLOY_LIVE_BASE.rstrip("/") + MANIFEST_REL).encode("utf-8")
+        live = parse_manifest_text(live_raw.decode("utf-8"))
     except Exception as e:
+        if target is not None:
+            return "manifesto ao vivo indisponível; política CLV exige baseline verificável"
         print(f"[deploy] manifesto ao vivo indisponível ({type(e).__name__}) — pulo a trava de encolhimento")
         return None
+    live_meta = ((live.get("artifacts") or {}).get("/data/history.js") or {})
+    if target is not None or live_meta.get("history_contract") is not None:
+        try:
+            live_history_raw = _fetch_text(DEPLOY_LIVE_BASE.rstrip("/") + "/data/history.js").encode("utf-8")
+            if sha256_bytes(live_history_raw) != live_meta.get("sha256"):
+                raise ValueError("live history hash differs from manifest (retry coherent snapshot)")
+            live_history = strip_window(live_history_raw.decode("utf-8"), "window.HIST=")
+            previous = history_contract(live_history, sha256_bytes(live_history_raw))
+            if previous != live_meta.get("history_contract"):
+                raise ValueError("live CLV contract differs from hash-bound artifact")
+            if target is None:
+                raise ValueError("cannot roll back strict CLV policy to unqualified legacy")
+            before, after = history_counts(live_history), target["counts"]
+            if any(after[k] < before[k] for k in ("monitoradas", "liquidadas")):
+                raise ValueError("raw/settled history count fell")
+            if previous is None:
+                report = transition_report(target, live_history, live_raw, live_history_raw, man.get("build_id"))
+                print("[deploy] CLV_POLICY_TRANSITION " + json.dumps(report, ensure_ascii=False, sort_keys=True))
+                return None
+            if previous.get("policy") != target.get("policy"):
+                raise ValueError("unsupported CLV policy transition")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            return "transição/integridade CLV bloqueada: " + str(exc)
     def vc(m):
         a = (m.get("artifacts") or {}).get("/data/history.js") or {}
         return a.get("valid_count")
@@ -103,12 +146,7 @@ def _shrink_reason(man):
         return None
     eps = float(os.environ.get("HISTORY_SHRINK_EPS", "0.02"))
     if now_v < live_v * (1 - eps):
-        approved = ROOT / "data" / "odds" / "_status" / "history_shrink_approved.json"
-        if approved.is_file():
-            print(f"[deploy] histórico encolheu ({live_v}→{now_v}) mas há migração APROVADA — libero")
-            return None
-        return (f"histórico VÁLIDO encolheu {live_v}→{now_v} (>{eps*100:.0f}%) sem migração aprovada "
-                f"— crie data/odds/_status/history_shrink_approved.json se for intencional")
+        return f"histórico VÁLIDO encolheu {live_v}→{now_v} (>{eps*100:.0f}%) fora da transição fechada de política"
     return None
 
 def api(method, path, data=None, raw=False):

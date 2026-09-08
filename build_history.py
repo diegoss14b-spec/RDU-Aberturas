@@ -26,6 +26,7 @@ from canonical import parse_history_key
 from history_merge import merge_records
 from observation_clock import close_age_band
 from cards_settlement import semantics_verified
+from history_policy import POLICY as CLV_POLICY, preservation_proof
 from migrate_history_keys import unify_keys_dict
 from history_quality import (
     compute_capture_quality, ensure_aware, is_strict_clv, parse_ts, strict_clv_reason,
@@ -188,6 +189,15 @@ def main():
                 keys[kk] = merge_records(keys[kk], vv) if kk in keys else vv
         except Exception as e:
             print(f"[history] pulei {f}: {type(e).__name__}")
+
+    # Inventory BEFORE view deduplication, across both hot and archived keys.
+    # An unsupported remap remains a failed preservation proof, never an assumed
+    # equivalence. This does not alter any source record.
+    try:
+        history_preservation = preservation_proof(
+            keys, (k for k, v in keys.items() if v.get("status") == "settled"))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        history_preservation = {"error": type(exc).__name__ + ": " + str(exc)}
 
     # dedup de confrontos em memória (mesmo jogo com grafias/dia diferentes entre
     # casas). O migrate também persiste isso nos keys/*.json; aqui é cinto e
@@ -428,9 +438,8 @@ def main():
         "gerado": now_brt.strftime("%Y-%m-%d %H:%M"),
         "gerado_iso": now_brt.isoformat(timespec="seconds"),
         "limiares": LIMIARES,
-        "clv_policy": {"schema": 2, "max_close_age_minutes": 60,
-                       "requires_verified_observed_at": True,
-                       "legacy_history_preserved": True},
+        "clv_policy": dict(CLV_POLICY),
+        "history_preservation": history_preservation,
         "banco": banco,
         "head": head,
         "recortes": recortes,
