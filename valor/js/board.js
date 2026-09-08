@@ -628,6 +628,10 @@
             LOGO(f.casa, "house-logo-sm") + " ✗</span>";
         })).concat((cap.casas_stale || []).map(function (c) {
           return '<span class="cap-stale" title="Full anterior reutilizado (stale-keep)">' + LOGO(c, "house-logo-sm") + " *</span>";
+        })).concat((cap.casas_protected || []).map(function(c){
+          return '<span class="cap-stale" title="Feed local mais completo preservado; não é falha de transporte">'+LOGO(c,"house-logo-sm")+' · preservado</span>';
+        })).concat((cap.casas_disabled || []).map(function(c){
+          return '<span class="cap-stale" title="Fonte desativada deliberadamente">'+LOGO(c,"house-logo-sm")+' · desativada</span>';
         }));
         var cls = failN === 0 && staleN === 0 ? "cap-green" : (okN >= 3 || staleN ? "cap-yellow" : "cap-red");
         if (fr.band === "old" || fr.stale) cls = "cap-red";
@@ -636,8 +640,8 @@
         var histTxt = "";
         if (cap.hist7) {
           var hs = Object.keys(cap.hist7).map(function (c) {
-            var h = cap.hist7[c], pct = h.total ? Math.round(100 * h.ok / h.total) : 0;
-            return c + " " + pct + "% (" + h.ok + "/" + h.total + ")";
+            var h = cap.hist7[c], pct = h.total ? Math.round(100 * h.ok / h.total) : null;
+            return c + (pct == null ? " — (sem capturas classificáveis)" : " " + pct + "% (" + h.ok + "/" + h.total + ")")+(h.protected?' · '+h.protected+' feeds preservados':'')+(h.legacy_unknown?' · '+h.legacy_unknown+' falhas legadas sem causa':'');
           });
           histTxt = '<div class="cap-note">Últimos 7 dias: ' + hs.join(" · ") + "</div>";
         }

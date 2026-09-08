@@ -585,7 +585,11 @@ def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, samp
         "pointer_file": (pointer_meta or {}).get("file"),
         "pointer_at": (pointer_meta or {}).get("at"),
         "pointer_age_h": (pointer_meta or {}).get("_age_h"),
+        # Keep the reason for a non-promotion distinct from transport failures.
+        "promotion_blocked": (pointer_meta or {}).get("promotion_blocked") or [],
     }
+    from capture_health import state as capture_state
+    st["source_state"] = capture_state(st, casa, now)
     _atomic_write_text(
         STATUS_DIR / f"{casa}.json",
         json.dumps(st, ensure_ascii=False, indent=1),

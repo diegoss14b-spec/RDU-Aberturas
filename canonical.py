@@ -505,6 +505,36 @@ def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures):
     the same day/kickoff, exact corrected opponents, an unchanged anchor team,
     matching category flags and no second candidate. No fuzzy threshold changes.
     """
+    # M6 08/09: reviewed UEFA translations, anchored by BOTH team identities.
+    # Never make Internazionale/PSG/AEK a loose worldwide alias.
+    # Betano labels UEFA as Portuguese "Liga dos Campeões". Keep that spelling
+    # local to the exact-ID fixture guard; do not globally classify every
+    # continental Champions League as UEFA.
+    if (league_fp(league) == "ucl" or n(league or "").strip() == "liga dos campeoes") and hn and an and start_dt is not None:
+        reviewed = {
+            "aek atenas": (3250, "aek athens"), "aek athens": (3250, "aek athens"),
+            "linzer ask": (2058, "lask"), "lask": (2058, "lask"),
+            "real madrid": (2829, "real madrid"), "internazionale": (2697, "inter"), "inter": (2697, "inter"),
+            "psg": (1644, "paris saint germain"), "paris saint germain": (1644, "paris saint germain"),
+            "slovan bratislava": (2404, "slovan bratislava"),
+        }
+        rh, ra = reviewed.get(hn), reviewed.get(an)
+        if rh and ra and (rh[1], ra[1]) != (hn, an):
+            hits = []
+            for f in fixtures:
+                if f.get("day_brt") != day or f.get("league_id") != 7 or f.get("label") != "UCL":
+                    continue
+                if _kickoff_delta_min(start_dt, f) > SOFA_TIME_TOL_MIN:
+                    continue
+                fh, fa = f.get("_hn"), f.get("_an")
+                if not flags_compatible(hn, an, fh, fa):
+                    continue
+                direct = (rh[0], ra[0]) == (f.get("home_id"), f.get("away_id")) and (rh[1], ra[1]) == (fh, fa)
+                reverse = (rh[0], ra[0]) == (f.get("away_id"), f.get("home_id")) and (rh[1], ra[1]) == (fa, fh)
+                if direct or reverse:
+                    hits.append(f.get("sofa_id"))
+            if len(set(hits)) == 1:
+                return rh[1], ra[1], "UEFA Champions League"
     if n(league).strip() != "ligue 1" or not hn or not an or start_dt is None:
         return hn, an, league
     nh, na = norm_team(hn, "France"), norm_team(an, "France")

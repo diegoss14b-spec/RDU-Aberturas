@@ -24,6 +24,7 @@ except Exception:
 ROOT_FOR_IMPORT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 from history_quality import parse_iso_flex  # noqa: E402  (parser único §10)
+from capture_health import ACTIVE_HOUSES, DISABLED_HOUSES, NAMES, state as source_state
 
 ROOT = Path(__file__).resolve().parent
 STATUS = ROOT / "data" / "odds" / "_status"
@@ -36,7 +37,8 @@ DISP = {
     "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365", "betfast": "Betfast",
     "sofa": "SofaScore",
 }
-CASAS = ["betano", "superbet", "estrelabet", "7k", "pinnacle", "bet365"]  # betfast desligada 21/08
+DISP.update(NAMES)
+CASAS = list(ACTIVE_HOUSES)
 MERCADOS = [
     "Cartões", "Faltas", "Finalizações", "Chutes no gol", "Escanteios",
     "Impedimentos", "Laterais", "Tiros de meta", "Desarmes",
@@ -93,12 +95,17 @@ def age_mins(ts_brt_str, now=None):
 
 def load_casa_status():
     rows = []
-    for c in CASAS:
+    for c in [*CASAS, *DISABLED_HOUSES]:
         st = load_json(STATUS / f"{c}.json") or {}
+        health = source_state(st, c)
+        discovery = load_json(STATUS / f"{c}_discovery.json") or {}
         rows.append({
             "id": c,
             "nome": DISP.get(c, c),
-            "ok": bool(st.get("ok")),
+            "ok": health == "ok",
+            "source_state": health,
+            "capture_ok": bool(st.get("ok")),
+            "discovery": discovery.get("metrics") or {},
             "n_events": st.get("n_events"),
             "n_markets": st.get("n_markets"),
             "market_counts": st.get("market_counts") or {},
@@ -139,7 +146,7 @@ def load_runs(days=7, limit=40):
     if not hf.exists():
         return [], {}
     cut = (now_brt() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M")
-    runs, agg = [], defaultdict(lambda: {"ok": 0, "total": 0, "n_sum": 0, "n_cnt": 0})
+    runs, agg = [], defaultdict(lambda: {"ok": 0, "total": 0, "n_sum": 0, "n_cnt": 0, "protected":0, "legacy_unknown":0})
     for ln in hf.read_text(encoding="utf-8").splitlines():
         try:
             r = json.loads(ln)
@@ -150,8 +157,14 @@ def load_runs(days=7, limit=40):
             continue
         runs.append(r)
         for c, v in (r.get("casas") or {}).items():
+            if c not in CASAS: continue
             a = agg[c]
+            if v.get("source_state") == "protected_feed":
+                a["protected"] += 1
+                continue
             a["total"] += 1
+            if not v.get("source_state") and not v.get("ok"):
+                a["legacy_unknown"] += 1
             if v.get("ok"):
                 a["ok"] += 1
             n = v.get("n")
@@ -165,6 +178,7 @@ def load_runs(days=7, limit=40):
         avg_n = round(a["n_sum"] / a["n_cnt"], 1) if a["n_cnt"] else None
         hist7[DISP.get(c, c)] = {
             "ok": a["ok"], "total": a["total"], "rate": rate, "avg_n": avg_n,
+            "protected":a["protected"], "legacy_unknown":a["legacy_unknown"],
         }
     # últimas N runs (mais recentes no fim do arquivo → pega o final)
     tail = runs[-limit:]
@@ -174,7 +188,7 @@ def load_runs(days=7, limit=40):
             "ts": r.get("ts"),
             "total": r.get("total"),
             "casas": {
-                DISP.get(c, c): {"ok": bool(v.get("ok")), "n": v.get("n")}
+                DISP.get(c, c): {"ok": bool(v.get("ok")), "n": v.get("n"), "source_state":v.get("source_state")}
                 for c, v in (r.get("casas") or {}).items()
             },
         })
@@ -404,7 +418,10 @@ def fixtures_info():
     }
 def build_avisos(summary, casas, board_cov, hist_h, runs):
     avisos = [{"level": "info", "txt": "Betfast DESLIGADA do pool (21/08, decisão Diego) — religar em run_capture.py"}]
-    fails = [c for c in casas if c["id"] in CASAS and not c["ok"]]
+    fails = [c for c in casas if c["id"] in CASAS and not c["ok"] and c.get("source_state") != "protected_feed"]
+    protected = [c["nome"] for c in casas if c.get("source_state") == "protected_feed"]
+    if protected:
+        avisos.append({"level":"info", "txt":"Feed local mais completo preservado: "+", ".join(protected)+". A proteção não confirma que todas as odds estejam atualizadas."})
     if fails:
         avisos.append({
             "level": "warn" if len(fails) <= 2 else "bad",
@@ -510,12 +527,13 @@ def main():
                 pass
             ok = v.get("ok") if v else None
             n = v.get("n") if v else None
-            col["cells"].append({"ok": ok, "n": n})
+            col["cells"].append({"ok": ok, "n": n, "source_state":v.get("source_state")})
         heat["cols"].append(col)
 
     # contadores head
     n_ok = sum(1 for c in casas if c["id"] in CASAS and c["ok"])
-    n_fail = sum(1 for c in casas if c["id"] in CASAS and not c["ok"])
+    n_fail = sum(1 for c in casas if c["id"] in CASAS and not c["ok"] and c.get("source_state") != "protected_feed")
+    n_protected = sum(1 for c in casas if c.get("source_state") == "protected_feed")
     total_ev = sum((c.get("n_events") or 0) for c in casas if c["id"] in CASAS and c["ok"])
 
     out = {
@@ -523,8 +541,10 @@ def main():
         "summary": {
             "ts_brt": summary.get("ts_brt"),
             "age_min": age_mins(summary.get("ts_brt")),
-            "n_ok": summary.get("n_ok", n_ok),
-            "n_fail": summary.get("n_fail", n_fail),
+            "n_ok": n_ok,
+            "n_fail": n_fail,
+            "n_protected":n_protected,
+            "n_active":len(CASAS),
             "total_events": summary.get("total_events", total_ev),
             "deploy_allowed": summary.get("deploy_allowed"),
             "reason": summary.get("reason"),

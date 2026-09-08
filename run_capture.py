@@ -149,6 +149,8 @@ def main():
             "pointer_valid": st.get("pointer_valid"),
             "pointer_file": st.get("pointer_file"),
             "error": st.get("error"),
+            "source_state": st.get("source_state"),
+            "error_class": st.get("error_class"),
         }
         per_casa[casa] = entry
         if valid:
@@ -181,7 +183,8 @@ def main():
 
     if not os.environ.get("ODDS_WINDOW_H"):
         hist_casas = {c: {"ok": v["ok"], "n": v["n_events"],
-                          "n_markets": v["n_markets"]} for c, v in per_casa.items()}
+                          "n_markets": v["n_markets"], "source_state":v.get("source_state"),
+                          "error_class":v.get("error_class")} for c, v in per_casa.items()}
         hist_line = {"ts": brt, "casas": hist_casas, "total": total_events,
                      "market_counts": summary["market_counts"],
                      "sofa": {"ok": bool(sofa.get("ok")),

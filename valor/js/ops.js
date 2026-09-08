@@ -91,8 +91,8 @@
       {
         lab: "Casas ok",
         // §11 — 7 casas (com Betfast); antes o fallback era 5 e escondia casas
-        val: (S.n_ok != null ? S.n_ok : "—") + " / " + ((S.n_ok || 0) + (S.n_fail || 0) || 7),
-        sub: (S.total_events != null ? S.total_events + " eventos" : "—") + (S.reason && S.reason !== "ok" ? " · " + S.reason : ""),
+        val: (S.n_ok != null ? S.n_ok : "—") + " / " + (S.n_active || ((S.n_ok || 0) + (S.n_fail || 0)) || 7),
+        sub: (S.total_events != null ? S.total_events + " eventos" : "—") + (S.n_protected?' · '+S.n_protected+' feeds preservados':'') + (S.reason && S.reason !== "ok" ? " · " + S.reason : ""),
         tone: (S.n_fail || 0) === 0 ? "good" : (S.n_ok || 0) >= 4 ? "mid" : "bad",
       },
       {
@@ -134,6 +134,8 @@
       var st = c.ok
         ? '<span class="op-pill op-pill-ok">ok</span>'
         : '<span class="op-pill op-pill-fail" title="' + esc(c.error || "") + '">fail</span>';
+      var states={protected_feed:'feed preservado',disabled:'desativada',stale:'status antigo',unknown:'sem status',running:'capturando'};
+      if(states[c.source_state])st='<span class="op-pill" title="'+esc(c.error||'')+'">'+esc(states[c.source_state])+'</span>';
       var dur = c.duration_sec != null ? br(c.duration_sec, 0) + "s" : "—";
       var n = c.n_events != null ? String(c.n_events) : "—";
       var proxy = c.proxy_br === true ? "BR" : c.proxy_br === false ? "direct" : "—";
@@ -141,6 +143,10 @@
       var rateHtml = rate != null
         ? '<span class="' + clsRate(rate) + '">' + br(rate, 0) + "% <span class=\"op-muted\">(" + h7.ok + "/" + h7.total + ")</span></span>"
         : "—";
+      if(h7.protected)rateHtml+=' · '+h7.protected+' preservados';
+      if(h7.legacy_unknown)rateHtml+=' · '+h7.legacy_unknown+' falhas legadas sem causa';
+      var disc=c.discovery||{};
+      var discoveryTxt=disc.inventory!=null?'Inventário: '+disc.inventory+' · selecionados: '+(disc.selected||0)+' · não visitados: '+(disc.unseen||0):'';
       return "<tr>"
         + "<td>" + (c.kind === "fixture" ? "<b>" + esc(c.nome) + '</b> <span class="op-muted">fixture</span>'
           : LOGO(c.nome)) + "</td>"
@@ -150,7 +156,7 @@
         + "<td>" + esc(ageTxt(cAge)) + "</td>"
         + "<td>" + esc(proxy) + "</td>"
         + "<td>" + rateHtml + "</td>"
-        + '<td class="op-err">' + esc(c.ok ? "" : (c.error || "—")) + "</td>"
+        + '<td class="op-err">' + esc((c.ok ? "" : (c.error || ""))+(discoveryTxt?' · '+discoveryTxt:'')) + "</td>"
         + "</tr>";
     }).join("");
 
@@ -170,8 +176,8 @@
         var cells = heat.cols.map(function (col) {
           var cell = (col.cells || [])[i] || {};
           var ok = cell.ok;
-          var cls = ok === true ? "ht-ok" : ok === false ? "ht-fail" : "ht-na";
-          var title = nome + " " + (col.ts || "") + (cell.n != null ? " · n=" + cell.n : "");
+          var cls = cell.source_state==='protected_feed' ? "ht-na" : ok === true ? "ht-ok" : ok === false ? "ht-fail" : "ht-na";
+          var title = nome + " " + (col.ts || "") + (cell.n != null ? " · n=" + cell.n : "")+(cell.source_state==='protected_feed'?' · feed preservado':'');
           return '<td class="' + cls + '" title="' + esc(title) + '"></td>';
         }).join("");
         return "<tr><th>" + LOGO(nome, "house-logo-sm") + "</th>" + cells + "</tr>";
