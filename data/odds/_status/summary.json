@@ -1,37 +1,41 @@
 {
- "ts_utc": "2026-09-08T06:47:46Z",
- "ts_brt": "2026-09-08 03:47",
+ "ts_utc": "2026-09-08T07:20:26Z",
+ "ts_brt": "2026-09-08 04:20",
  "casas_ok": [
   "betano",
   "superbet",
   "estrelabet",
   "7k",
-  "pinnacle",
   "bet365",
   "sportingbet"
  ],
- "casas_fail": [],
- "n_ok": 7,
- "n_fail": 0,
- "total_events": 459,
+ "casas_fail": [
+  {
+   "casa": "pinnacle",
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=75 há 45min > n_novo=22; guarda 75min)"
+  }
+ ],
+ "n_ok": 6,
+ "n_fail": 1,
+ "total_events": 438,
  "per_casa": {
   "betano": {
    "ok": true,
    "n_events": 60,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 21,
-    "Chutes no gol": 21,
+    "Cartões": 23,
+    "Chutes no gol": 23,
     "Desarmes": 7,
-    "Escanteios": 45,
+    "Escanteios": 55,
     "Faltas": 9,
-    "Finalizações": 21,
+    "Finalizações": 23,
     "Impedimentos": 9,
     "Laterais": 7,
     "Tiros de meta": 6
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-08_0339.jsonl",
+   "pointer_file": "betano_2026-09-08_0410.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
@@ -52,7 +56,7 @@
     "Tiros de meta": 9
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-08_0338.jsonl",
+   "pointer_file": "superbet_2026-09-08_0410.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
@@ -99,17 +103,17 @@
    "error_class": null
   },
   "pinnacle": {
-   "ok": true,
+   "ok": false,
    "n_events": 22,
    "n_markets": 1,
    "market_counts": {
     "Cartões": 22
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-09-08_0338.jsonl",
-   "error": null,
-   "source_state": "ok",
-   "error_class": null
+   "pointer_file": "pinnacle_2026-09-08_0418.jsonl",
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=75 há 45min > n_novo=22; guarda 75min)",
+   "source_state": "protected_feed",
+   "error_class": "Other"
   },
   "bet365": {
    "ok": true,
@@ -122,51 +126,75 @@
     "Finalizações": 7
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-09-08_0338.jsonl",
+   "pointer_file": "bet365_2026-09-08_0410.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
   },
   "sportingbet": {
    "ok": true,
-   "n_events": 59,
+   "n_events": 60,
    "n_markets": 3,
    "market_counts": {
     "Cartões": 16,
-    "Escanteios": 55,
+    "Escanteios": 56,
     "Finalizações": 18
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-09-08_0339.jsonl",
+   "pointer_file": "sportingbet_2026-09-08_0410.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
   }
  },
  "market_counts": {
-  "Cartões": 212,
-  "Chutes no gol": 183,
+  "Cartões": 192,
+  "Chutes no gol": 185,
   "Desarmes": 42,
-  "Escanteios": 416,
+  "Escanteios": 427,
   "Faltas": 65,
-  "Finalizações": 159,
+  "Finalizações": 161,
   "Impedimentos": 72,
   "Laterais": 45,
   "Tiros de meta": 38
  },
  "fixtures": {
   "casa": "sofa",
-  "ok": false,
-  "ts_utc": "2026-09-08T06:43:45Z",
-  "ts_brt": "2026-09-08 03:43",
-  "n_events": 0,
+  "kind": "fixture",
+  "ok": true,
+  "ts_utc": "2026-09-08T07:14:29Z",
+  "ts_brt": "2026-09-08 04:14",
+  "n_events": 997,
+  "n_fixtures": 997,
   "n_markets": 0,
-  "market_counts": {},
-  "pointer_valid": false,
-  "duration_sec": 240.0,
-  "error": "TIMEOUT após 240s",
-  "error_class": "Timeout",
-  "mode": "full"
+  "min_events": 250,
+  "promoted": true,
+  "pointer_valid": true,
+  "pointer_file": "_snapshots/sofa_b5196ad5d6a48cb12b9d.json",
+  "pointer_at": "2026-09-08T04:14:29-03:00",
+  "pointer_n": 997,
+  "pointer_age_h": 0.0,
+  "duration_sec": 232.2,
+  "error": null,
+  "error_class": null,
+  "transport": {
+   "requests": 147,
+   "proxy_attempts": 147,
+   "direct_attempts": 0,
+   "statuses": {
+    "200": 144,
+    "404": 3
+   },
+   "last_error": null,
+   "consecutive_failures": 0,
+   "circuit_open": false,
+   "failed_tournaments": [],
+   "inactive_tournaments": [
+    "WC",
+    "CDF",
+    "CDR"
+   ]
+  }
  },
  "deploy_allowed": true,
  "reason": "ok",

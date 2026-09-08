@@ -1,5 +1,5 @@
 {
- "ts_brt": "2026-09-08 03:54",
+ "ts_brt": "2026-09-08 04:25",
  "reasons": [
   "identidade impura sofa:16938796 — 2 partidas reais sob o mesmo id (paris saint germain x slovan bratislava ×VS× psg x slovan bratislava); board não pode publicar odds misturadas"
  ],
@@ -7,17 +7,17 @@
   "n_games": 120,
   "sofa_games": 116,
   "sofa_pct": 96.66666666666667,
-  "value_games": 21,
-  "value_sofa": 21,
+  "value_games": 7,
+  "value_sofa": 7,
   "value_sofa_pct": 100.0,
   "houses": {
-   "Betano": 21,
+   "Betano": 23,
    "Superbet": 28,
    "7k": 109,
    "EstrelaBet": 53,
    "bet365": 9,
    "Sportingbet": 28,
-   "Pinnacle": 22
+   "Pinnacle": 25
   },
   "markets": {
    "Cartões": 76,
@@ -31,9 +31,9 @@
   },
   "house_markets": {
    "Betano": {
-    "Cartões": 48,
-    "Finalizações": 34,
-    "Chutes no gol": 34,
+    "Cartões": 50,
+    "Finalizações": 36,
+    "Chutes no gol": 36,
     "Faltas": 26,
     "Impedimentos": 26,
     "Tiros de meta": 17,
@@ -53,7 +53,7 @@
    "7k": {
     "Cartões": 201,
     "Finalizações": 106,
-    "Chutes no gol": 234,
+    "Chutes no gol": 233,
     "Faltas": 75,
     "Impedimentos": 75,
     "Tiros de meta": 67,
@@ -61,13 +61,13 @@
     "Desarmes": 63
    },
    "EstrelaBet": {
-    "Cartões": 97,
-    "Finalizações": 132,
-    "Chutes no gol": 125,
-    "Faltas": 36,
-    "Impedimentos": 54,
-    "Laterais": 18,
-    "Desarmes": 18
+    "Cartões": 87,
+    "Finalizações": 129,
+    "Chutes no gol": 123,
+    "Faltas": 24,
+    "Impedimentos": 42,
+    "Laterais": 6,
+    "Desarmes": 6
    },
    "bet365": {
     "Cartões": 27,
@@ -79,7 +79,7 @@
     "Finalizações": 53
    },
    "Pinnacle": {
-    "Cartões": 66
+    "Cartões": 75
    }
   }
  },
@@ -165,21 +165,41 @@
  },
  "sofa": {
   "casa": "sofa",
-  "ok": false,
-  "ts_utc": "2026-09-08T06:43:45Z",
-  "ts_brt": "2026-09-08 03:43",
-  "n_events": 0,
+  "kind": "fixture",
+  "ok": true,
+  "ts_utc": "2026-09-08T07:14:29Z",
+  "ts_brt": "2026-09-08 04:14",
+  "n_events": 997,
+  "n_fixtures": 997,
   "n_markets": 0,
-  "market_counts": {},
+  "min_events": 250,
+  "promoted": true,
   "pointer_valid": true,
-  "duration_sec": 240.0,
-  "error": "TIMEOUT após 240s",
-  "error_class": "Timeout",
-  "mode": "full",
-  "pointer_file": "_snapshots/sofa_4173567c2a1c4b4ecaa6.json",
-  "pointer_at": "2026-09-08T02:42:21-03:00",
+  "pointer_file": "_snapshots/sofa_b5196ad5d6a48cb12b9d.json",
+  "pointer_at": "2026-09-08T04:14:29-03:00",
   "pointer_n": 997,
-  "pointer_age_h": 1.1978996133333335
+  "pointer_age_h": 0.17649832972222224,
+  "duration_sec": 232.2,
+  "error": null,
+  "error_class": null,
+  "transport": {
+   "requests": 147,
+   "proxy_attempts": 147,
+   "direct_attempts": 0,
+   "statuses": {
+    "200": 144,
+    "404": 3
+   },
+   "last_error": null,
+   "consecutive_failures": 0,
+   "circuit_open": false,
+   "failed_tournaments": [],
+   "inactive_tournaments": [
+    "WC",
+    "CDF",
+    "CDR"
+   ]
+  }
  },
  "model": {
   "status": "promoted",
