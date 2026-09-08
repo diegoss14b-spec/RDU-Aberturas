@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-09-08T10:52:38Z",
- "ts_brt": "2026-09-08 07:52",
+ "ts_utc": "2026-09-08T11:18:40Z",
+ "ts_brt": "2026-09-08 08:18",
  "casas_ok": [
   "betano",
   "superbet",
@@ -12,43 +12,43 @@
  "casas_fail": [
   {
    "casa": "pinnacle",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=79 há 48min > n_novo=22; guarda 75min)"
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=76 há 39min > n_novo=22; guarda 75min)"
   }
  ],
  "n_ok": 6,
  "n_fail": 1,
- "total_events": 472,
+ "total_events": 476,
  "per_casa": {
   "betano": {
    "ok": true,
    "n_events": 60,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 14,
-    "Chutes no gol": 13,
-    "Desarmes": 7,
-    "Escanteios": 51,
-    "Faltas": 9,
-    "Finalizações": 13,
-    "Impedimentos": 9,
-    "Laterais": 7,
-    "Tiros de meta": 6
+    "Cartões": 19,
+    "Chutes no gol": 19,
+    "Desarmes": 5,
+    "Escanteios": 46,
+    "Faltas": 7,
+    "Finalizações": 19,
+    "Impedimentos": 7,
+    "Laterais": 5,
+    "Tiros de meta": 4
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-08_0738.jsonl",
+   "pointer_file": "betano_2026-09-08_0808.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 101,
+   "n_events": 106,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 38,
+    "Cartões": 39,
     "Chutes no gol": 32,
     "Desarmes": 13,
-    "Escanteios": 100,
+    "Escanteios": 104,
     "Faltas": 22,
     "Finalizações": 32,
     "Impedimentos": 23,
@@ -56,7 +56,7 @@
     "Tiros de meta": 13
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-08_0746.jsonl",
+   "pointer_file": "superbet_2026-09-08_0808.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
@@ -110,23 +110,23 @@
     "Cartões": 22
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-09-08_0751.jsonl",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=79 há 48min > n_novo=22; guarda 75min)",
+   "pointer_file": "pinnacle_2026-09-08_0816.jsonl",
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=76 há 39min > n_novo=22; guarda 75min)",
    "source_state": "protected_feed",
    "error_class": "Other"
   },
   "bet365": {
    "ok": true,
-   "n_events": 38,
+   "n_events": 37,
    "n_markets": 4,
    "market_counts": {
     "Cartões": 9,
-    "Chutes no gol": 10,
-    "Escanteios": 36,
-    "Finalizações": 10
+    "Chutes no gol": 11,
+    "Escanteios": 35,
+    "Finalizações": 11
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-09-08_0738.jsonl",
+   "pointer_file": "bet365_2026-09-08_0808.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
@@ -141,60 +141,36 @@
     "Finalizações": 18
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-09-08_0739.jsonl",
+   "pointer_file": "sportingbet_2026-09-08_0808.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
   }
  },
  "market_counts": {
-  "Cartões": 178,
-  "Chutes no gol": 141,
-  "Desarmes": 47,
-  "Escanteios": 458,
-  "Faltas": 71,
-  "Finalizações": 152,
-  "Impedimentos": 78,
-  "Laterais": 50,
-  "Tiros de meta": 43
+  "Cartões": 184,
+  "Chutes no gol": 148,
+  "Desarmes": 45,
+  "Escanteios": 456,
+  "Faltas": 69,
+  "Finalizações": 159,
+  "Impedimentos": 76,
+  "Laterais": 48,
+  "Tiros de meta": 41
  },
  "fixtures": {
   "casa": "sofa",
-  "kind": "fixture",
-  "ok": true,
-  "ts_utc": "2026-09-08T10:42:51Z",
-  "ts_brt": "2026-09-08 07:42",
-  "n_events": 1003,
-  "n_fixtures": 1003,
+  "ok": false,
+  "ts_utc": "2026-09-08T11:12:44Z",
+  "ts_brt": "2026-09-08 08:12",
+  "n_events": 0,
   "n_markets": 0,
-  "min_events": 250,
-  "promoted": true,
-  "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_7a81c764053e10a0c29e.json",
-  "pointer_at": "2026-09-08T07:42:51-03:00",
-  "pointer_n": 1003,
-  "pointer_age_h": 0.0,
-  "duration_sec": 205.6,
-  "error": null,
-  "error_class": null,
-  "transport": {
-   "requests": 147,
-   "proxy_attempts": 147,
-   "direct_attempts": 0,
-   "statuses": {
-    "200": 144,
-    "404": 3
-   },
-   "last_error": null,
-   "consecutive_failures": 0,
-   "circuit_open": false,
-   "failed_tournaments": [],
-   "inactive_tournaments": [
-    "WC",
-    "CDF",
-    "CDR"
-   ]
-  }
+  "market_counts": {},
+  "pointer_valid": false,
+  "duration_sec": 240.0,
+  "error": "TIMEOUT após 240s",
+  "error_class": "Timeout",
+  "mode": "full"
  },
  "deploy_allowed": true,
  "reason": "ok",

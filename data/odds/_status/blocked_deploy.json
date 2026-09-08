@@ -1,82 +1,82 @@
 {
- "ts_brt": "2026-09-08 07:57",
+ "ts_brt": "2026-09-08 08:25",
  "reasons": [
   "identidade impura sofa:16938796 — 2 partidas reais sob o mesmo id (paris saint germain x slovan bratislava ×VS× psg x slovan bratislava); board não pode publicar odds misturadas"
  ],
  "now": {
-  "n_games": 85,
-  "sofa_games": 71,
-  "sofa_pct": 83.52941176470588,
-  "value_games": 10,
-  "value_sofa": 10,
+  "n_games": 129,
+  "sofa_games": 120,
+  "sofa_pct": 93.02325581395348,
+  "value_games": 8,
+  "value_sofa": 8,
   "value_sofa_pct": 100.0,
   "houses": {
-   "Superbet": 38,
+   "Betano": 19,
+   "Superbet": 39,
+   "7k": 109,
    "EstrelaBet": 53,
-   "bet365": 12,
+   "bet365": 13,
    "Sportingbet": 44,
-   "7k": 37,
-   "Betano": 14,
    "Pinnacle": 25
   },
   "markets": {
-   "Cartões": 73,
-   "Chutes no gol": 65,
-   "Finalizações": 61,
-   "Faltas": 43,
-   "Impedimentos": 44,
+   "Cartões": 84,
+   "Finalizações": 60,
+   "Chutes no gol": 99,
+   "Faltas": 41,
+   "Impedimentos": 42,
    "Desarmes": 25,
    "Laterais": 27,
    "Tiros de meta": 27
   },
   "house_markets": {
+   "Betano": {
+    "Cartões": 40,
+    "Finalizações": 30,
+    "Chutes no gol": 30,
+    "Faltas": 20,
+    "Impedimentos": 20,
+    "Tiros de meta": 11,
+    "Laterais": 14,
+    "Desarmes": 14
+   },
    "Superbet": {
-    "Cartões": 110,
-    "Chutes no gol": 96,
+    "Cartões": 113,
     "Finalizações": 96,
+    "Chutes no gol": 96,
     "Faltas": 66,
     "Impedimentos": 69,
     "Desarmes": 39,
     "Laterais": 26,
     "Tiros de meta": 37
    },
+   "7k": {
+    "Cartões": 201,
+    "Finalizações": 106,
+    "Chutes no gol": 233,
+    "Faltas": 75,
+    "Impedimentos": 75,
+    "Tiros de meta": 67,
+    "Laterais": 69,
+    "Desarmes": 63
+   },
    "EstrelaBet": {
-    "Cartões": 109,
-    "Finalizações": 132,
-    "Chutes no gol": 125,
-    "Faltas": 39,
-    "Impedimentos": 57,
-    "Laterais": 18,
-    "Desarmes": 18
+    "Cartões": 87,
+    "Finalizações": 129,
+    "Chutes no gol": 123,
+    "Faltas": 24,
+    "Impedimentos": 42,
+    "Laterais": 6,
+    "Desarmes": 6
    },
    "bet365": {
     "Cartões": 27,
-    "Chutes no gol": 27,
-    "Finalizações": 29
+    "Finalizações": 32,
+    "Chutes no gol": 29
    },
    "Sportingbet": {
     "Cartões": 110,
     "Finalizações": 53
-   },
-   "7k": {
-    "Faltas": 81,
-    "Cartões": 90,
-    "Finalizações": 90,
-    "Impedimentos": 81,
-    "Chutes no gol": 111,
-    "Tiros de meta": 68,
-    "Laterais": 70,
-    "Desarmes": 63
-   },
-   "Betano": {
-    "Cartões": 29,
-    "Finalizações": 24,
-    "Chutes no gol": 24,
-    "Faltas": 26,
-    "Impedimentos": 26,
-    "Tiros de meta": 17,
-    "Laterais": 20,
-    "Desarmes": 20
    },
    "Pinnacle": {
     "Cartões": 75
@@ -165,41 +165,21 @@
  },
  "sofa": {
   "casa": "sofa",
-  "kind": "fixture",
-  "ok": true,
-  "ts_utc": "2026-09-08T10:42:51Z",
-  "ts_brt": "2026-09-08 07:42",
-  "n_events": 1003,
-  "n_fixtures": 1003,
+  "ok": false,
+  "ts_utc": "2026-09-08T11:12:44Z",
+  "ts_brt": "2026-09-08 08:12",
+  "n_events": 0,
   "n_markets": 0,
-  "min_events": 250,
-  "promoted": true,
+  "market_counts": {},
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_7a81c764053e10a0c29e.json",
-  "pointer_at": "2026-09-08T07:42:51-03:00",
-  "pointer_n": 1003,
-  "pointer_age_h": 0.24394729333333331,
-  "duration_sec": 205.6,
-  "error": null,
-  "error_class": null,
-  "transport": {
-   "requests": 147,
-   "proxy_attempts": 147,
-   "direct_attempts": 0,
-   "statuses": {
-    "200": 144,
-    "404": 3
-   },
-   "last_error": null,
-   "consecutive_failures": 0,
-   "circuit_open": false,
-   "failed_tournaments": [],
-   "inactive_tournaments": [
-    "WC",
-    "CDF",
-    "CDR"
-   ]
-  }
+  "duration_sec": 240.0,
+  "error": "TIMEOUT após 240s",
+  "error_class": "Timeout",
+  "mode": "full",
+  "pointer_file": "_snapshots/sofa_4173567c2a1c4b4ecaa6.json",
+  "pointer_at": "2026-09-08T02:42:21-03:00",
+  "pointer_n": 997,
+  "pointer_age_h": 5.718581920277778
  },
  "model": {
   "status": "promoted",
