@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-09-08T04:18:49Z",
- "ts_brt": "2026-09-08 01:18",
+ "ts_utc": "2026-09-08T04:40:51Z",
+ "ts_brt": "2026-09-08 01:40",
  "casas_ok": [
   "betano",
   "superbet",
@@ -12,12 +12,12 @@
  "casas_fail": [
   {
    "casa": "pinnacle",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=75 há 39min > n_novo=21; guarda 75min)"
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=75 há 26min > n_novo=22; guarda 75min)"
   }
  ],
  "n_ok": 6,
  "n_fail": 1,
- "total_events": 432,
+ "total_events": 436,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -35,18 +35,18 @@
     "Tiros de meta": 6
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-08_0108.jsonl",
+   "pointer_file": "betano_2026-09-08_0130.jsonl",
    "error": null
   },
   "superbet": {
    "ok": true,
-   "n_events": 88,
+   "n_events": 92,
    "n_markets": 9,
    "market_counts": {
     "Cartões": 27,
     "Chutes no gol": 27,
     "Desarmes": 8,
-    "Escanteios": 88,
+    "Escanteios": 92,
     "Faltas": 18,
     "Finalizações": 28,
     "Impedimentos": 19,
@@ -54,7 +54,7 @@
     "Tiros de meta": 9
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-08_0108.jsonl",
+   "pointer_file": "superbet_2026-09-08_0130.jsonl",
    "error": null
   },
   "estrelabet": {
@@ -72,7 +72,7 @@
     "Laterais": 2
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-09-08_0108.jsonl",
+   "pointer_file": "estrelabet_2026-09-08_0130.jsonl",
    "error": null
   },
   "7k": {
@@ -91,19 +91,19 @@
     "Tiros de meta": 23
    },
    "pointer_valid": true,
-   "pointer_file": "7k_2026-09-08_0108.jsonl",
+   "pointer_file": "7k_2026-09-08_0130.jsonl",
    "error": null
   },
   "pinnacle": {
    "ok": false,
-   "n_events": 21,
+   "n_events": 22,
    "n_markets": 1,
    "market_counts": {
-    "Cartões": 21
+    "Cartões": 22
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-09-08_0117.jsonl",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=75 há 39min > n_novo=21; guarda 75min)"
+   "pointer_file": "pinnacle_2026-09-08_0139.jsonl",
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=75 há 26min > n_novo=22; guarda 75min)"
   },
   "bet365": {
    "ok": true,
@@ -116,7 +116,7 @@
     "Finalizações": 7
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-09-08_0108.jsonl",
+   "pointer_file": "bet365_2026-09-08_0130.jsonl",
    "error": null
   },
   "sportingbet": {
@@ -129,7 +129,7 @@
     "Finalizações": 18
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-09-08_0109.jsonl",
+   "pointer_file": "sportingbet_2026-09-08_0131.jsonl",
    "error": null
   }
  },
@@ -137,7 +137,7 @@
   "Cartões": 189,
   "Chutes no gol": 181,
   "Desarmes": 38,
-  "Escanteios": 411,
+  "Escanteios": 415,
   "Faltas": 60,
   "Finalizações": 158,
   "Impedimentos": 67,
@@ -148,10 +148,10 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-09-08T04:10:47Z",
-  "ts_brt": "2026-09-08 01:10",
-  "n_events": 281,
-  "n_fixtures": 281,
+  "ts_utc": "2026-09-08T04:34:55Z",
+  "ts_brt": "2026-09-08 01:34",
+  "n_events": 845,
+  "n_fixtures": 845,
   "n_markets": 0,
   "min_events": 250,
   "promoted": false,
@@ -159,65 +159,23 @@
   "pointer_file": "_snapshots/sofa_e1e3b415e9d803d0ec59.json",
   "pointer_at": "2026-09-08T00:13:28-03:00",
   "pointer_n": 997,
-  "pointer_age_h": 0.955,
-  "duration_sec": 71.6,
-  "error": "snapshot não saudável: n=281, mínimo=250; fallback preservado n=997; transporte req=40 proxy=40 direto=0 http=200:38,403:1,404:1 ultimo=HTTP 403 via proxy circuito=1 falhas=Libertadores,Sudamericana,LigaMX,BOL,CHI,PER,COL,COL2,ARG2,CZE,ROU,DEN,SUI,CDA,MEXE,EFLC,ECL,NED,GER2,SCO,ENG2,BEL,POR,ITA2,JPN",
+  "pointer_age_h": 1.358,
+  "duration_sec": 199.9,
+  "error": "snapshot não saudável: n=845, mínimo=250; fallback preservado n=997; transporte req=126 proxy=126 direto=0 http=200:122,403:1,404:3 ultimo=HTTP 403 via proxy circuito=1 falhas=DFB,FAC,BR-C,POL2,ROU2,RSA,KOR,NED2,HUN,FIN,CYP inativos=WC,CDF,CDR",
   "error_class": "Geo",
   "transport": {
-   "requests": 40,
-   "proxy_attempts": 40,
+   "requests": 126,
+   "proxy_attempts": 126,
    "direct_attempts": 0,
    "statuses": {
-    "200": 38,
-    "404": 1,
+    "200": 122,
+    "404": 3,
     "403": 1
    },
    "last_error": "HTTP 403 via proxy",
    "consecutive_failures": 0,
    "circuit_open": true,
    "failed_tournaments": [
-    "Libertadores",
-    "Sudamericana",
-    "LigaMX",
-    "BOL",
-    "CHI",
-    "PER",
-    "COL",
-    "COL2",
-    "ARG2",
-    "CZE",
-    "ROU",
-    "DEN",
-    "SUI",
-    "CDA",
-    "MEXE",
-    "EFLC",
-    "ECL",
-    "NED",
-    "GER2",
-    "SCO",
-    "ENG2",
-    "BEL",
-    "POR",
-    "ITA2",
-    "JPN",
-    "AUT",
-    "POL",
-    "TUR",
-    "GRE",
-    "SAU",
-    "UKR",
-    "CRO",
-    "SRB",
-    "BUL",
-    "VEN",
-    "PAR",
-    "AUS",
-    "ESP2",
-    "FRA2",
-    "CDF",
-    "CDI",
-    "CDR",
     "DFB",
     "FAC",
     "BR-C",
@@ -231,7 +189,9 @@
     "CYP"
    ],
    "inactive_tournaments": [
-    "WC"
+    "WC",
+    "CDF",
+    "CDR"
    ]
   }
  },
