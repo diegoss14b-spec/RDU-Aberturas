@@ -497,20 +497,23 @@ def _kickoff_delta_min(start_dt, fixture) -> float:
         return 9999.0
 
 
-def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures):
+def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures, *, expected_sofa_id=None):
     """Country omitted by a provider: require an exact, unique Sofa context.
 
     Narrow observed case: Sportingbet 'Ligue 1', Angers x Rennes. A bare league
     label never enables global aliases. France's fixture must have league_id=34,
     the same day/kickoff, exact corrected opponents, an unchanged anchor team,
     matching category flags and no second candidate. No fuzzy threshold changes.
+    When checking an existing identity, expected_sofa_id also binds the proof to
+    that exact event; a valid alias for a different fixture cannot purify it.
     """
     # M6 08/09: reviewed UEFA translations, anchored by BOTH team identities.
     # Never make Internazionale/PSG/AEK a loose worldwide alias.
     # Betano labels UEFA as Portuguese "Liga dos Campeões". Keep that spelling
     # local to the exact-ID fixture guard; do not globally classify every
     # continental Champions League as UEFA.
-    if (league_fp(league) == "ucl" or n(league or "").strip() == "liga dos campeoes") and hn and an and start_dt is not None:
+    league_key = " ".join(re.sub(r"[^a-z0-9 ]", " ", n(league or "")).split())
+    if league_key in {"champions league", "uefa champions league", "liga dos campeoes"} and hn and an and start_dt is not None:
         reviewed = {
             "aek atenas": (3250, "aek athens"), "aek athens": (3250, "aek athens"),
             "linzer ask": (2058, "lask"), "lask": (2058, "lask"),
@@ -533,7 +536,9 @@ def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures):
                 reverse = (rh[0], ra[0]) == (f.get("away_id"), f.get("home_id")) and (rh[1], ra[1]) == (fa, fh)
                 if direct or reverse:
                     hits.append(f.get("sofa_id"))
-            if len(set(hits)) == 1:
+            if len(set(hits)) == 1 and hits[0] is not None and (
+                expected_sofa_id is None or str(hits[0]) == str(expected_sofa_id)
+            ):
                 return rh[1], ra[1], "UEFA Champions League"
     if n(league).strip() != "ligue 1" or not hn or not an or start_dt is None:
         return hn, an, league
@@ -553,7 +558,9 @@ def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures):
         reverse = (nh, na) == (fa, fh) and (hn == fa or an == fh)
         if direct or reverse:
             matches.append(f.get("sofa_id"))
-    if len(set(matches)) == 1:
+    if len(set(matches)) == 1 and matches[0] is not None and (
+        expected_sofa_id is None or str(matches[0]) == str(expected_sofa_id)
+    ):
         return nh, na, "France - Ligue 1"
     return hn, an, league
 
@@ -991,14 +998,22 @@ def same_game_pairs(p, q):
            (_side_compat(p[0], q[1]) and _side_compat(p[1], q[0]))
 
 
-def sofa_purity(keys, only_ids=None):
+def sofa_purity(keys, only_ids=None, *, fixtures=None):
     """keys = dict do banco (chave → registro). → {sofa_id: relatório}.
 
     Agrupa os pares crus (home_raw, away_raw normalizados) de cada sofa_id em
     clusters de "mesmo jogo" (compatibilidade lado-a-lado, ligação simples).
     n_clusters > 1 ⇒ identidade IMPURA (duas partidas reais sob o mesmo id).
+
+    Reviewed aliases are revalidated against the current fixture snapshot,
+    including the record's own league, kickoff and exact sofa_id. Stored
+    home_norm/away_norm or alias_context are NOT proof: a wrong prior match must
+    remain detectable. Missing/ambiguous fixture evidence keeps the raw pair.
     """
+    if fixtures is None:
+        fixtures = load_sofa_fixtures()
     by_sid = {}
+    alias_cache = {}
     for k, v in (keys or {}).items():
         if str(k).startswith("__") or not isinstance(v, dict):
             continue
@@ -1012,6 +1027,16 @@ def sofa_purity(keys, only_ids=None):
         ar = norm_team(v.get("away_raw") or v.get("away_norm") or "")
         if not hr or not ar:
             continue
+        league = v.get("league_raw") or ""
+        kickoff = v.get("kickoff")
+        context = (str(sid), hr, ar, league, str(kickoff))
+        if context not in alias_cache:
+            dt = parse_start(kickoff)
+            day = dt.strftime("%Y-%m-%d") if dt is not None else "?"
+            alias_cache[context] = fixture_scoped_alias_pair(
+                hr, ar, league, day, dt, fixtures, expected_sofa_id=sid,
+            )[:2]
+        hr, ar = alias_cache[context]
         by_sid.setdefault(str(sid), {}).setdefault((hr, ar), 0)
         by_sid[str(sid)][(hr, ar)] += 1
     out = {}

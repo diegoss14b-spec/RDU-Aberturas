@@ -191,11 +191,12 @@ def main():
             print(f"[history] pulei {f}: {type(e).__name__}")
 
     # Inventory BEFORE view deduplication, across both hot and archived keys.
-    # An unsupported remap remains a failed preservation proof, never an assumed
-    # equivalence. This does not alter any source record.
+    # Only closed, source-bound remaps may supplement literal identity coverage;
+    # pass actual records for value and unique-lineage checks before view dedup.
+    # This does not alter records or add aliases to the real inventory counts.
     try:
         history_preservation = preservation_proof(
-            keys, (k for k, v in keys.items() if v.get("status") == "settled"))
+            keys, (k for k, v in keys.items() if v.get("status") == "settled"), records=keys)
     except (OSError, ValueError, KeyError, TypeError) as exc:
         history_preservation = {"error": type(exc).__name__ + ": " + str(exc)}
 

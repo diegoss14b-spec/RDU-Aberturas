@@ -49,8 +49,12 @@ def load_baseline(directory=None):
     return meta, raw_ids, settled_ids
 
 
-def preservation_proof(raw_ids, settled_ids, directory=None):
-    """Pure set comparison; no mutation, remapping or deletion of historical keys."""
+def preservation_proof(raw_ids, settled_ids, directory=None, *, records=None):
+    """Literal inventory, optionally supplemented by closed, value-checked renames.
+
+    Counts always describe actual records, never aliases added to the inventory.
+    The original schema-1 set-only interface remains literal and unchanged.
+    """
     meta, baseline_ids, baseline_settled = load_baseline(directory)
     raw_ids, settled_ids = set(raw_ids), set(settled_ids)
     body = {"schema": 1, "policy_id": POLICY["id"],
@@ -66,6 +70,22 @@ def preservation_proof(raw_ids, settled_ids, directory=None):
             "missing_settled_count": len(baseline_settled - settled_ids),
             "missing_raw_examples": sorted(baseline_ids - raw_ids)[:5],
             "missing_settled_examples": sorted(baseline_settled - settled_ids)[:5]}
+    if records is not None:
+        if (set(records) != raw_ids or not settled_ids <= raw_ids
+                or {key for key, value in records.items() if value.get("status") == "settled"} != settled_ids):
+            raise ValueError("raw/settled records do not match preservation inventory")
+        missing = baseline_ids - raw_ids
+        if missing:
+            from history_policy_remap import load_evidence, remap_witnesses
+            evidence_hash, entries = load_evidence(meta, baseline_ids, baseline_settled, directory or BASELINE_DIR)
+            witnesses = remap_witnesses(records, missing, entries)
+            remapped = {item["old_key"] for item in witnesses}
+            body.update(schema=2, literal_missing_raw_count=len(missing),
+                        literal_missing_raw_ids=sorted(missing),
+                        remapped_raw_count=len(remapped), remapped_settled_count=0,
+                        remap_evidence_sha256=evidence_hash, remap_witnesses=witnesses,
+                        missing_raw_count=len(missing - remapped),
+                        missing_raw_examples=sorted(missing - remapped)[:5])
     return {**body, "report_sha256": digest(body)}
 
 
@@ -83,17 +103,42 @@ def contract(history, history_sha256):
 
 def validate_preservation(proof, directory=None):
     """Every v1 build must retain the frozen legacy universe, not just its size."""
-    meta, _ids, _settled = load_baseline(directory)
+    meta, baseline_ids, baseline_settled = load_baseline(directory)
     proof = proof or {}
     body = {k: v for k, v in proof.items() if k != "report_sha256"}
     if proof.get("report_sha256") != digest(body) or proof.get("baseline_sha256") != digest(meta):
         raise ValueError("preservation report missing/altered or wrong baseline")
-    expected = {"schema": 1, "policy_id": POLICY["id"], "source_commit": meta["source_commit"],
+    if type(proof.get("schema")) is not int or proof["schema"] not in (1, 2):
+        raise ValueError("preservation report source/schema mismatch")
+    expected = {"policy_id": POLICY["id"], "source_commit": meta["source_commit"],
                 "source_manifest_sha256": meta["source_manifest_sha256"],
                 "source_history_sha256": meta["source_history_sha256"],
                 "baseline_raw_count": meta["raw_count"], "baseline_settled_count": meta["settled_count"]}
     if any(proof.get(k) != v for k, v in expected.items()):
         raise ValueError("preservation report source/schema mismatch")
+    if proof["schema"] == 2:
+        from history_policy_remap import load_evidence, validate_witnesses
+        evidence_hash, entries = load_evidence(meta, baseline_ids, baseline_settled, directory or BASELINE_DIR)
+        if proof.get("remap_evidence_sha256") != evidence_hash:
+            raise ValueError("preservation remap evidence hash mismatch")
+        literal = proof.get("literal_missing_raw_ids")
+        if (not isinstance(literal, list) or any(not isinstance(x, str) for x in literal)
+                or literal != sorted(set(literal)) or not set(literal) <= baseline_ids
+                or type(proof.get("literal_missing_raw_count")) is not int
+                or proof["literal_missing_raw_count"] != len(literal)):
+            raise ValueError("preservation literal missing inventory mismatch")
+        witnesses = proof.get("remap_witnesses")
+        if not isinstance(witnesses, list):
+            raise ValueError("preservation remap witnesses missing")
+        remapped = validate_witnesses(witnesses, entries)
+        if (not remapped <= set(literal) or remapped & baseline_settled
+                or {w["target_key"] for w in witnesses} & set(literal)
+                or type(proof.get("remapped_raw_count")) is not int
+                or proof["remapped_raw_count"] != len(remapped)
+                or type(proof.get("remapped_settled_count")) is not int
+                or proof["remapped_settled_count"] != 0
+                or proof.get("missing_raw_count") != len(set(literal) - remapped)):
+            raise ValueError("preservation remap coverage/count mismatch")
     for key in ("missing_raw_count", "missing_settled_count"):
         if type(proof.get(key)) is not int or proof[key] != 0:
             raise ValueError("historical identities lost: " + key)
