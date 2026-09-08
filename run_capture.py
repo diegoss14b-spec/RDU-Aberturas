@@ -28,7 +28,11 @@ FETCHERS = [
     # ("betfast",  "fetch_odds_betfast.py",   10 * 60),
     ("sportingbet","fetch_odds_sportingbet.py", 8 * 60),
 ]
-FIXTURE_FETCH = ("sofa", "fetch_fixtures_sofascore.py", 4 * 60)
+# 08/09: 72 torneios sequenciais; captura saudável de 12:13 levou 237,3s
+# (150 requests, 1103 fixtures). O teto de 240s deixou só 2,7s de folga e
+# matou a rodada seguinte. 480s permite variação de latência sem alterar
+# promoção atômica, rejeição de fonte parcial ou gate de frescor de 12h.
+FIXTURE_FETCH = ("sofa", "fetch_fixtures_sofascore.py", 8 * 60)
 
 
 def _now_fields():

@@ -1,4 +1,5 @@
 import json
+import subprocess
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -7,7 +8,44 @@ from unittest.mock import patch
 
 import fetch_fixtures_sofascore as ff
 import gate_board as gb
+import run_capture as rc
 from build_ops import parse_ts_brt
+
+
+class FixtureCaptureDeadlineTest(unittest.TestCase):
+    def test_sofa_has_bounded_eight_minute_deadline(self):
+        casa, script, deadline = rc.FIXTURE_FETCH
+        self.assertEqual(("sofa", "fetch_fixtures_sofascore.py"), (casa, script))
+        self.assertIs(type(deadline), int)
+        self.assertEqual(480, deadline)
+        self.assertGreater(deadline, 0)
+
+    def test_house_deadlines_are_unchanged(self):
+        self.assertEqual({
+            "betano": 780, "superbet": 900, "estrelabet": 600, "7k": 720,
+            "pinnacle": 300, "bet365": 480, "sportingbet": 480,
+        }, {casa: deadline for casa, _, deadline in rc.FETCHERS})
+
+    def test_sofa_deadline_still_fails_closed_and_preserves_fallback(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            status = root / "data" / "odds" / "_status"
+            pointer = root / "data" / "fixtures" / "sofa_latest.json"
+            pointer.parent.mkdir(parents=True)
+            previous = '{"file":"previous.json","n":997}'
+            pointer.write_text(previous, encoding="utf-8")
+            with patch.multiple(rc, ROOT=root, STATUS=status):
+                with patch.object(rc.subprocess, "run", side_effect=subprocess.TimeoutExpired(
+                        "sofa", rc.FIXTURE_FETCH[2])) as child:
+                    result = rc.run_one(*rc.FIXTURE_FETCH)
+            self.assertEqual(480, child.call_args.kwargs["timeout"])
+            self.assertEqual(124, result)
+            state = json.loads((status / "sofa.json").read_text(encoding="utf-8"))
+            self.assertFalse(state["ok"])
+            self.assertFalse(state["pointer_valid"])
+            self.assertEqual("Timeout", state["error_class"])
+            self.assertEqual("TIMEOUT após 480s", state["error"])
+            self.assertEqual(previous, pointer.read_text(encoding="utf-8"))
 
 
 class FakeResponse:
