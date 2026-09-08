@@ -42,6 +42,8 @@ from canonical import parse_history_key
 from history_merge import merge_records
 from migrate_history_keys import unify_keys_dict
 from history_quality import ensure_aware, is_pre_kickoff, parse_ts, valid_decimal_odd
+from observation_clock import close_age_band
+from cards_settlement import semantics_verified
 
 HIST = ROOT / "data" / "odds_history"
 OUT_JSONL = ROOT / "data" / "odds" / "openclose" / "openclose.jsonl"
@@ -313,6 +315,10 @@ def main():
 def build_row(gid, mercado, g):
     ko = g["kickoff"]
     kts = ensure_aware(parse_ts(ko))
+    evidence = [r for lines in g["casas"].values() for sides in lines.values() for r in sides.values()]
+    clock_verified = bool(evidence) and all(r.get("open_time_verified") is True and r.get("close_time_verified") is True for r in evidence)
+    close_recent = clock_verified and all(close_age_band(r) in ("within_15m", "within_30m", "within_60m") for r in evidence)
+    result_verified = mercado != "Cartões" or all(semantics_verified(r) for r in evidence)
 
     def pair_minute(rec_o, rec_u, field):
         """Minuto em que o par ficou completo (max dos 2 lados), como no gráfico."""
@@ -408,7 +414,7 @@ def build_row(gid, mercado, g):
     except (TypeError, ValueError):
         result_num = None
     lado = None
-    if result_num is not None:
+    if result_num is not None and result_verified:
         if result_num > linha_main:
             lado = "over"
         elif result_num < linha_main:
@@ -425,6 +431,9 @@ def build_row(gid, mercado, g):
         "mercado": mercado,
         "linha": linha_main,
         "resultado": result_num,
+        "settlement_verified": result_verified,
+        "observation_time_verified": clock_verified,
+        "close_within_60m": close_recent,
         "lado": lado,
         "mu_open": r2(c_open),
         "mu_close": r2(c_close),

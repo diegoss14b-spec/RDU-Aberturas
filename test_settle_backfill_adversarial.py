@@ -171,7 +171,7 @@ def test_um_mercado_divergente_derruba_o_jogo_inteiro():
 
 def test_ja_com_identidade_nao_reprocessa():
     """Key com sofa_id forte (ou sofa_id_settle anterior) fica fora do grupo."""
-    feed = [row("2026-07-25", "Time Alpha", "Time Beta", sofa_id=100, cards=4.0)]
+    feed = [row("2026-07-25", "Time Alpha", "Time Beta", sofa_id=100, cards=4.0, red_cards=0)]
     k1, r1 = settled_key("Cartões", "3.5", 4.0, sofa_id="999")
     k2, r2 = settled_key("Escanteios", "8.5", 9.0, sofa_id_settle=888)
     n = backfill_sofa_from_feed({k1: r1, k2: r2}, feed)
@@ -183,7 +183,7 @@ def test_circularidade_mesmo_feed_e_aceite_automatico():
     """DOCUMENTA o limite: settle e backfill com o MESMO feed → o result veio
     da própria row, corroboração passa por construção. A identidade aqui está
     apoiada nos guards do find_result — por isso settle_match_method existe."""
-    feed = [row("2026-07-25", "Time Alpha", "Time Beta", sofa_id=100, cards=4.0)]
+    feed = [row("2026-07-25", "Time Alpha", "Time Beta", sofa_id=100, cards=4.0, red_cards=0)]
     key, rec = settled_key("Cartões", "3.5", None)
     rec.update({"status": "closed", "result": None, "won": None,
                 "open_odd": 1.9, "close_odd": 1.85})

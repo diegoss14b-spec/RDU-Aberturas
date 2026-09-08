@@ -97,16 +97,20 @@ def main():
         MIN_EFF = (min(MIN_EVENTS, 1) if events else 0)   # janela curta: 1+ ok; lista vazia não é falha
         log(f"[betano] modo close: janela {_wh:g}h -> {len(events)} de {_tot} eventos")
     now = datetime.now(BRT)
+    from capture_discovery import DiscoveryQueue
+    queue = DiscoveryQueue(OUT / "_status" / "betano_discovery.json", now)
+    selected = queue.select(events, MAX_EVENTS)
     stamp = now.strftime("%Y-%m-%d_%H%M")
     fp = OUT / f"betano_{stamp}.jsonl"
     n_ok = 0
     with fp.open("w", encoding="utf-8") as f:
-        for ev in events[:MAX_EVENTS]:
+        for ev in selected:
             if not ev.get("url"): continue
             rec = {"captured_at": datetime.now(BRT).isoformat(timespec="seconds"),
                    "event_id": ev["id"], "name": ev["name"], "league": ev["league"],
                    "region": ev["region"], "start": ev["start"], "markets": {}}
             base_ev = get(f"{BASE}/api{ev['url']}")
+            succeeded = bool(base_ev)
             if base_ev:
                 mks = ((base_ev.get("data") or {}).get("event") or {}).get("markets") or []
                 x = extract_1x2(mks)
@@ -118,11 +122,21 @@ def main():
                     continue   # mercado desligado (MERCADOS_OFF) — economiza 1 request/evento
                 d = get(f"{BASE}/api{ev['url']}?bt={bt}")
                 if d:
+                    succeeded = True
                     mks = ((d.get("data") or {}).get("event") or {}).get("markets") or []
                     rec["markets"][label] = extract_ou(mks)
                 time.sleep(0.45)
+            from bookmaker_contracts import betano_market, event_participants
+            recognized = {mapped[0] for tab in rec["markets"].values() if isinstance(tab, list)
+                          for market in tab
+                          if (mapped := betano_market(market.get("market"), event_participants(rec.get("name")), rec.get("league") or ""))}
+            queue.record(ev["id"], success=succeeded, useful=bool(recognized), markets=recognized)
+            if not succeeded:
+                continue
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
             n_ok += 1
+    queue.save()
+    log(f"descoberta: {json.dumps(queue.metrics, ensure_ascii=False)}")
     from capture_common import write_odds_latest
     write_odds_latest("betano", fp.name, n_ok, at=now.isoformat(timespec="seconds"), min_events=MIN_EFF)  # full pointer só se n>0 e não-close
     log(f"✅ {n_ok} eventos capturados → {fp.name}")

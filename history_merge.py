@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+from history_quality import ensure_aware, parse_ts
 
 
 _STATUS_RANK = {
@@ -17,6 +18,7 @@ _STATUS_RANK = {
     "unavailable": 1,       # legado: deve voltar para retry no settlement
     "closed": 2,
     "pending_result": 3,
+    "pending_semantics": 3,
     "settled": 4,
 }
 
@@ -51,6 +53,9 @@ def _pick_by_ts(a, b, ts_field, *, latest):
         return b if tb else a
     if not tb:
         return a
+    da, db = ensure_aware(parse_ts(ta)), ensure_aware(parse_ts(tb))
+    if da is not None and db is not None:
+        ta, tb = da, db
     if latest:
         return b if tb > ta else a
     return b if tb < ta else a
@@ -78,16 +83,21 @@ def merge_records(a, b):
     for field in ("open_odd", "open_ts", "open_is_first_seen"):
         if field in opened:
             out[field] = opened[field]
+    _copy_evidence(out, opened, ("open_observed_at", "open_time_verified", "timestamp_provenance"))
 
     last = _pick_by_ts(a, b, "last_ts", latest=True)
     for field in ("last_odd", "last_ts"):
         if field in last:
             out[field] = last[field]
+    _copy_evidence(out, last, ("last_observed_at", "last_time_verified", "last_snapshot_row_sha256"))
+    seen = _pick_by_ts(a, b, "last_seen_observed_at", latest=True)
+    _copy_evidence(out, seen, ("last_seen_observed_at", "last_ingested_at"))
 
     closed = _pick_by_ts(a, b, "close_ts", latest=True)
     for field in ("close_odd", "close_ts"):
         if _present(closed.get(field)):
             out[field] = closed[field]
+    _copy_evidence(out, closed, ("close_observed_at", "close_time_verified", "close_snapshot_row_sha256"))
 
     max_values = [v for v in (a.get("max_odd"), b.get("max_odd")) if v is not None]
     min_values = [v for v in (a.get("min_odd"), b.get("min_odd")) if v is not None]
@@ -113,15 +123,21 @@ def merge_records(a, b):
     if settled:
         winner = settled[0]
         if len(settled) == 2:
-            winner = _pick_by_ts(settled[0], settled[1], "last_ts", latest=True)
+            stamp = "settled_at" if any(r.get("settled_at") for r in settled) else "last_ts"
+            winner = _pick_by_ts(settled[0], settled[1], stamp, latest=True)
         for field in (
             "result", "won", "clv_pct", "beat_close", "settled_at",
             "settlement_reason", "settlement_source",
             # B2 (31/07): os dois números de cartões viajam com a liquidação
             "result_yellows", "result_reds",
+            "result_r1", "result_r2", "result_bounds", "settlement_rule",
+            "settlement_revision", "supersedes_settlement_revision",
+            "settlement_retryable", "m_emitted",
         ):
             if field in winner:
                 out[field] = winner[field]
+            else:
+                out.pop(field, None)
         out["status"] = "settled"
 
     sofa = b if b.get("sofa_id") else a if a.get("sofa_id") else None
@@ -147,8 +163,13 @@ def merge_records(a, b):
 def merge_latest_state(a, b):
     """Merge pequeno para ``__main_lines__``: mantém o estado mais recente."""
     a, b = dict(a or {}), dict(b or {})
-    ta, tb = str(a.get("ts") or ""), str(b.get("ts") or "")
-    winner, other = (b, a) if tb > ta else (a, b)
-    out = dict(other)
-    out.update(winner)
-    return out
+    return dict(_pick_by_ts(a, b, "ts", latest=True))  # never borrow clock provenance
+
+
+def _copy_evidence(out, source, fields):
+    """Metadata belongs to its selected price, not to the merged game."""
+    for field in fields:
+        if field in source:
+            out[field] = source[field]
+        else:
+            out.pop(field, None)

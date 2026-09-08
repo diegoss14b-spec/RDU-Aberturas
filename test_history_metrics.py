@@ -22,6 +22,8 @@ def settled(**changes):
         "result": 10,
     }
     row.update(changes)
+    row.update(open_time_verified=True, close_time_verified=True,
+               open_observed_at=row["open_ts"], close_observed_at=row["close_ts"])
     return row
 
 

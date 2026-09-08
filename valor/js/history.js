@@ -96,6 +96,8 @@
       var L = String(r.linha);
       var ln = m.linhas[L] || (m.linhas[L] = { linha: +r.linha, lados: {}, result: null });
       if (r.result != null) ln.result = r.result;
+      if (r.settlement_verified === false) ln.resultUnverified = true;
+      if (r.result_bounds) ln.resultBounds = r.result_bounds;
       var lado = r.lado;
       var slot = ln.lados[lado] || (ln.lados[lado] = { rows: [], gk: r.gk });
       slot.rows.push(r);
@@ -443,6 +445,7 @@
       (b.liquidadas || 0) + "</b> linhas liquidadas · <b>" + (b.clv_validas || 0) +
       "</b> linhas CLV estritas · <b>" + (b.sinais_clv || nv) + "</b> sinais independentes · " +
       br(b.moveu_pct, 1) + "% moveram" +
+      '<div class="cap-note">CLV estrito exige horários comprovados de captura e fechamento observado nos últimos 60 minutos antes do jogo. Histórico antigo sem essa prova é preservado, mas não entra nessas métricas.</div>' +
       (formacao
         ? '<div class="cap-note"><b>CLV em formação</b> — precisa ≥' + (head.limiar_clv || LIM.head) +
           " sinais jogo+mercado com open e close pré-KO (agora " + nv + "). Não use taxa/ROI agregado ainda.</div>"
@@ -744,7 +747,11 @@
     panel.className = "ex-panel";
     var hit = lineHit(state.linha, ln.result);
     var resultHtml = "";
-    if (ln.result != null) {
+    if (ln.resultUnverified) {
+      resultHtml = '<div class="ex-result wait"><div class="ex-res-k">Registro legado</div><div class="ex-res-v">contagem de cartões a revalidar</div></div>';
+    } else if (ln.resultBounds && ln.result == null) {
+      resultHtml = '<div class="ex-result wait"><div class="ex-res-k">Desfecho da aposta conhecido; total exato pendente</div><div class="ex-res-v">entre ' + br(ln.resultBounds[0],0) + ' e ' + br(ln.resultBounds[1],0) + '</div></div>';
+    } else if (ln.result != null) {
       resultHtml =
         '<div class="ex-result ' + (hit === "Mais" ? "over" : (hit === "Menos" ? "under" : "push")) + '">' +
         '<div class="ex-res-k">Resultado no jogo</div>' +
@@ -863,6 +870,8 @@
       }
       g.lados[LADO_EN[r.lado] || "over"] = r;
       if (r.result != null) g.result = r.result;
+      if (r.settlement_verified === false) g.resultUnverified = true;
+      if (r.result_bounds) g.resultBounds = r.result_bounds;
       if (r.push) g.push = true;
       if ((r.n_moves || 0) > g.n_moves) g.n_moves = r.n_moves || 0;
     });
@@ -986,6 +995,8 @@
       var hitCls = hit === "Mais" ? "o" : (hit === "Menos" ? "u" : "");
       var resTxt = g.result == null ? "—"
         : br(g.result, 0) + " · " + (hit === "Push" ? "push" : hit);
+      if (g.resultUnverified) { resTxt = "legado · a revalidar"; hitCls = "pm"; }
+      else if (g.resultBounds && g.result == null) { resTxt = br(g.resultBounds[0],0) + "–" + br(g.resultBounds[1],0) + " · total pendente"; hitCls = "pm"; }
       t += '<tr class="' + (g.isMain ? "" : "sm") + '"' + rowAttrs(g) + ">" +
         '<td class="jg">' + esc(g.jogo) + "</td>" +
         "<td>" + (ABBR[g.mercado] || esc(g.mercado)) + "</td>" +
@@ -1129,9 +1140,12 @@
       var d = src.delta != null ? src.delta : ocDelta(mo, mc);
       var resTxt = r.resultado == null ? "—"
         : br(r.resultado, 0) + ' <span class="pm">' + esc(UNIDADE[r.mercado] || r.mercado.toLowerCase()) + "</span>";
+      if (r.settlement_verified === false) resTxt = "legado · a revalidar";
+      var clockNote = r.observation_time_verified !== true ? "horários não verificados"
+        : (r.close_within_60m !== true ? "última captura >60min antes" : "captura verificada ≤60min");
       t += '<tr class="oc-row" data-oc="' + i + '" title="Toque pra abrir por casa">' +
         "<td>" + esc(fmtBrt(r.kickoff_epoch || r.kickoff || r.data, false)) + "</td>" +
-        '<td class="jg">' + esc(r.jogo) + "</td>" +
+        '<td class="jg">' + esc(r.jogo) + '<div class="pm">' + clockNote + "</div></td>" +
         '<td title="' + esc(r.mercado) + '">' + (ABBR[r.mercado] || esc(r.mercado)) + "</td>" +
         '<td class="ln">' + br(r.linha, 1) + "</td>" +
         '<td class="ln">' + (mo == null ? '<span class="pm">—</span>' : br(mo, 2)) + "</td>" +

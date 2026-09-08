@@ -24,6 +24,8 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 from canonical import parse_history_key
 from history_merge import merge_records
+from observation_clock import close_age_band
+from cards_settlement import semantics_verified
 from migrate_history_keys import unify_keys_dict
 from history_quality import (
     compute_capture_quality, ensure_aware, is_strict_clv, parse_ts, strict_clv_reason,
@@ -365,6 +367,11 @@ def main():
             "close_epoch": int(cts.timestamp()) if cts else None,
             "clv_valido": clv_valido, "clv_invalid_reason": clv_invalid_reason,
             "quality": q_out,
+            "close_age_band": close_age_band(v),
+            "timestamp_provenance": v.get("timestamp_provenance") or "legacy_unknown",
+            "settlement_rule": v.get("settlement_rule"),
+            "settlement_verified": mercado != "Cartões" or semantics_verified(v),
+            "result_bounds": v.get("result_bounds"),
             "sofa_id": v.get("sofa_id"), "match_method": v.get("match_method"),
         })
     liquidadas.sort(key=lambda x: x.get("kickoff_epoch") or 0, reverse=True)
@@ -421,6 +428,9 @@ def main():
         "gerado": now_brt.strftime("%Y-%m-%d %H:%M"),
         "gerado_iso": now_brt.isoformat(timespec="seconds"),
         "limiares": LIMIARES,
+        "clv_policy": {"schema": 2, "max_close_age_minutes": 60,
+                       "requires_verified_observed_at": True,
+                       "legacy_history_preserved": True},
         "banco": banco,
         "head": head,
         "recortes": recortes,

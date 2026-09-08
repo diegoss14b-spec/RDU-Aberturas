@@ -62,6 +62,7 @@ CLOSE_EPS = timedelta(seconds=45)       # close deve ser antes de kickoff − ε
 LATE_OPEN = timedelta(hours=3)          # open < 3h do KO = late
 PREMATCH_MIN = timedelta(minutes=2)     # só fecha key se agora ≥ KO − 2min
 ACCEPTED_CLV_QUALITY = frozenset(("full_prematch", "late_open"))
+MAX_CLOSE_AGE = timedelta(minutes=60)
 
 
 def parse_ts(s):
@@ -125,6 +126,10 @@ def strict_clv_reason(k: dict) -> str | None:
     """
     if k.get("status") != "settled":
         return "not_settled"
+    if k.get("open_time_verified") is not True or k.get("close_time_verified") is not True:
+        return "observation_time_unknown"
+    if k.get("settlement_rule") == "r1_fallback":
+        return "legacy_card_semantics_unknown"
     if not valid_decimal_odd(k.get("open_odd")):
         return "invalid_open"
     if not valid_decimal_odd(k.get("close_odd")):
@@ -143,6 +148,10 @@ def strict_clv_reason(k: dict) -> str | None:
         return "open_not_prematch"
     if cts >= ko - CLOSE_EPS:
         return "close_not_prematch"
+    if ko - cts > MAX_CLOSE_AGE:
+        return "close_older_than_60m"
+    if ensure_aware(parse_ts(k.get("open_observed_at"))) != ots or ensure_aware(parse_ts(k.get("close_observed_at"))) != cts:
+        return "observation_timestamp_mismatch"
 
     raw = k.get("capture_quality") or compute_capture_quality(k)
     band = raw.get("band") if isinstance(raw, dict) else raw

@@ -48,15 +48,20 @@ def main():
             last_ts = k.get("last_ts")
             last_odd = k.get("last_odd")
             ko = k.get("kickoff")
-            if last_odd and is_pre_kickoff(last_ts, ko):
+            observed = k.get("last_observed_at")
+            if last_odd and observed and k.get("last_time_verified") is True and is_pre_kickoff(observed, ko):
                 k["close_odd"] = last_odd
-                k["close_ts"] = last_ts
+                k["close_ts"] = observed
+                k["close_observed_at"] = observed
+                k["close_time_verified"] = True
+                k["close_snapshot_row_sha256"] = k.get("last_snapshot_row_sha256")
                 k["status"] = "closed"
                 n_closed += 1
             else:
                 # não usa odd pós-kickoff como close
                 k["close_odd"] = None
                 k["close_ts"] = None
+                k["close_time_verified"] = False
                 k["status"] = "closed"
                 n_no_close += 1
             k["capture_quality"] = compute_capture_quality(k, now)

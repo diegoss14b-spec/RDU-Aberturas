@@ -230,7 +230,9 @@ def test_cards_settle_carries_both_numbers():
     now = datetime(2026, 7, 18, 12, 0, tzinfo=BRT)
     row = result_row(cards=5, yellow_cards=4, red_cards=1)
     outcome, _, clv = settle_one(key, item, [row], now)
-    assert outcome == "settled" and item["result"] == 5 and item["won"] is True
+    assert outcome == "settled" and item["result"] is None and item["won"] is True
+    assert item["result_bounds"] == [5, 6]
+    assert item["settlement_rule"] == "red2_outcome_invariant"
     assert item["result_yellows"] == 4 and item["result_reds"] == 1
     assert clv["result_yellows"] == 4 and clv["result_reds"] == 1
 
@@ -241,9 +243,10 @@ def test_cards_settle_null_safe_when_feed_lacks_split():
     item = record()
     now = datetime(2026, 7, 18, 12, 0, tzinfo=BRT)
     outcome, _, clv = settle_one(key, item, [result_row(cards=5)], now)
-    assert outcome == "settled" and item["result"] == 5
+    assert outcome == "pending" and item["result"] is None
+    assert item["status"] == "pending_semantics"
     assert item["result_yellows"] is None and item["result_reds"] is None
-    assert clv["result_yellows"] is None and clv["result_reds"] is None
+    assert clv is None
     # e mercados que não são cartões nem carregam os campos
     key2 = "betano|2026-07-17|time alpha|time beta|Escanteios|9.5|over"
     item2 = record()

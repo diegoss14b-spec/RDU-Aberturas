@@ -321,6 +321,11 @@ def _ledger_line(key, rec, meta, market, sid, sid_settle, fx, push_map, ref_poli
         "open_ts": rec.get("open_ts"),
         "odd_close": rec.get("close_odd"),
         "close_ts": rec.get("close_ts"),
+        "open_observed_at": rec.get("open_observed_at"),
+        "close_observed_at": rec.get("close_observed_at"),
+        "open_time_verified": rec.get("open_time_verified") is True,
+        "close_time_verified": rec.get("close_time_verified") is True,
+        "timestamp_provenance": rec.get("timestamp_provenance") or "legacy_unknown",
         "min_odd": rec.get("min_odd"),
         "max_odd": rec.get("max_odd"),
         "n_moves": rec.get("n_moves"),
@@ -343,6 +348,12 @@ def _ledger_line(key, rec, meta, market, sid, sid_settle, fx, push_map, ref_poli
         "won": rec.get("won"),
         "result_yellows": rec.get("result_yellows"),
         "result_reds": rec.get("result_reds"),
+        "result_r1": rec.get("result_r1"),
+        "result_r2": rec.get("result_r2"),
+        "result_bounds": rec.get("result_bounds"),
+        "settlement_rule": rec.get("settlement_rule"),
+        "settlement_revision": rec.get("settlement_revision"),
+        "supersedes_settlement_revision": rec.get("supersedes_settlement_revision"),
         "date_offset": rec.get("settlement_date_offset") or 0,
         "settlement_source": rec.get("settlement_source"),
     }
@@ -382,16 +393,19 @@ def emit_ledger(merged, fixidx, push_map, ref_policy, now, ledger_dir=None):
             with path.open(encoding="utf-8") as handle:
                 for raw in handle:
                     try:
-                        seen.add(json.loads(raw).get("key"))
+                        old = json.loads(raw)
+                        seen.add((old.get("key"), old.get("settlement_revision")))
                     except ValueError:
                         continue
         novas = []
         for key, rec, line in items:
-            if key in seen:
+            ident = (key, line.get("settlement_revision"))
+            if ident in seen:
                 rec["m_emitted"] = now.isoformat(timespec="seconds")
                 n["ja_no_arquivo_so_marcadas"] += 1
                 continue
             novas.append((key, rec, json.dumps(line, ensure_ascii=False)))
+            seen.add(ident)
         # grava primeiro, marca depois: crash entre os dois deixa a linha no
         # arquivo e o record sem mark — exatamente o caso que o dedupe cobre.
         append_jsonl_month(ledger_dir, month, [texto for _, _, texto in novas])

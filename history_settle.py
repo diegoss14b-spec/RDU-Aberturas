@@ -42,7 +42,7 @@ sys.path.insert(0, str(ROOT))
 from canonical import flags_compatible, norm_team, parse_history_key  # noqa: E402
 from history_merge import atomic_write_text, merge_records  # noqa: E402
 from history_quality import parse_iso_flex  # noqa: E402  (parser único §10)
-from jsonl_shard import append_jsonl_month  # noqa: E402  (GH001: clv mensal fatiado)
+from jsonl_shard import append_jsonl_month, month_jsonl_paths  # noqa: E402
 
 HIST = ROOT / "data" / "odds_history"
 RES_AUTO = HIST / "results" / "results_auto.json"
@@ -61,7 +61,7 @@ FIELD = {
     "Chutes no gol": "shots_on_goal",
     "Desarmes": "tackles",
 }
-RETRYABLE_STATUSES = {"closed", "pending_result"}
+RETRYABLE_STATUSES = {"closed", "pending_result", "pending_semantics"}
 PENDING_STATUS = "pending_result"
 RETRY_AUDIT_INTERVAL = timedelta(hours=6)
 # Jogo VELHO cuja data o feed já publicou em volume não está esperando publicação: é
@@ -121,7 +121,7 @@ def load_results():
                         "away": row.get("away"),
                         "_source": "manual",
                     }
-                    for field in set(FIELD.values()):
+                    for field in set(FIELD.values()) | {"cards_r2", "yellow_cards", "red_cards", "reds_direct", "reds_second"}:
                         rec[field] = _number((row.get(field) or "").strip())
                     out.append(rec)
         except (OSError, ValueError):
@@ -344,7 +344,7 @@ def settle_one(key, record, results, now, cobertura=None):
         return "pending", changed, None
 
     result = _number(result_row.get(field))
-    if result is None:
+    if result is None and not (field == "cards" and _number(result_row.get("cards_r2")) is not None):
         changed = _mark_pending(record, f"stat_missing:{field}", now)
         return "pending", changed, None
 
@@ -378,36 +378,35 @@ def settle_one(key, record, results, now, cobertura=None):
         record["settlement_last_attempt"] = now.isoformat()
         record["settlement_attempts"] = int(record.get("settlement_attempts") or 0) + 1
         return "unavailable", changed, None
-    record["result"] = result
     # B2 (31/07): a Mesa liquida cartões como AMARELOS+VERMELHOS (o feed manda
     # `cards` = y+r) e o modelo do site prevê AMARELOS — 95 chaves (2,4%) trocavam
     # de vencedor conforme a definição no backtest de 30/07. `won` NÃO muda de
     # semântica; os dois números viajam JUNTOS para a análise honesta dos dois
     # lados (ledger/CLV). Lei do null: feed sem os campos → None, nunca 0.
     if field == "cards":
-        record["result_yellows"] = _number(result_row.get("yellow_cards"))
-        record["result_reds"] = _number(result_row.get("red_cards"))
-        # 10/08 (auditoria D1): TODAS as casas da Mesa liquidam vermelho DIRETO=2
-        # (Betano/bet365/Sportingbet/Superbet/EstrelaBet/7k/Betfast — red=1 é só
-        # Betfair/Betnacional, que a Mesa não captura). O feed do site agora manda
-        # cards_r2 = Y + 2·direto + 1·2º-amarelo (dos INCIDENTES) — quando existe,
-        # a liquidação usa a régua REAL da casa; sem incidentes, segue o y+r antigo
-        # com o carimbo r1_fallback pra análise filtrar. Os DOIS números viajam.
-        _r2 = _number(result_row.get("cards_r2"))
-        record["result_r1"] = result
-        if _r2 is not None:
-            record["result_r2"] = _r2
-            record["settlement_rule"] = "red2_incidents"
-            result = _r2
-            record["result"] = result
-        else:
-            record["result_r2"] = None
-            record["settlement_rule"] = "r1_fallback"
-    if abs(result - line) < 1e-9:
-        record["won"] = None
+        from cards_settlement import card_decision
+        decision = card_decision(result_row, line, side)
+        old_revision = record.get("settlement_revision")
+        if record.get("status") == "settled" and old_revision == decision["settlement_revision"]:
+            return "unchanged", False, None
+        record.update({k: v for k, v in decision.items()
+                       if k not in ("rule", "pending", "retryable")})
+        record["settlement_rule"] = decision["rule"]
+        if decision["pending"]:
+            changed = _mark_pending(record, "cards_incident_semantics_missing", now,
+                                    status="pending_semantics")
+            return "pending", changed, None
+        result = decision["result"]
+        if old_revision and old_revision != decision["settlement_revision"]:
+            record["supersedes_settlement_revision"] = old_revision
+            record.pop("m_emitted", None)
     else:
-        over_won = result > line
-        record["won"] = over_won if side == "over" else not over_won
+        record["result"] = result
+        if abs(result - line) < 1e-9:
+            record["won"] = None
+        else:
+            over_won = result > line
+            record["won"] = over_won if side == "over" else not over_won
     if record.get("open_odd") and record.get("close_odd"):
         record["clv_pct"] = round(
             (float(record["open_odd"]) / float(record["close_odd"]) - 1) * 100, 2
@@ -418,7 +417,7 @@ def settle_one(key, record, results, now, cobertura=None):
     record["settlement_last_attempt"] = now.isoformat()
     record["settlement_attempts"] = int(record.get("settlement_attempts") or 0) + 1
     record["settlement_reason"] = "settled"
-    record["settlement_retryable"] = False
+    record["settlement_retryable"] = bool(field == "cards" and decision["retryable"])
     record["settlement_source"] = result_row.get("_source") or "auto"
     clv_row = {
         "key": key,
@@ -438,8 +437,13 @@ def settle_one(key, record, results, now, cobertura=None):
         "date_offset": date_offset or 0,
     }
     if field == "cards":
-        clv_row["result_yellows"] = record.get("result_yellows")
-        clv_row["result_reds"] = record.get("result_reds")
+        for field_name in ("result_yellows", "result_reds", "result_r1", "result_r2",
+                           "result_bounds", "settlement_rule", "settlement_revision",
+                           "supersedes_settlement_revision"):
+            clv_row[field_name] = record.get(field_name)
+    for field_name in ("open_ts", "close_ts", "open_observed_at", "close_observed_at",
+                       "open_time_verified", "close_time_verified", "timestamp_provenance"):
+        clv_row[field_name] = record.get(field_name)
     return "settled", True, clv_row
 
 
@@ -599,7 +603,7 @@ def build_settlement_status(records, results, now):
         market_row["status"][status] += 1
         if status == "settled":
             settled_offsets[int(record.get("settlement_date_offset") or 0)] += 1
-        if status == PENDING_STATUS:
+        if status in (PENDING_STATUS, "pending_semantics"):
             bucket, age_days = _age_bucket(record.get("kickoff"), now)
             reason = record.get("settlement_reason") or "unknown"
             market_row["pending_age"][bucket] += 1
@@ -644,7 +648,7 @@ def build_settlement_status(records, results, now):
             market: plain_market(row) for market, row in sorted(by_market.items())
         },
         "backlog": {
-            "total": total_status.get(PENDING_STATUS, 0),
+            "total": total_status.get(PENDING_STATUS, 0) + total_status.get("pending_semantics", 0),
             "age": dict(backlog_age),
             # §10: pendências cuja data não parseou. Com o parser único deve ser ~0;
             # um valor alto = kickoff corrompido ou formato novo → alerta, não "recente".
@@ -668,7 +672,21 @@ def _append_clv(rows):
         month = kickoff[:7] if len(kickoff) >= 7 else datetime.now(BRT).strftime("%Y-%m")
         by_month[month].append(row)
     for month, month_rows in by_month.items():
-        append_jsonl_month(HIST / "clv", month, month_rows)
+        seen = set()
+        for path in month_jsonl_paths(HIST / "clv", month):
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    row = json.loads(raw)
+                    seen.add((row.get("key"), row.get("settlement_revision")))
+                except ValueError:
+                    continue
+        fresh = []
+        for row in month_rows:
+            ident = (row.get("key"), row.get("settlement_revision"))
+            if ident not in seen:
+                fresh.append(row)
+                seen.add(ident)
+        append_jsonl_month(HIST / "clv", month, fresh)
 
 
 def main():
@@ -686,6 +704,8 @@ def main():
         current_status = record.get("status")
         retryable = current_status in RETRYABLE_STATUSES or (
             current_status == "unavailable" and record.get("settlement_retryable") is not False
+        ) or (
+            current_status == "settled" and record.get("settlement_rule") == "red2_outcome_invariant"
         )
         if retryable:
             outcome, _record_changed, clv_row = settle_one(
@@ -724,7 +744,7 @@ def main():
     if duplicates:
         print(f"[settle] {duplicates:,} duplicatas mensais consolidadas · {changed_files} arquivos atualizados")
     for market, row in status["by_market"].items():
-        pending = row["status"].get(PENDING_STATUS, 0)
+        pending = row["status"].get(PENDING_STATUS, 0) + row["status"].get("pending_semantics", 0)
         if pending:
             ages = ", ".join(f"{name}={count}" for name, count in row["pending_age"].items())
             print(f"  [backlog] {market}: {pending} · {ages}")

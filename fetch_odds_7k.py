@@ -303,7 +303,7 @@ def main():
 
     evs = gj("/api/pulse/snapshot/events?lang=BR-PT") or []
     cand = [e for e in evs if str(e.get("SportId")) == "1" and not e.get("IsLive")
-            and (e.get("TotalActiveMarketsCount") or 0) >= MIN_MARKETS]
+            and (e.get("TotalActiveMarketsCount") or 0) > 0]
     _wh = odds_window()
     if _wh is not None:   # modo close: filtra ANTES do sort/cap e das 2 chamadas markets/all por evento
         global MIN_EFF
@@ -313,8 +313,10 @@ def main():
         MIN_EFF = (min(MIN_EVENTS, 1) if cand else 0)   # janela curta: 1+ ok; lista vazia não é falha
         print(f"[7k] modo close: janela {_wh:g}h -> {len(cand)} de {_tot} eventos")
     cand.sort(key=lambda e: -(e.get("TotalActiveMarketsCount") or 0))
-    cand = cand[:MAX_EVENTS]
-    print(f"[7k] snapshot {len(evs)} eventos · {len(cand)} candidatos (futebol+prematch+≥{MIN_MARKETS} mercados)")
+    from capture_discovery import DiscoveryQueue
+    queue = DiscoveryQueue(OUTDIR / "_status" / "7k_discovery.json", now)
+    cand = queue.select(cand, MAX_EVENTS, id_field="_id")
+    print(f"[7k] snapshot {len(evs)} eventos · {len(cand)} selecionados por orçamento/rotação")
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
     out_path = OUTDIR / f"7k_{stamp}.jsonl"
@@ -327,13 +329,16 @@ def main():
     n_fallback = 0
     for e in cand:
         eid = e["_id"]
+        observed_at = datetime.now(BRT).isoformat(timespec="seconds")
         # eventpage = cardápio completo; :ALL trunca ~30% (ver docstring do módulo)
         allm = _eventpage_markets(gj, eid)
         if allm is None:
             allm = gj(f"/api/eventlist/eu/markets/all?markets={eid}:ALL")
             n_fallback += 1
         time.sleep(random.uniform(0.15, 0.3))
-        if not allm: continue
+        if not allm:
+            queue.record(eid, success=allm is not None, useful=False)
+            continue
         # Famílias por (canon, market_type_id) — NÃO mesclar MarketTypes diferentes
         # só porque canon(name) colidiu (brief §4 auditoria 2026-07-14).
         families = {}       # canon -> {family_key: {meta, lines_by_L}}
@@ -401,17 +406,20 @@ def main():
                 arr, dropped = _pick_family(fams)
                 if arr:
                     merc_t.setdefault(c2, {})[team] = arr
+        queue.record(eid, success=True, useful=bool(merc or merc_t), markets=set(merc) | set(merc_t))
         if not merc and not merc_t: continue
         from bookmaker_contracts import normalize_7k_event_name
         name = normalize_7k_event_name(e.get("EventName"))
         rec = {"casa": "7k", "event_id": eid, "name": name, "league": e.get("LeagueName"),
-               "start": e.get("StartEventDate"), "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+               "start": e.get("StartEventDate"), "captured_at": observed_at,
                "mercados": merc}
         if merc_t: rec["mercados_time"] = merc_t
         if fam_log: rec["_family_choices"] = fam_log
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
     f.close(); write_latest(n_out, promote=None)
+    queue.save()
+    print(f"[7k] descoberta: {json.dumps(queue.metrics, ensure_ascii=False)}")
     print(f"[7k] {n_out} jogos com mercado de estatística salvos em {out_path.name}"
           + (f" · ⚠ {n_fallback} eventos caíram no fallback :ALL (formato do eventpage mudou?)" if n_fallback else ""))
     return n_out

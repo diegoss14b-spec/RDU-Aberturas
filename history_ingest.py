@@ -31,6 +31,7 @@ from migrate_history_keys import migrate_keys_dict, migrate_tick_file, unify_key
 # Duas implementações do "de quem é esta linha" divergiriam e o banco discordaria da tela.
 from build_board import _assign_side
 from bookmaker_contracts import BETANO_MK, betano_market, event_participants, normalize_7k_event_name
+from observation_clock import observation_meta, observation_reason, SCHEMA
 
 ODDS = ROOT / "data" / "odds"
 HIST = ROOT / "data" / "odds_history"
@@ -62,6 +63,7 @@ def load_events(casa):
             if not ln.strip():
                 continue
             e = json.loads(ln)
+            observed = observation_meta(e, ln)
             if casa == "7k":
                 e["name"] = normalize_7k_event_name(e.get("name"))
             merc_t = {}
@@ -101,6 +103,7 @@ def load_events(casa):
                 "mercados": merc, "mercados_time": merc_t,
                 "home_raw": home_raw, "away_raw": away_raw,
                 "event_id": e.get("event_id"),
+                **observed,
             })
         return evs
     except Exception as ex:
@@ -238,6 +241,7 @@ def main():
 
     # batch: (casa,gid,mercado) -> list of {linha,over,under}
     batch_ou = defaultdict(list)
+    batch_observed = {}
     # (casa,gid,mercado) -> chaves daquele mercado nesta rodada. O movimento de LINHA
     # é um fato do MERCADO (a linha principal andou), não de uma chave — que é sempre
     # uma linha fixa. Sem este índice o `n_line_moves` da chave não tinha quem o
@@ -249,9 +253,14 @@ def main():
     hmap = prune_house_map(load_house_map(), now)
 
     n_ticks = n_new = n_obs = n_sofa = n_skip_post = n_line_moves = 0
-    n_time_ok = n_time_sem_lado = 0
+    n_time_ok = n_time_sem_lado = n_invalid_clock = n_repeated_clock = 0
     for casa in CASAS:
         for ev in load_events(casa):
+            if observation_reason(ev, now):
+                n_invalid_clock += 1
+                continue  # missing/future timestamps never become fresh by reingestion
+            observed_at = ev["observed_at"]
+            observed_dt = ensure_aware(parse_ts(observed_at))
             idt = resolve_identity(casa, ev, fixtures, hmap, now_iso)
             if not idt["day"] or idt["day"] == "?":
                 continue
@@ -286,10 +295,11 @@ def main():
             for mercado, linhas in mercados_do_evento.items():
                 # coleta O/U da partida p/ main line
                 for l in linhas:
-                    if l.get("over") and l.get("under") and l.get("linha") is not None:
+                    if kick_iso and is_pre_kickoff(observed_dt, kick_iso) and l.get("over") and l.get("under") and l.get("linha") is not None:
                         batch_ou[(casa, gid, mercado)].append({
                             "linha": l["linha"], "over": l["over"], "under": l["under"],
                         })
+                        batch_observed[(casa, gid, mercado)] = observed_at
 
                 for l in linhas:
                     linha = l.get("linha")
@@ -304,14 +314,17 @@ def main():
                                       ("casa", l.get("casa")), ("fora", l.get("fora"))):
                         if not odd or odd <= 1.01 or odd > 50:
                             continue
-                        n_obs += 1
                         key = history_key(
                             casa, djogo, h, a, mercado, linha, lado,
                             sofa_id=idt.get("sofa_id"),
                         )
                         mkt_keys[(casa, gid, mercado)].add(key)
                         k = keys.get(key)
-                        pre_ko = is_pre_kickoff(now, kick_iso) if kick_iso else True
+                        if observation_reason(ev, now, k):
+                            n_repeated_clock += 1
+                            continue
+                        pre_ko = bool(kick_iso) and is_pre_kickoff(observed_dt, kick_iso)
+                        n_obs += 1
                         is_new = k is None
                         # price_move só se já existia e odd mudou ≥0.01 (1ª obs: n_moves=0)
                         price_moved = (not is_new) and (
@@ -321,9 +334,12 @@ def main():
                         if is_new:
                             # open só “vale” se 1ª vista pré-kickoff; senão marca post
                             keys[key] = k = {
-                                "open_odd": odd, "open_ts": now_iso, "open_is_first_seen": True,
+                                "open_odd": odd, "open_ts": observed_at, "open_is_first_seen": True,
+                                "open_observed_at": observed_at, "open_time_verified": True,
+                                "observation_schema": SCHEMA,
+                                "timestamp_provenance": "source_captured_at",
                                 "close_odd": None, "close_ts": None,
-                                "last_odd": odd, "last_ts": now_iso,
+                                "last_odd": odd, "last_ts": observed_at,
                                 "n_obs": 0, "n_moves": 0,  # 1ª obs → n_moves permanece 0
                                 "n_price_moves": 0, "n_line_moves": 0,
                                 "max_odd": odd, "min_odd": odd,
@@ -343,6 +359,9 @@ def main():
                             }
                             n_new += 1
                         else:
+                            if not k.get("observation_schema"):
+                                k["timestamp_provenance"] = "legacy_unknown"
+                                k["open_time_verified"] = False
                             if idt.get("sofa_id") and not k.get("sofa_id"):
                                 k["sofa_id"] = idt["sofa_id"]
                                 k["match_method"] = idt.get("match_method")
@@ -353,6 +372,8 @@ def main():
                                 k["kickoff"] = kick_iso
 
                         k["n_obs"] = (k.get("n_obs") or 0) + 1
+                        k["last_ingested_at"] = now_iso
+                        k["last_seen_observed_at"] = observed_at
 
                         # P1: não poluir last com odd pós-kickoff (preserva close real)
                         if k.get("status") == "open":
@@ -361,7 +382,10 @@ def main():
                                     k["n_moves"] = (k.get("n_moves") or 0) + 1
                                     k["n_price_moves"] = (k.get("n_price_moves") or 0) + 1
                                 k["last_odd"] = odd
-                                k["last_ts"] = now_iso
+                                k["last_ts"] = observed_at
+                                k["last_observed_at"] = observed_at
+                                k["last_snapshot_row_sha256"] = ev["snapshot_row_sha256"]
+                                k["last_time_verified"] = True
                                 k["max_odd"] = max(k.get("max_odd") or odd, odd)
                                 k["min_odd"] = min(k.get("min_odd") or odd, odd)
                             else:
@@ -372,7 +396,10 @@ def main():
                         # tick de preço: 1ª obs (open) ou movimento real
                         if pre_ko and (is_new or price_moved):
                             tick_f.write(json.dumps({
-                                "ts": now_iso, "kind": "price" if price_moved else "open",
+                                "ts": observed_at, "ingested_at": now_iso,
+                                "observation_schema": SCHEMA,
+                                "snapshot_row_sha256": ev["snapshot_row_sha256"],
+                                "kind": "price" if price_moved else "open",
                                 "casa": casa, "kickoff": k.get("kickoff"),
                                 "home": h, "away": a, "mercado": mercado,
                                 "linha": linha, "lado": lado, "odd": odd,
@@ -389,6 +416,10 @@ def main():
             continue
         mk = f"{casa}|{gid}|{mercado}"
         prev = main_store.get(mk) or {}
+        observed_at = batch_observed[(casa, gid, mercado)]
+        prev_observed = ensure_aware(parse_ts(prev.get("observed_at")))
+        if prev_observed and ensure_aware(parse_ts(observed_at)) <= prev_observed:
+            continue
         prev_line = prev.get("line")
         sid = gid.replace("sofa:", "") if str(gid).startswith("sofa:") else None
         if prev_line is None:
@@ -397,7 +428,8 @@ def main():
             # ABERTURA — que é metade da pergunta "abriu 25,5 e fechou 23,5" —
             # não existia em lugar nenhum quando a linha nunca mais se mexia.
             tick_f.write(json.dumps({
-                "ts": now_iso, "kind": "line_open",
+                "ts": observed_at, "ingested_at": now_iso, "observation_schema": SCHEMA,
+                "kind": "line_open",
                 "casa": casa, "mercado": mercado, "gid": gid,
                 "linha_to": main, "sofa_id": sid,
             }, ensure_ascii=False) + "\n")
@@ -405,7 +437,8 @@ def main():
             n_ticks += 1
         elif abs(float(prev_line) - float(main)) >= 0.01:
             tick_f.write(json.dumps({
-                "ts": now_iso, "kind": "line_move",
+                "ts": observed_at, "ingested_at": now_iso, "observation_schema": SCHEMA,
+                "kind": "line_move",
                 "casa": casa, "mercado": mercado, "gid": gid,
                 "linha_from": prev_line, "linha_to": main,
                 "sofa_id": sid,
@@ -419,7 +452,8 @@ def main():
                 rec = keys.get(key)
                 if isinstance(rec, dict):
                     rec["n_line_moves"] = (rec.get("n_line_moves") or 0) + 1
-        main_store[mk] = {"line": main, "ts": now_iso}
+        main_store[mk] = {"line": main, "ts": observed_at, "observed_at": observed_at,
+                          "ingested_at": now_iso, "observation_schema": SCHEMA}
 
     keys["__main_lines__"] = main_store
     tick_f.close()
@@ -434,6 +468,8 @@ def main():
         f"por_time={n_time_ok} (lado indefinido: {n_time_sem_lado}) · "
         f"total keys mês={len(keys):,}"
     )
+    print(f"[ingest] relógio: {n_invalid_clock} eventos sem horário válido; "
+          f"{n_repeated_clock} observações repetidas/fora de ordem ignoradas")
 
 
 if __name__ == "__main__":
