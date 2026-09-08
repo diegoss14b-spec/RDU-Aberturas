@@ -45,19 +45,15 @@ def ou_probs_from_cdf(
     """Retorna (p_over_win, p_under_win, p_push) via CDF(k) = P(X <= k)."""
     L = float(line)
     mu = float(mu)
+    if not math.isfinite(L) or not math.isfinite(mu) or mu < 0:
+        raise ValueError('Non-finite/negative distribution input')
+    if not (is_half_line(L) or is_integer_line(L)):
+        raise ValueError('Quarter/nonstandard lines require Asian settlement math')
     if mu <= 0:
-        return 0.0, 1.0, 0.0
+        return (1.0,0.0,0.0) if L<0 else ((0.0,0.0,1.0) if L==0 else (0.0,1.0,0.0))
 
     if is_half_line(L):
         k = math.floor(L)  # n for n.5
-        p_under = float(cdf(k, mu, *cdf_args))
-        p_over = 1.0 - p_under
-        return _clip3(p_over, p_under, 0.0)
-
-    if not is_integer_line(L):
-        # Linha não-padrão (ex. 7.25): trata como “sem push mass” no ponto arredondado
-        # usando over = 1-CDF(floor(L)), under = CDF(floor(L))  (igual meia para fins práticos).
-        k = math.floor(L)
         p_under = float(cdf(k, mu, *cdf_args))
         p_over = 1.0 - p_under
         return _clip3(p_over, p_under, 0.0)
@@ -69,6 +65,44 @@ def ou_probs_from_cdf(
     p_over = max(0.0, 1.0 - cdf_k)          # X > L
     p_under = max(0.0, cdf_km1)             # X < L
     return _clip3(p_over, p_under, p_push)
+
+
+def cards_pmf(mu_y, lam_d, lam_2y, phi_y=None, kmax=60):
+    """T=Y+2D+S; NegBin yellow component and independent Poisson red types.
+
+    R1 is represented by lam_d=0 and lam_2y=all red mass. This mirrors the
+    site's cards_regime_blocks.cards_pmf, not NB(total mean).
+    """
+    for value in (mu_y,lam_d,lam_2y):
+        if not math.isfinite(float(value)) or value < 0:
+            raise ValueError('Invalid cards intensity')
+    def pois(lam,n):
+        result=[math.exp(-lam)]
+        for i in range(1,n+1):result.append(result[-1]*lam/i)
+        return result
+    if phi_y is None or phi_y<=0 or phi_y>1e6 or mu_y<=0:
+        py=pois(mu_y,kmax)
+    else:
+        p=phi_y/(phi_y+mu_y);py=[p**phi_y]
+        for i in range(1,kmax+1):py.append(py[-1]*(phi_y+i-1)/i*(1-p))
+    pd=pois(lam_d,min(8,kmax));ps=pois(lam_2y,min(8,kmax));out=[0.0]*(kmax+1)
+    for d,wd in enumerate(pd):
+        if wd<1e-12:continue
+        for s,ws in enumerate(ps):
+            if ws<1e-12:continue
+            shift=2*d+s
+            for y in range(max(0,kmax+1-shift)):out[y+shift]+=wd*ws*py[y]
+    mass=sum(out)
+    if mass<=0:raise ValueError('Cards PMF has no probability mass')
+    return [v/mass for v in out]
+
+
+def ou_probs_from_pmf(pmf,line):
+    L=float(line)
+    if not math.isfinite(L) or not (is_integer_line(L) or is_half_line(L)):
+        raise ValueError('Unsupported settlement line')
+    def cdf(k,*_):return sum(pmf[:k+1]) if k>=0 else 0.0
+    return ou_probs_from_cdf(cdf,1.0,L)
 
 
 def _clip3(po: float, pu: float, pp: float) -> Tuple[float, float, float]:

@@ -726,6 +726,10 @@ def main():
                 for casa, linhas in j["mercados"][canon].items():
                     casa_stale = casa in stale_set
                     for ln_ in linhas:
+                        # No quarter-line approximation: Asian split stakes are
+                        # outside the current total-model contract.
+                        if not (is_integer_line(ln_['linha']) or abs(float(ln_['linha']) % 1 - .5) < 1e-9):
+                            continue
                         if three_way(ln_):
                             n_skip_3way += 1
                             continue
@@ -735,7 +739,20 @@ def main():
                         # ao BOARD.valor — o precificador casa por NOME, não por fixture.
                         # Falha de fixture transitória degrada para "sem flag neste jogo",
                         # nunca para "gate derruba a Mesa inteira de madrugada".
-                        pr = PRICERS[model].price(lg, hid, aid, ln_["linha"])
+                        if model_source == 'candidate_pricer':
+                            try:
+                                _kick=datetime.fromisoformat(j.get('inicio_iso') or '')
+                                _fx={'eid':j.get('sofa_id'),'comp':fx_comp,'home_id':fx_hid,'away_id':fx_aid,
+                                     'date':_kick.astimezone(BRT).date().isoformat(),'kickoff_ts':int(_kick.timestamp())}
+                            except (ValueError,TypeError):
+                                _fx=None
+                            pr = PRICERS[model].price(lg,hid,aid,ln_['linha'],fixture=_fx,bookmaker=casa)
+                        else:
+                            pr = PRICERS[model].price(lg,hid,aid,ln_['linha'])
+                        if pr:
+                            _ctx_keys=('math_version','settlement_rule','contract_source','ref_applied','ref_reason',
+                                       'referee','ref_source','ref_observed_at','model_version','model_data_through','model_age_days')
+                            j.setdefault('model_context',{}).setdefault(canon,{})[casa]={k:pr.get(k) for k in _ctx_keys}
                         if pr and actionable_game and not casa_stale and not j.get("sofa_id"):
                             n_skip_nosofa += 1
                         elif pr and actionable_game and not casa_stale:
@@ -765,6 +782,7 @@ def main():
                                         "actionable": True,
                                         "model_status": model_status,
                                         "model_source": model_source,
+                                        **{k:pr.get(k) for k in _ctx_keys},
                                     })
                                     n_valor += 1
                         elif pr and not actionable_game:
@@ -863,42 +881,10 @@ def main():
         print(f"[board] ⚠ {n_skip_nosofa} flags suprimidas por falta de sofa_id (não liquidáveis)")
     # transparência da captura (brief P0 §2.4): quem entrou e quem falhou nesta rodada
     # §11 — Betfast estava OMITIDA aqui (7 casas, não 6): passa a aparecer no painel/hist7
-    _disp = {"betano": "Betano", "superbet": "Superbet", "estrelabet": "EstrelaBet", "7k": "7k", "pinnacle": "Pinnacle", "bet365": "bet365", "betfast": "Betfast", "sportingbet": "Sportingbet"}
     _stdir = ROOT / "data" / "odds" / "_status"
     if _stdir.exists():
-        cap = {"casas_ok": [], "casas_fail": [], "casas_stale": []}
-        for _c, _nome in _disp.items():
-            _f = _stdir / f"{_c}.json"
-            if not _f.exists(): continue
-            try: _st = json.loads(_f.read_text(encoding="utf-8"))
-            except Exception: continue
-            if _st.get("ok"): cap["casas_ok"].append(_nome)
-            else: cap["casas_fail"].append({"casa": _nome, "error": (_st.get("error") or "?")[:120],
-                                            "error_class": _st.get("error_class")})
-        # stale-keep: casas presentes no board via full antigo
-        _stale_all = set()
-        for _j in lista:
-            for _sc in (_j.get("stale_casas") or []):
-                _stale_all.add(_sc)
-        if _stale_all:
-            cap["casas_stale"] = sorted(_stale_all)
-        # confiabilidade 7 dias (11/07): lê o history.jsonl das rodadas e agrega por casa
-        _hf = _stdir / "history.jsonl"
-        if _hf.exists():
-            from datetime import timedelta as _td
-            _cut = (datetime.now(BRT) - _td(days=7)).strftime("%Y-%m-%d %H:%M")
-            _agg = {}
-            for _ln in _hf.read_text(encoding="utf-8").splitlines():
-                try: _r = json.loads(_ln)
-                except Exception: continue
-                if (_r.get("ts") or "") < _cut: continue
-                for _c, _v in (_r.get("casas") or {}).items():
-                    a = _agg.setdefault(_c, {"ok": 0, "total": 0})
-                    a["total"] += 1; a["ok"] += 1 if _v.get("ok") else 0
-            if _agg:
-                cap["hist7"] = {_disp.get(c, c): v for c, v in _agg.items()}
-        if cap["casas_ok"] or cap["casas_fail"] or cap.get("casas_stale"):
-            out["capture"] = cap
+        from capture_health import board_capture
+        out["capture"] = board_capture(_stdir, lista)
     outdir = ROOT / "valor" / "data"; outdir.mkdir(parents=True, exist_ok=True)
     (outdir / "board.js").write_text("window.BOARD=" + json.dumps(out, ensure_ascii=False) + ";", encoding="utf-8")
 
