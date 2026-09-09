@@ -1,60 +1,57 @@
 {
- "ts_utc": "2026-09-09T22:49:41Z",
- "ts_brt": "2026-09-09 19:49",
+ "ts_utc": "2026-09-09T23:18:43Z",
+ "ts_brt": "2026-09-09 20:18",
  "casas_ok": [
   "betano",
+  "superbet",
   "7k",
   "bet365",
   "sportingbet"
  ],
  "casas_fail": [
   {
-   "casa": "superbet",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=79 há 30min > n_novo=78; guarda 75min)"
-  },
-  {
    "casa": "estrelabet",
    "error": "promoção full bloqueada: mercado Faltas caiu >65%: 8 → 1 eventos; mercado Impedimentos caiu >65%: 16 → 4 eventos"
   },
   {
    "casa": "pinnacle",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=80 há 35min > n_novo=17; guarda 75min)"
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=78 há 29min > n_novo=17; guarda 75min)"
   }
  ],
- "n_ok": 4,
- "n_fail": 3,
- "total_events": 241,
+ "n_ok": 5,
+ "n_fail": 2,
+ "total_events": 321,
  "per_casa": {
   "betano": {
    "ok": true,
    "n_events": 60,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 30,
-    "Chutes no gol": 27,
+    "Cartões": 28,
+    "Chutes no gol": 26,
     "Desarmes": 6,
-    "Escanteios": 54,
-    "Faltas": 12,
-    "Finalizações": 27,
-    "Impedimentos": 12,
-    "Laterais": 7,
-    "Tiros de meta": 7
+    "Escanteios": 52,
+    "Faltas": 13,
+    "Finalizações": 26,
+    "Impedimentos": 13,
+    "Laterais": 8,
+    "Tiros de meta": 8
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-09_1938.jsonl",
+   "pointer_file": "betano_2026-09-09_2008.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
   },
   "superbet": {
-   "ok": false,
-   "n_events": 78,
+   "ok": true,
+   "n_events": 80,
    "n_markets": 9,
    "market_counts": {
     "Cartões": 34,
     "Chutes no gol": 32,
     "Desarmes": 12,
-    "Escanteios": 78,
+    "Escanteios": 80,
     "Faltas": 30,
     "Finalizações": 32,
     "Impedimentos": 30,
@@ -62,10 +59,10 @@
     "Tiros de meta": 26
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-09_1947.jsonl",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=79 há 30min > n_novo=78; guarda 75min)",
-   "source_state": "protected_feed",
-   "error_class": "Other"
+   "pointer_file": "superbet_2026-09-09_2016.jsonl",
+   "error": null,
+   "source_state": "ok",
+   "error_class": null
   },
   "estrelabet": {
    "ok": false,
@@ -114,8 +111,8 @@
     "Cartões": 17
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-09-09_1948.jsonl",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=80 há 35min > n_novo=17; guarda 75min)",
+   "pointer_file": "pinnacle_2026-09-09_2017.jsonl",
+   "error": "promoção full bloqueada: feed local fresco mais rico (n=78 há 29min > n_novo=17; guarda 75min)",
    "source_state": "protected_feed",
    "error_class": "Other"
   },
@@ -130,7 +127,7 @@
     "Finalizações": 19
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-09-09_1938.jsonl",
+   "pointer_file": "bet365_2026-09-09_2008.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
@@ -145,40 +142,40 @@
     "Finalizações": 6
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-09-09_1939.jsonl",
+   "pointer_file": "sportingbet_2026-09-09_2008.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null
   }
  },
  "market_counts": {
-  "Cartões": 87,
-  "Chutes no gol": 73,
-  "Desarmes": 13,
-  "Escanteios": 235,
-  "Faltas": 28,
-  "Finalizações": 73,
-  "Impedimentos": 28,
-  "Laterais": 14,
-  "Tiros de meta": 14
+  "Cartões": 119,
+  "Chutes no gol": 104,
+  "Desarmes": 25,
+  "Escanteios": 313,
+  "Faltas": 59,
+  "Finalizações": 104,
+  "Impedimentos": 59,
+  "Laterais": 41,
+  "Tiros de meta": 41
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-09-09T22:43:17Z",
-  "ts_brt": "2026-09-09 19:43",
+  "ts_utc": "2026-09-09T23:12:16Z",
+  "ts_brt": "2026-09-09 20:12",
   "n_events": 1138,
   "n_fixtures": 1138,
   "n_markets": 0,
   "min_events": 285,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_7359a56ac7eade9e7a62.json",
-  "pointer_at": "2026-09-09T19:43:17-03:00",
+  "pointer_file": "_snapshots/sofa_bb0362ca27ad95ac75c7.json",
+  "pointer_at": "2026-09-09T20:12:16-03:00",
   "pointer_n": 1138,
   "pointer_age_h": 0.0,
-  "duration_sec": 227.8,
+  "duration_sec": 233.1,
   "error": null,
   "error_class": null,
   "transport": {
