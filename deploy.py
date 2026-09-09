@@ -47,7 +47,7 @@ def _fetch_text(url, timeout=20):
         return r.read().decode("utf-8", errors="replace")
 
 
-def manifest_gate(dirpath):
+def manifest_gate(dirpath, *, history_root=None):
     """§8 — bloqueia se o manifesto estiver ausente/inválido/velho, se algum artefato
     do build faltar ou tiver hash diferente (build misturado), ou se o histórico VÁLIDO
     encolher em relação à produção sem migração aprovada. Retorna None (ok) ou motivo."""
@@ -88,6 +88,12 @@ def manifest_gate(dirpath):
                     return "contagens do manifesto divergem do contrato CLV"
                 if contract is not None:
                     validate_preservation(contract.get("preservation"))
+                    if history_root is not None:
+                        from history_preservation_inventory import validate_local_inventory
+                        proof = validate_local_inventory(contract["preservation"], history_root)
+                        print(f"[deploy] histórico real conferido: {proof['raw_count']} registros; "
+                              f"{proof['settled_count']} liquidados; "
+                              f"{proof.get('remapped_raw_count', 0)} identidades preservadas por renomeação")
             except (OSError, ValueError, TypeError, KeyError) as exc:
                 return "política CLV inválida: " + str(exc)
     shrink = _shrink_reason(man)
@@ -188,7 +194,7 @@ def main():
         return 1
     # §8 — publicação atômica: board/ops/history/moves/openclose têm que ser do MESMO build,
     # frescos e íntegros. Bloqueia build misturado/defasado ANTES de tocar a produção.
-    _mreason = manifest_gate(DIR)
+    _mreason = manifest_gate(DIR, history_root=ROOT / "data" / "odds_history")
     if _mreason:
         print("❌ ABORTADO — manifesto/atômico: " + _mreason)
         return 1

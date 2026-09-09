@@ -191,14 +191,21 @@ def main():
             print(f"[history] pulei {f}: {type(e).__name__}")
 
     # Inventory BEFORE view deduplication, across both hot and archived keys.
-    # Only closed, source-bound remaps may supplement literal identity coverage;
-    # pass actual records for value and unique-lineage checks before view dedup.
+    # Immutable baseline originals and independently pinned fixture anchors permit
+    # later legitimate renames; actual values and unique lineage are still checked.
     # This does not alter records or add aliases to the real inventory counts.
     try:
         history_preservation = preservation_proof(
-            keys, (k for k, v in keys.items() if v.get("status") == "settled"), records=keys)
+            keys, (k for k, v in keys.items() if v.get("status") == "settled"),
+            records=keys, durable_remaps=True)
+        print("[history] preservação: "
+              f"{history_preservation.get('literal_missing_raw_count', 0)} IDs renomeados; "
+              f"{history_preservation.get('remapped_raw_count', 0)} comprovados; "
+              f"{history_preservation['missing_raw_count']} sem cobertura; "
+              f"{history_preservation['missing_settled_count']} liquidados ausentes")
     except (OSError, ValueError, KeyError, TypeError) as exc:
         history_preservation = {"error": type(exc).__name__ + ": " + str(exc)}
+        print("[history] preservação BLOQUEADA: " + history_preservation["error"])
 
     # dedup de confrontos em memória (mesmo jogo com grafias/dia diferentes entre
     # casas). O migrate também persiste isso nos keys/*.json; aqui é cinto e

@@ -75,3 +75,12 @@ The command only reads Git and prints the reproducible certificate. It treats
 the prior audit as candidate pairs, not as source-record evidence; original
 shards must pass the original baseline hashes. It does not update the pinned
 hash, change the baseline, rewrite raw history, or run automatically in CI.
+
+## Compatibility note — 09/09/2026
+
+The closed certificate described above remains unchanged for schema-2 compatibility and
+its previously audited observation floors. Production `build_history.py` now
+requests schema 3 (`history_policy_dynamic.py`), rooted in immutable baseline
+originals and independently audited fixture anchors. Do not keep extending this
+old per-target list to suppress recurring failures. Unknown identities or changed
+opening evidence still require independent review, not automatic approval.
