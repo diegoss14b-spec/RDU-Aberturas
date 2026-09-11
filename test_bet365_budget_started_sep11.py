@@ -1,5 +1,6 @@
 """Portable CI regressions: request-local admission, retries and in-flight drain."""
 import json
+from concurrent.futures import wait as futures_wait
 from threading import Barrier
 from types import SimpleNamespace
 
@@ -7,6 +8,13 @@ import pytest
 import requests
 import fetch_odds_bet365 as fetch
 from test_bet365_capture_sep11 import isolated_capture, NOW, quote, inventory, seed_full
+
+
+def _wait_for_head_done(pending, return_when):
+    # STOP is asserted after the budget future is known complete. A bare
+    # Barrier starts workers together but cannot order their completion.
+    futures_wait([next(iter(pending))])
+    return futures_wait(pending, return_when=return_when)
 
 
 @pytest.mark.parametrize("limit", ["requests", "deadline"])
@@ -46,6 +54,7 @@ def test_previous_or_other_worker_request_cannot_set_local_started(monkeypatch):
 
 @pytest.mark.parametrize("started", [False, True, None])
 def test_initial_budget_empty_only_when_proven_no_http_and_drains_other_worker(monkeypatch, started):
+    monkeypatch.setattr(fetch, "wait", _wait_for_head_done)
     monkeypatch.setattr(fetch, "FI_BATCH", 1)
     ready = Barrier(2)
     calls = []
@@ -124,4 +133,3 @@ def test_main_keeps_selected_tombstones_and_full_guard_with_correct_attempt_metr
     rows = [json.loads(line) for line in (isolated_capture.odds / "bet365_2026-09-11_1500.jsonl").read_text().splitlines()]
     assert {row["event_id"] for row in rows} == {f"{i:02}" for i in range(10, 25)}
     assert {row["event_id"] for row in rows if row.get("retained_from_previous")} == {f"{i:02}" for i in range(20, 25)}
-

@@ -55,8 +55,7 @@ if sys.stderr is None or not hasattr(sys.stderr, "write"): sys.stderr = open(os.
 try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception: pass
 import requests
-from collections import deque
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from threading import BoundedSemaphore, Lock
 
@@ -139,9 +138,12 @@ def get(path, params, token):
     url = f"{BASE}{path}"
     q = dict(params); q["token"] = token
     fi_count = len(str(params["FI"]).split(",")) if params.get("FI") else 0
+    # Keep a second batch try (observed to recover valid FIs), then recover
+    # missing FIs individually instead of spending a third 30s on the same lot.
+    attempt_limit = 2 if path == "/v3/bet365/prematch" and fi_count > 1 else 3
     local_attempts = 0
     try:
-        for a in range(3):
+        for a in range(attempt_limit):
             delay = 1.0
             # Budget exceptions occur outside the retry handler and remain typed.
             with _request_slot() as (request_no, timeout):
@@ -166,7 +168,8 @@ def get(path, params, token):
                           f"attempt={a+1} result={outcome} "
                           f"elapsed_s={time.monotonic()-started:.2f}", flush=True)
             remaining = DEADLINE - time.monotonic() if DEADLINE is not None else delay
-            time.sleep(min(delay, max(0, remaining)))
+            if a + 1 < attempt_limit:
+                time.sleep(min(delay, max(0, remaining)))
     except CaptureBudgetExceeded as error:
         # Local to this get() call: another worker can advance N_REQ at any time.
         error.request_started = bool(local_attempts)
@@ -638,50 +641,64 @@ def fetch_batch(lote, token):
 
 
 def iter_batches(events, token):
-    """At most two submitted batches; consume in selection order, drain on budget.
+    """Refill on completion, emit in selection order; at most two in-flight.
 
-    Transport failures remain visible to main. A deadline in one worker never
-    discards already valid observations returned by the other in-flight worker.
-    Only the main thread parses markets, records queue state and writes files.
+    Finished rows wait in a bounded buffer (the caller selects at most 120 FIs),
+    retaining their HTTP receipt clocks. One slow batch cannot idle the other
+    lane. Budget errors stop refills but never discard the other in-flight
+    worker or results already buffered. Only main parses and writes records.
     """
     chunks = iter(events[i:i + FI_BATCH] for i in range(0, len(events), FI_BATCH))
-    pending = deque()
+    pending, completed = {}, {}
+    next_submit = next_yield = 0
     stopped = False
     with ThreadPoolExecutor(max_workers=2, thread_name_prefix="bet365-prematch") as pool:
         def submit_next():
+            nonlocal next_submit
             for chunk in chunks:
                 lote = [e for e in chunk if float(e["time"]) > time.time()]
                 if not lote:
                     continue
                 submitted_at = datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S")
-                pending.append((lote, submitted_at, pool.submit(fetch_batch, lote, token)))
+                future = pool.submit(fetch_batch, lote, token)
+                pending[future] = (next_submit, lote, submitted_at)
+                next_submit += 1
                 return True
             return False
+
         for _ in range(2):
             if not submit_next():
                 break
         while pending:
-            lote, submitted_at, future = pending.popleft()
-            try:
-                found, exhausted, missing = future.result()
-            except CaptureBudgetExceeded as error:
-                found, exhausted, missing = ObservedRows(), True, sorted(str(e["fi"]) for e in lote)
-                if getattr(error, "request_started", None) is False:
-                    # Budget denied before this batch's first HTTP. Keep it
-                    # unattempted; the complete selected-ID tombstone set in
-                    # main still prevents unsafe retention of these identities.
-                    lote = []
-            if not isinstance(found, ObservedRows):
-                # Compatibility with adapters/tests: conservative submission
-                # clock, NEVER the delayed moment at which main parses this.
-                observed = ObservedRows()
-                observed.update(found)
-                observed.observed_at.update({ident: submitted_at for ident in found})
-                found = observed
-            stopped = stopped or exhausted
-            yield lote, found, exhausted, missing
-            if not stopped:
-                submit_next()
+            done, _ = wait(pending, return_when=FIRST_COMPLETED)
+            done.update(future for future in pending if future.done())
+            # Resolve every observed completion before refill: a simultaneous
+            # budget failure must not be hidden by a successful lower index.
+            for future in sorted(done, key=lambda item: pending[item][0]):
+                index, lote, submitted_at = pending.pop(future)
+                try:
+                    found, exhausted, missing = future.result()
+                except CaptureBudgetExceeded as error:
+                    found, exhausted, missing = ObservedRows(), True, sorted(str(e["fi"]) for e in lote)
+                    if getattr(error, "request_started", None) is False:
+                        # No HTTP: preserve unattempted metrics and the full
+                        # selected-ID tombstones used by retention in main.
+                        lote = []
+                if not isinstance(found, ObservedRows):
+                    observed = ObservedRows()
+                    observed.update(found)
+                    observed.observed_at.update({ident: submitted_at for ident in found})
+                    found = observed
+                stopped = stopped or exhausted
+                completed[index] = (lote, found, exhausted, missing)
+            # Replenish transport before yielding: parsing can be slower than
+            # an HTTP return and must not hold an otherwise available lane.
+            while not stopped and len(pending) < 2:
+                if not submit_next():
+                    break
+            while next_yield in completed:
+                yield completed.pop(next_yield)
+                next_yield += 1
 
 
 def main():

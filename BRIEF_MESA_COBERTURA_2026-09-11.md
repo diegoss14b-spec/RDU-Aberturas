@@ -1,6 +1,6 @@
 # Mesa: captura, cobertura e publicação — 11/09/2026
 
-Versão 3 consolidada, substitui a primeira versão enviada em 11/09 e incorpora o refinamento da versão 2. Alterações autorizadas pelo Diego e implementadas pelo Codex. Este brief é o contrato de continuidade para o Mac e o Windows. O recibo final de publicação será enviado separadamente ao Drive, após a validação.
+Versão 4 consolidada, substitui as versões anteriores enviadas em 11/09. Alterações autorizadas pelo Diego e implementadas pelo Codex. Este brief é o contrato de continuidade para o Mac e o Windows. O recibo de publicação é enviado separadamente ao Drive, após a validação; não confundir testes locais ou sucesso global do workflow com aceite de cada casa.
 
 ## Proprietário e segurança
 
@@ -31,6 +31,18 @@ Versão 3: duas varreduras simultâneas, mantendo as 10 páginas iniciais e as 1
 O relógio de cada FI vem do recebimento da resposta, inclusive em recuperações individuais; esperar outro lote/parsing não renova odds antigas. Uma falha parcial continua impedindo promoção. Resultados válidos já em voo são processados, mesmo que outro lote alcance o orçamento. Sem GET iniciado, não renovar `last_attempt` nem contar o evento como consultado.
 
 Logs agora mostram número de request, endpoint sem query/token, tamanho do lote, tentativa, resultado e duração. Métricas separam tempo de inventário e tempo de prematch. O prazo de 420s é lógico/admissão e timeout de socket, não garantia absoluta de término da biblioteca HTTP; o timeout externo de 480s permanece.
+
+### Versão 4: eliminar espera entre lotes e limitar repetição do lote inteiro
+
+A versão 3 foi publicada no build `5175baa58e6943e99500a7858361357a`, às 17:32:07 BRT, pelo run `34642335607`. Os hashes dos cinco artefatos e os scripts públicos foram verificados; preservação histórica com 910.127 registros brutos, 346.572 liquidados e zero identidades ausentes. Porém a Bet365 continuou parcial: 49 requests, 60 FIs tentados, 53 recebidos, 40 úteis e 60 não tentados. O inventário melhorou para 71,21s; prematch gastou 349,11s e esgotou 420s. O full anterior permaneceu preservado.
+
+Os logs provaram espera indevida: o segundo lote terminou às 20:12:19 UTC, mas o próximo só começou aproximadamente às 20:14:59 porque a entrega em ordem bloqueava a reposição da fila. Cerca de 160s de uma fila ficaram ociosos. A versão 4 agenda novamente assim que qualquer lote termina (`FIRST_COMPLETED`), recolhe todos os lotes já concluídos antes de decidir novos envios e guarda os resultados por índice. A entrega ao parser continua na ordem selecionada; o buffer é limitado aos 120 FIs selecionados. Continuam no máximo dois lotes/GETs simultâneos, mesmos clocks originais e escrita somente pela thread principal.
+
+Qualquer esgotamento de orçamento observado interrompe novos envios, mas preserva os resultados já concluídos e os ainda em voo. Uma submissão que não chegou a fazer HTTP mantém `request_started=False` e não renova a fila. A admissão global de requests continua sendo a autoridade do limite; nenhuma proteção de promoção parcial foi removida.
+
+Retries: lote prematch com mais de um FI tem no máximo duas tentativas; recuperação individual e inventário mantêm três. Mantida a segunda tentativa: ela recuperou 20 FIs nos logs analisados. As duas terceiras tentativas de lote falharam e consumiram 59,74 segundos de ocupação HTTP. Depois de duas falhas do lote, recuperar somente os FIs ausentes individualmente. Não aguardar backoff depois da última tentativa. Não reduzir 120 eventos, aumentar 90 requests/420s ou adotar split de lote sem evidência.
+
+As regressões antigas de STOP agora sincronizam explicitamente a conclusão da future com orçamento esgotado: `Barrier(2)` apenas iniciava workers juntos e não ordenava a conclusão. Não foram removidas assertivas de relógio, retenção, número de requests ou promoção. Novas regressões exigem que o terceiro lote inicie enquanto o primeiro está lento, que os 120 FIs possam ser processados com uma cabeça lenta, e que os resultados em buffer sobrevivam a orçamento esgotado. Testes de timeout/502/429 cobrem lotes de 2/5/10 FIs e singles/inventário.
 
 ## Outras casas: mudanças e evidências
 
@@ -92,6 +104,8 @@ O build `0129fc7766614033937e1ccb1263f687` confirmou scripts publicados iguais a
 
 Bet365 ainda falhou por tempo nessa primeira rodada; 7k e Estrela não foram recapturadas por `FULL_STRIDE=2` na hora UTC ímpar. Portanto, essa rodada não valida a captura completa da versão 3 nem o ganho da seleção nova da 7k. Exigir o recibo posterior para essa confirmação.
 
+A publicação da versão 3 confirmou ganhos reais em partidas ainda futuras, no mesmo corte de horário: 7k passou de 41 para 86 jogos, Betano de 11 para 47, Sportingbet de 36 para 61 e Estrela de 31 para 32. Na 7k, desarmes passaram de 5 para 20 jogos, faltas/impedimentos de 11 para 59, e laterais/tiros de meta de 5 para 23. Sportingbet chegou a 20 jogos com Chutes no gol. Esses números medem o board, não o catálogo integral; a rotação substitui parte dos eventos antigos. Bet365 permaneceu com um único jogo futuro e fonte antiga. O recibo v3 explicita essa pendência; exigir nova captura para aceitar a versão 4.
+
 Melhoria posterior, não incluída: salvar checkpoints da fila 7k e intercalar exploração durante capturas lentas; atualmente um timeout pode interromper a rodada antes das últimas explorações. O saldo CLV estrito ainda era zero e havia backlog de resultados na primeira publicação; isso não foi resolvido por mudanças de captura e não justifica afrouxar a política de CLV.
 
 ## Arquivos estruturais para preservar
@@ -108,6 +122,8 @@ Melhoria posterior, não incluída: salvar checkpoints da fila 7k e intercalar e
 6. Conferir o recibo final: commit publicado, workflow, manifesto, hashes e preservação histórica. Avisar em caso de divergência; não afrouxar gates para obter verde.
 
 ## Aceite
+
+Suíte consolidada da versão 4: **693 testes passaram, 1 ignorado e 140 subtestes passaram**. O E2E utiliza as funções reais de inventário, fila, agendamento, retries, parser e pointers, simulando apenas transporte, token e relógios em diretório temporário: 120 FIs com cabeça lenta e recuperação individual resultaram em 43 HTTP, máximo de dois simultâneos, relógios de recebimento preservados e full promovido. Em outro caso, o limite real de 22 requests impediu qualquer HTTP adicional, manteve 20 observações novas, marcou 100 não tentados e preservou o full anterior sem atualizá-lo. A publicação/captura real da versão 4 ainda deve ser confirmada no recibo posterior.
 
 Suíte local consolidada da versão 3: 665 testes passaram, 1 ignorado e 140 subtestes passaram. Inclui testes portáveis da seleção equilibrada por família, comparação com a política anterior, preservação da exploração, chamadas do coletor Betano isoladas de rede, concorrência Bet365, limites compartilhados, clocks por FI e renderização real dos diagnósticos. Verificações de sintaxe de JavaScript e de whitespace também passaram. O recibo de publicação registra a verificação posterior em produção.
 

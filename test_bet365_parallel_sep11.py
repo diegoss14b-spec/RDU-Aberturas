@@ -1,5 +1,5 @@
 """CI regressions for bounded concurrency; all HTTP, clocks and files isolated."""
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait as futures_wait
 from datetime import datetime, timedelta
 import json
 from threading import Barrier, Event, Lock
@@ -10,6 +10,13 @@ import pytest
 import requests
 import fetch_odds_bet365 as fetch
 from test_bet365_capture_sep11 import isolated_capture, NOW, quote, inventory
+
+
+def _wait_for_head_done(pending, return_when):
+    # STOP is asserted after the budget future is known complete. A bare
+    # Barrier starts workers together but cannot order their completion.
+    futures_wait([next(iter(pending))])
+    return futures_wait(pending, return_when=return_when)
 
 
 def response(rows=()):
@@ -153,6 +160,7 @@ def test_batches_are_ordered_with_two_inflight_and_original_clock(monkeypatch):
 
 
 def test_budget_drains_other_inflight_success_without_starting_more(monkeypatch):
+    monkeypatch.setattr(fetch, "wait", _wait_for_head_done)
     monkeypatch.setattr(fetch, "FI_BATCH", 1)
     started = Barrier(2)
     calls = []
@@ -171,6 +179,7 @@ def test_budget_drains_other_inflight_success_without_starting_more(monkeypatch)
 
 
 def test_partial_batch_preserved_and_stops_new_submissions(monkeypatch):
+    monkeypatch.setattr(fetch, "wait", _wait_for_head_done)
     monkeypatch.setattr(fetch, "FI_BATCH", 2)
     started = Barrier(2)
     def batch(lote, token):
@@ -222,4 +231,3 @@ def test_main_writes_receipt_clock_not_delayed_processing_clock(monkeypatch, iso
     rows = [json.loads(line) for line in output.read_text().splitlines()]
     assert {row["captured_at"] for row in rows} == {"2026-09-11 14:58:00"}
     assert not fetch.CAPTURE_INCOMPLETE
-
