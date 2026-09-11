@@ -140,6 +140,10 @@
       var n = c.n_events != null ? String(c.n_events) : "—";
       var proxy = c.proxy_br === true ? "BR" : c.proxy_br === false ? "direct" : "—";
       var cAge = liveAge(c.ts_brt, c.age_min);
+      var fullAge = liveAge(c.full_at, c.full_age_min);
+      var fullText = c.kind === 'fixture' ? '—' : c.full_valid ? ageTxt(fullAge) : 'sem fonte validada';
+      var fullClass = c.kind === 'fixture' ? '' : !c.full_valid || fullAge == null || fullAge > 120 ? 'op-bad' : 'op-good';
+      if(c.attempted === false)st += ' <span class="op-muted">sem nova coleta</span>';
       var rateHtml = rate != null
         ? '<span class="' + clsRate(rate) + '">' + br(rate, 0) + "% <span class=\"op-muted\">(" + h7.ok + "/" + h7.total + ")</span></span>"
         : "—";
@@ -154,6 +158,7 @@
         + '<td class="op-num">' + esc(n) + "</td>"
         + '<td class="op-num">' + esc(dur) + "</td>"
         + "<td>" + esc(ageTxt(cAge)) + "</td>"
+        + '<td class="'+fullClass+'">' + esc(fullText) + '</td>'
         + "<td>" + esc(proxy) + "</td>"
         + "<td>" + rateHtml + "</td>"
         + '<td class="op-err">' + esc((c.ok ? "" : (c.error || ""))+(discoveryTxt?' · '+discoveryTxt:'')) + "</td>"
@@ -163,7 +168,7 @@
     var casaTbl =
       '<div class="op-sec"><div class="op-sec-h">Casas — última rodada + confiabilidade 7 dias</div>'
       + '<div class="op-table-wrap"><table class="op-table">'
-      + "<thead><tr><th>Casa</th><th>Status</th><th>Eventos</th><th>Duração</th><th>Idade</th><th>Proxy</th><th>7 dias</th><th>Erro</th></tr></thead>"
+      + "<thead><tr><th>Casa</th><th>Captura</th><th>Eventos</th><th>Duração</th><th>Última coleta</th><th>Linhas completas</th><th>Proxy</th><th title=\"Sucesso das capturas; não é percentual das linhas da casa\">Capturas 7 dias</th><th>Diagnóstico</th></tr></thead>"
       + "<tbody>" + casaRows + "</tbody></table></div></div>";
 
     // --- heatmap runs ---

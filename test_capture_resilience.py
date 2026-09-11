@@ -143,13 +143,16 @@ class CaptureResilienceTest(unittest.TestCase):
             cc.snapshot_market_counts(normalized),
         )
         betano = self.odds / "betano.jsonl"
-        write_jsonl(betano, [{"markets": {"estatisticas": [
-            {"market": "Total de Faltas"}, {"market": "Time A Total de chutes"}
-        ], "cartoes": [{"market": "Total de Cartões"}]}}])
+        write_jsonl(betano, [{"name": "Time A - Time B", "markets": {"estatisticas": [
+            {"market": "Total de Faltas", "line": 24.5, "over": 1.9, "under": 1.9},
+            {"market": "Time A Total de chutes", "line": 12.5, "over": 1.9, "under": 1.9}
+        ], "cartoes": [{"market": "Total de Cartões", "line": 4.5, "over": 1.9, "under": 1.9}]}}])
         self.assertEqual(
             {"Cartões": 1, "Faltas": 1, "Finalizações": 1},
             cc.snapshot_market_counts(betano, casa="betano"),
         )
+        write_jsonl(betano, [{"markets": {"estatisticas": [{"market": "Total de Faltas"}]}}])
+        self.assertEqual({}, cc.snapshot_market_counts(betano, casa="betano"))
 
     def test_finish_populates_n_markets_and_pointer_health(self):
         src = self.odds / "book.jsonl"

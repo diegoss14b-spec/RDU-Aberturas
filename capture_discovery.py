@@ -23,7 +23,7 @@ class DiscoveryQueue:
         self.rows = {str(k):v for k,v in self.rows.items() if isinstance(v,dict)} if isinstance(self.rows,dict) else {}
         self.metrics = {}
 
-    def select(self, events, budget, id_field="id"):
+    def select(self, events, budget, id_field="id", priority_key=None, ignored_markets=()):
         # Dedupe provider identity, never fuzzy teams. Keep input order as a tie
         # break (7k sorts by market count), then rotate using the persisted clock.
         unique = {}
@@ -35,13 +35,19 @@ class DiscoveryQueue:
         def age(item):
             rec = self.rows.get(item[0], {})
             dt = ensure_aware(parse_ts(rec.get("last_attempt")))
-            return (dt.timestamp() if dt else float("-inf"), rank[item[0]])
+            priority = priority_key(item[1]) if priority_key else 0
+            return (priority, dt.timestamp() if dt else float("-inf"), rank[item[0]])
         budget = max(0, int(budget))
         explore_budget = max(1, (budget + 3) // 4) if budget else 0
-        known = sorted([x for x in items if self.rows.get(x[0], {}).get("useful")], key=age)
+        ignored = set(ignored_markets)
+        known = sorted([x for x in items if self.rows.get(x[0], {}).get("useful")
+                        and (not ignored or set(self.rows[x[0]].get('markets') or []) - ignored)], key=age)
         chosen = known[:max(0, budget-explore_budget)]
         chosen_ids = {x[0] for x in chosen}
-        remaining = sorted([x for x in items if x[0] not in chosen_ids], key=age)
+        # Exploration must rotate even when the priority tier never fits the
+        # budget. Oldest/unseen first; league priority only breaks age ties.
+        remaining = sorted([x for x in items if x[0] not in chosen_ids],
+                           key=lambda item: (age(item)[1], age(item)[0], age(item)[2]))
         chosen.extend(remaining[:budget-len(chosen)])
         self.metrics = {"inventory":len(items),"budget":budget,"selected":len(chosen),
                         "not_selected":max(0,len(items)-len(chosen)),

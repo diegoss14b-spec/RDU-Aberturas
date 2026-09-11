@@ -94,17 +94,30 @@ def age_mins(ts_brt_str, now=None):
 
 
 def load_casa_status():
+    from capture_common import resolve_odds_pointer
     rows = []
     for c in [*CASAS, *DISABLED_HOUSES]:
         st = load_json(STATUS / f"{c}.json") or {}
         health = source_state(st, c)
         discovery = load_json(STATUS / f"{c}_discovery.json") or {}
+        full, _ = resolve_odds_pointer(c, prefer_full=True)
+        if not full or full.get('_pointer') != f'{c}_latest_full.json':
+            full = {}
         rows.append({
             "id": c,
             "nome": DISP.get(c, c),
             "ok": health == "ok",
             "source_state": health,
             "capture_ok": bool(st.get("ok")),
+            "attempted": st.get("attempted"),
+            "skipped_reason": st.get("skipped_reason"),
+            "capture_mode": st.get("mode"),
+            "full_at": full.get("at"),
+            "full_age_min": age_mins(full.get("at")),
+            "full_events": full.get("_actual_n"),
+            "full_valid": bool(full),
+            "full_source": full.get("captured_by"),
+            "full_market_counts": full.get("market_counts") or {},
             "discovery": discovery.get("metrics") or {},
             "n_events": st.get("n_events"),
             "n_markets": st.get("n_markets"),
@@ -158,6 +171,7 @@ def load_runs(days=7, limit=40):
         runs.append(r)
         for c, v in (r.get("casas") or {}).items():
             if c not in CASAS: continue
+            if v.get("attempted") is False: continue
             a = agg[c]
             if v.get("source_state") == "protected_feed":
                 a["protected"] += 1
@@ -430,6 +444,12 @@ def build_avisos(summary, casas, board_cov, hist_h, runs):
                 for c in fails
             ),
         })
+    old_full = [c for c in casas if c['id'] in CASAS and
+                (c.get('full_age_min') is None or c['full_age_min'] > 120)]
+    if old_full:
+        avisos.append({'level':'warn', 'txt':'Linhas completas antigas ou sem fonte validada: ' +
+                      ', '.join(c['nome'] for c in old_full) +
+                      '. Uma captura close recente não renova todo o catálogo.'})
     if summary and not summary.get("deploy_allowed", True):
         avisos.append({
             "level": "bad",

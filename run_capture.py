@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parent
 STATUS = ROOT / "data" / "odds" / "_status"
 BRT = timezone(timedelta(hours=-3))
 from capture_common import _atomic_write_text
+from capture_health import state as capture_state
 
 FETCHERS = [
     ("betano",     "fetch_odds_betano.py",    13 * 60),
@@ -72,6 +73,11 @@ def run_one(casa, script, tmo):
             "mode": "close" if os.environ.get("ODDS_WINDOW_H") else "full",
         }, ensure_ascii=False, indent=1))
     print(f"[{casa}] exit={rc} ({time.time()-t0:.0f}s)", flush=True)
+    st = load_status(casa)
+    st.update({"attempted": not bool(st.get("skipped_reason")), "attempt_started_epoch": t0,
+               "attempt_finished_epoch": time.time()})
+    st["source_state"] = capture_state(st, casa)
+    _atomic_write_text(STATUS / f"{casa}.json", json.dumps(st, ensure_ascii=False, indent=1))
     return rc
 
 
@@ -84,7 +90,7 @@ def load_status(casa):
 
 
 def status_ok(st):
-    if not st.get("ok"):
+    if capture_state(st, st.get("casa")) != "ok":
         return False
     n = int(st.get("n_events") or 0)
     if st.get("mode") == "full" and n > 0:
@@ -97,6 +103,27 @@ def status_ok(st):
 
 def casa_ok(casa):
     return status_ok(load_status(casa))
+
+
+def should_retry(st, casa):
+    # A preserved richer residential feed and policy/parse failures cannot be
+    # improved by repeating the same datacenter capture immediately.
+    if capture_state(st, casa) in ("protected_feed", "disabled") or status_ok(st):
+        return False
+    if st.get("attempted") is False:
+        return False
+    if casa == "bet365" and "captura parcial: rede/orçamento" in str(st.get("error") or ""):
+        return False  # bounded collector already retries missing FIs internally
+    return st.get("error_class") not in ("Auth", "Geo", "Parse", "CaptureBudgetExceeded")
+
+
+def record_skip(casa, reason):
+    st = load_status(casa)
+    st.update({"attempted": False, "skipped_reason": reason,
+               "last_decision_epoch": time.time()})
+    st['source_state'] = capture_state(st, casa)
+    # Do not refresh ts_utc/ts_brt or the pointer: no odds were fetched.
+    _atomic_write_text(STATUS / f"{casa}.json", json.dumps(st, ensure_ascii=False, indent=1))
 
 
 def main():
@@ -124,6 +151,7 @@ def main():
         if _is_full and st > 1 and (_hr % st) != 0:
             print(f"[stride] {c}: full pulado (hora {_hr} %% {st} != 0) — pointer anterior segue valendo")
             results[c] = 0
+            record_skip(c, "full_stride")
             continue
         _run.append((c, script, tmo))
     with ThreadPoolExecutor(max_workers=6) as ex:
@@ -133,12 +161,22 @@ def main():
         for casa, fut in futs.items():
             results[casa] = fut.result()
 
-    for casa, script, tmo in FETCHERS:
-        if casa not in {c for c, _, _ in _run}:
-            continue   # pulada pelo stride: não re-tentar
-        if not casa_ok(casa):
-            print(f"\n===== RETRY {casa} =====", flush=True)
-            results[casa] = run_one(casa, script, tmo)
+    # Bound the tail of a full: at most two simultaneous retries and 10 min
+    # overall, instead of adding every house timeout sequentially.
+    retry_deadline = time.monotonic() + 600
+    def retry_one(casa, script, tmo):
+        remaining = int(retry_deadline - time.monotonic())
+        if remaining < 30:
+            print(f"[{casa}] retry não iniciado: orçamento da rodada esgotado")
+            return results.get(casa, 1)
+        print(f"[retry] {casa} (até {min(tmo, remaining)}s)", flush=True)
+        return run_one(casa, script, min(tmo, remaining))
+    retries = [(c, script, tmo) for c, script, tmo in _run
+               if should_retry(load_status(c), c)]
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        futs = {c: ex.submit(retry_one, c, script, tmo) for c, script, tmo in retries}
+        for casa, fut in futs.items():
+            results[casa] = fut.result()
 
     casas_ok, casas_fail, total_events = [], [], 0
     per_casa, per_market = {}, {}
@@ -155,6 +193,10 @@ def main():
             "error": st.get("error"),
             "source_state": st.get("source_state"),
             "error_class": st.get("error_class"),
+            "attempted": st.get("attempted"),
+            "skipped_reason": st.get("skipped_reason"),
+            "mode": st.get("mode"),
+            "ts_utc": st.get("ts_utc"),
         }
         per_casa[casa] = entry
         if valid:
@@ -189,6 +231,8 @@ def main():
         hist_casas = {c: {"ok": v["ok"], "n": v["n_events"],
                           "n_markets": v["n_markets"], "source_state":v.get("source_state"),
                           "error_class":v.get("error_class")} for c, v in per_casa.items()}
+        for c, v in per_casa.items():
+            hist_casas[c].update({"attempted": v.get("attempted"), "skipped_reason": v.get("skipped_reason")})
         hist_line = {"ts": brt, "casas": hist_casas, "total": total_events,
                      "market_counts": summary["market_counts"],
                      "sofa": {"ok": bool(sofa.get("ok")),

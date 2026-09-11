@@ -4,7 +4,7 @@ de estatística de JOGO INTEIRO, pra a Mesa de Aberturas. API cds-api pública, 
   fixtures: /cds-api/bettingoffer/fixtures?...&sportIds=4        -> ~945 jogos (id,name,startDate,liga,optionMarkets)
   detalhe : /cds-api/bettingoffer/fixture-offers?fixtureIds=<id> -> mercados aninhados (varre recursivo por 'options')
 Mercado principal: "Total de Escanteios" (O/U de jogo inteiro) + "{Time} - Total de Escanteios" (por time).
-Cartões/chutes abrem só PERTO do kickoff e vêm como prop binária/por-jogador (não O/U) — não forçamos em O/U.
+Cartões/chutes de jogo e time são aceitos quando há pares O/U; props de jogador ficam fora.
 Auth: só o querystring x-bwin-accessid (público) + fingerprint TLS do curl_cffi impersonate="chrome124".
 Saída: data/odds/sportingbet_{stamp}.jsonl + sportingbet_latest.json (formato normalizado do board).
 
@@ -25,6 +25,8 @@ try:
     import ctypes; ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)
 except Exception: pass
 from curl_cffi import requests as creq
+from capture_discovery import DiscoveryQueue
+from bookmaker_contracts import event_participants
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -86,29 +88,31 @@ def _norm_stat(stat):
 _MATCH_RE = re.compile(r"^total\s+(?:de\s+)?(.+)$", re.I)
 # "{Time} - Total de {stat}"  (por time).
 _TEAM_RE = re.compile(r"^(.+?)\s+-\s+total\s+(?:de\s+)?(.+)$", re.I)
-_EXCL = ("gol", "tempo", "1º", "2º", "1°", "2°", "handicap", "par", "ímpar", "impar",
-         "exato", "faixa", "múltipl", "multipl", "75:", "fim de jogo", "primeir", "últim", "ultim")
 
 def canon_match(nm):
     """'Total de Escanteios' (sem time) -> stat canônico, ou None."""
     if not nm: return None
     l = nm.strip().lower()
     if " - " in l: return None
-    if any(b in l for b in _EXCL): return None
     m = _MATCH_RE.match(l)
     if not m: return None
     return _norm_stat(m.group(1))
 
-def canon_team(nm):
+def canon_team(nm, participants=None):
     """'Time - Total de Escanteios' -> (stat, nome_time), ou None."""
     if not nm: return None
     m = nm.strip()
     ml = m.lower()
-    if any(b in ml for b in _EXCL): return None
     mo = _TEAM_RE.match(m)
     if not mo: return None
     team, stat = mo.group(1).strip(), mo.group(2)
     c = _norm_stat(stat)
+    # Check only the stat against an exact allowlist. Team names may contain
+    # "par" (Queens Park Rangers) or other words unrelated to market semantics.
+    if participants is not None:
+        candidate = _deacc(team.lower())
+        if sum(_deacc(p.lower()) == candidate for p in participants) != 1:
+            return None
     if c and len(team) >= 2: return c, team
     return None
 
@@ -219,7 +223,8 @@ def main():
 
     # oferta rica primeiro (mais optionMarkets no grid) e capa
     fixtures.sort(key=lambda f: len(f.get("optionMarkets") or []), reverse=True)
-    fixtures = fixtures[:MAX_EVENTS]
+    queue = DiscoveryQueue(OUTDIR / '_status' / 'sportingbet_discovery.json', now)
+    fixtures = queue.select(fixtures, MAX_EVENTS)
 
     out_path = OUTDIR / f"sportingbet_{stamp}.jsonl"
     from capture_common import write_odds_latest
@@ -243,10 +248,13 @@ def main():
     for fx in fixtures:
         eid = fx.get("id")
         d = details.get(eid)
-        if not d: continue
+        if not d:
+            queue.record(eid, success=False)
+            continue
         raw_bytes += save_raw(eid, stamp, d)
 
         merc, merc_t = {}, {}
+        participants = event_participants((fx.get('name') or {}).get('value'))
         has_card_prop = False
         for m in iter_markets(d):
             mname = (m.get("name") or {}).get("value") or ""
@@ -254,7 +262,7 @@ def main():
             if "cart" in ml:  # cartões: pode ser O/U ("Total de Cartões") OU prop binária perto do jogo
                 has_card_prop = True
             cm = canon_match(mname)
-            ct = None if cm else canon_team(mname)
+            ct = None if cm else canon_team(mname, participants)
             if not cm and not ct: continue
             lines = ou_lines(m)
             arr = [{"linha": L, "over": v["over"], "under": v["under"]}
@@ -269,6 +277,8 @@ def main():
                 merc_t.setdefault(c2, {})[team] = [prev[L] for L in sorted(prev)]
 
         merc = {k: v for k, v in merc.items() if v}
+        useful = (set(merc) | set(merc_t)) - {'Escanteios'}
+        queue.record(eid, success=True, useful=bool(useful), markets=useful)
         if not merc and not merc_t: continue
         if "Escanteios" in merc or "Escanteios" in merc_t: n_corners += 1
         if "Cartões" in merc or "Cartões" in merc_t or has_card_prop: n_cards += 1
@@ -288,6 +298,7 @@ def main():
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
     f.close()
+    queue.save()
 
     promote = None  # deixa write_odds_latest decidir (full: promove se n>=MIN_EFF)
     write_odds_latest("sportingbet", out_path.name, n_out,

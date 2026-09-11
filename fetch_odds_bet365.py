@@ -15,7 +15,7 @@ a Mesa de Aberturas. Plano do Diego: 30 req/s, 3.600 req/h — cada captura usa
 
 Mercados capturados (só O/U de linha; faixas/race/exatos/3-vias ficam FORA):
   Cartões    : number_of_cards_in_match + asian_total_cards (+ team_cards por time)
-  Escanteios : corners_2_way + alternative_corners + asian_corners + asian_total_corners
+  Escanteios : corners_2_way + asian_corners + asian_total_corners
                (+ team_corners por time)  — corners.corners é 3-VIAS (Over/Exactly/Under), NÃO entra
   Finalizações / Chutes no gol: match_shots / match_shots_on_target (+ team_*)
   Impedimentos / Desarmes: a bet365 abre só em "especiais/outros" e raramente — QUANDO
@@ -36,21 +36,17 @@ SEGREDO: token via env BETSAPI_TOKEN (GitHub Actions secret — o repo é públi
 token JAMAIS vai em código/commit) com fallback betsapi_config.json local (gitignored).
 Saída: data/odds/bet365_{stamp}.jsonl + bet365_latest.json (formato normalizado do board).
 
-POLÍTICA DE CONSUMO "abertura + fechamento" (21/07 — o token é COMPARTILHADO):
-  - FULL: só a cada ~3h (gate por timestamp em _status/bet365_gate.json; fulls
-    intermediários pulam SEM chamada nenhuma, reaproveitando o pointer atual —
-    vira stale-keep honesto no board). Pega a abertura + pontos intermediários.
-  - CLOSE: SEMPRE roda, mas SÓ os jogos iminentes do CACHE de FIs gravado no
-    último full (_status/bet365_fis.json) — tipicamente 2-8 req; upcoming só
-    como fallback (2 páginas) se o cache não servir.
-  Conta (com lotes de 10 FIs): ~8 fulls/dia × ~20 req + ~72 closes × ~2 req ≈
-  300-350 req/dia (era ~2.250), com limite de 3.600/h — folga enorme pro outro usuário.
+POLÍTICA DE CONSUMO (11/09 — token COMPARTILHADO):
+  - FULL: intervalo mínimo de 1h, comprovado pelo ponteiro full validado.
+    Até 120 eventos, 20 páginas upcoming e 90 requests por processo/420s.
+  - CLOSE: até 40 jogos futuros do cache, com pelo menos 3min até o kickoff.
+  - Falha parcial preserva o full anterior; orçamento esgotado não dispara
+    uma segunda captura imediata. Métricas registram o consumo real.
 
-TOTAL DE CHUTES DO JOGO (Finalizações): a BetsAPI NÃO entrega. `other.sp.match_shots`
-existe no catálogo mas vem sempre com odds:[] — 0 ocorrências em 28 jogos testados
-(21/07), incluindo o jogo mais rico (Atlético-MG×Bahia, 79 blocos) e jogos a 9 min do
-apito. A bet365 mostra o mercado na tela, o provedor não expõe. O que dá pra ter:
-match_shots_on_target (total do jogo, raro) e team_shots/team_shots_on_target (por time)."""
+11/09: Finalizações e Chutes no gol de jogo estão disponíveis na lista `others`.
+O contrato segue v3: v4 foi comparado, mas não mostrou cobertura adicional na
+amostra. Seleção exata de ligas, rotação, recuperação parcial e orçamento limitado.
+Taxa de capturas bem-sucedidas NÃO representa cobertura do catálogo da casa."""
 import sys, os, json, re, time
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -75,27 +71,27 @@ UNKNOWN_MK_F = STATUS_DIR / "bet365_unknown_markets.jsonl"  # rede de segurança
 BRT = timezone(timedelta(hours=-3))
 BASE = "https://api.b365api.com"
 DAYS_AHEAD = 5           # janela da Mesa
-MAX_EVENTS = 60          # cap de chamadas de prematch por FULL (~75 req no total)
-MAX_CLOSE_EVENTS = 12    # cap do close (iminentes; tipicamente 2-8)
+MAX_EVENTS = 120         # bounded: at most 12 normal prematch batches per full
+MAX_CLOSE_EVENTS = 40    # four batches; useful games first, with exploration
 MAX_PAGES = 20           # upcoming pagina de 50 em 50 (~700 eventos = 14 páginas)
-FULL_EVERY_H = 2.5       # gate: full de verdade só a cada ~3h (2h30 de guarda, cron atrasa)
+FULL_EVERY_H = 1.0       # aligned with hourly full and 2h stale safety threshold
 FIS_MAX_AGE_H = 12.0     # cache de FIs mais velho que isso não vale (fallback upcoming)
 FI_BATCH = 10            # o /v3/prematch aceita FI=a,b,c — 10 jogos por request (21/07)
 SLEEP = 0.12             # ≤10 req/s — bem abaixo do limite de 30 req/s do plano
 MIN_EVENTS = 5
 MIN_EFF = MIN_EVENTS     # modo close (ODDS_WINDOW_H) e skip do gate reduzem — ver main()
 N_REQ = 0                # contador de requests da captura (auditoria de consumo)
+REQUEST_LIMIT = 90       # shared token: includes discovery, failures and retries
+DEADLINE = None          # set by main, below the orchestrator's 480s timeout
+FULL_SKIPPED = False
+CAPTURE_INCOMPLETE = False
+from bet365_capture_plan import eligible_events, league_priority, merge_inventory, retained_quotes
+from capture_discovery import DiscoveryQueue
 
 # ligas falsas (bots/simulação) — NUNCA entram
 EXCL_LEAGUE = re.compile(r"esoccer|e-?soccer|srl\b|\(srl\)|virtual|simulat", re.I)
-# prioridade 0 = ligas com MODELO na Mesa (cartões/faltas/finalizações/escanteios)
-PRIO_LEAGUE = re.compile(
-    r"brazil serie [ab]|premier league|la liga|italy serie a|bundesliga|ligue 1|"
-    r"eliteserien|bolivia|ecuador|china super league", re.I)
-# prioridade 1 = competições que a Mesa acompanha de perto
-SEC_LEAGUE = re.compile(
-    r"brazil|libertadores|sudamericana|sul-americana|argentina|mexico|colombia|"
-    r"uefa|champions|europa|conference|championship|eredivisie|primeira liga|mls", re.I)
+class CaptureBudgetExceeded(RuntimeError):
+    pass
 
 
 def _token():
@@ -119,15 +115,18 @@ def get(path, params, token):
     url = f"{BASE}{path}"
     q = dict(params); q["token"] = token
     for a in range(3):
+        remaining = DEADLINE - time.monotonic() if DEADLINE is not None else 30
+        if N_REQ >= REQUEST_LIMIT or remaining < 2:
+            raise CaptureBudgetExceeded("orçamento de requests/tempo esgotado")
         try:
             N_REQ += 1
-            r = requests.get(url, params=q, timeout=30)
+            r = requests.get(url, params=q, timeout=min(30, remaining))
             if r.status_code == 200:
                 d = r.json()
                 if d.get("success") == 1:
                     return d
                 # success:0 = token/quota — não insistir além do retry
-                print(f"[bet365] {path} success=0 (tentativa {a+1}): {str(d)[:120]}")
+                print(f"[bet365] {path} success=0 (tentativa {a+1})")
             elif r.status_code == 429:
                 time.sleep(2.0 * (a + 1)); continue
             else:
@@ -144,42 +143,76 @@ _OU_NAME = re.compile(r"^(over|under)\s+([0-9.]+)$", re.I)
 
 def _num(s):
     try:
-        v = float(str(s).strip())
-        return v
-    except Exception:
+        value = float(str(s).strip())
+        return value if value == value and abs(value) != float("inf") else None
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
+def _supported_line(value, *, signed=False):
+    """Only finite integer/half lines; quarter settlement is not supported."""
+    value = _num(value)
+    return value is not None and (signed or value >= 0) and (value * 2).is_integer()
+
+def _has_exact_outcome(odds_list):
+    """Three-way totals must not be converted to two-way Asian/push totals."""
+    return any(
+        isinstance(o, dict)
+        and any(str(o.get(k) or "").strip().lower().split(" ", 1)[0]
+                in ("exactly", "exact") for k in ("header", "name", "handicap"))
+        for o in odds_list
+    )
+
+def _put_price(lines, line, side, price):
+    """Conflicting duplicate legs invalidate that block/line, not other blocks."""
+    slot = lines.setdefault(line, {})
+    if side in slot and slot[side] != price:
+        slot["_conflict"] = True
+    slot.setdefault(side, price)
+
+def _merge_complete(target, block, sides=("over", "under")):
+    """First complete block wins. Never combine one leg from separate blocks."""
+    for line, pair in block.items():
+        if not pair.get("_conflict") and all(side in pair for side in sides):
+            target.setdefault(line, {side: pair[side] for side in sides})
+
 def _entry_side_line(o):
-    """Uma odd da BetsAPI → (side, linha) ou None.
-    Formatos: header Over/Under + name/handicap numérico  |  name/handicap 'Over 5.5'."""
+    """Parse an unambiguous total; never infer a quarter or conflicting side."""
+    if not isinstance(o, dict):
+        return None
     header = str(o.get("header") or "").strip().lower()
-    name = str(o.get("name") or "").strip()
-    hcap = str(o.get("handicap") or "").strip()
-    if "," in name or "," in hcap:
-        return None  # linha asiática quartada (5.5,6.0) — não representável no par O/U
-    if header in ("over", "under"):
-        L = _num(name) if _num(name) is not None else _num(hcap)
-        if L is None:
-            return None
-        return header, L
-    for txt in (name, hcap):
+    texts = [str(o.get(k) if o.get(k) is not None else "").strip()
+             for k in ("name", "handicap")]
+    if any("," in txt for txt in texts):
+        return None
+    candidates = []
+    for txt in texts:
         mo = _OU_NAME.match(txt)
         if mo:
-            return mo.group(1).lower(), float(mo.group(2))
-    return None
+            side, line = mo.group(1).lower(), _num(mo.group(2))
+            if header in ("over", "under") and header != side:
+                return None
+            candidates.append((side, line))
+        elif header in ("over", "under") and _num(txt) is not None:
+            candidates.append((header, _num(txt)))
+    if not candidates or any(item != candidates[0] for item in candidates[1:]):
+        return None
+    side, line = candidates[0]
+    return (side, line) if _supported_line(line) else None
 
 
 def _collect(lines, odds_list):
-    """Acumula pares O/U em lines[L] = {'over','under'} (primeiro valor vence)."""
-    for o in odds_list or []:
+    if not isinstance(odds_list, list) or _has_exact_outcome(odds_list):
+        return
+    for o in odds_list:
+        if not isinstance(o, dict):
+            continue
         sl = _entry_side_line(o)
         price = _num(o.get("odds"))
-        if not sl or not price or price <= 1:
+        if sl is None or price is None or price <= 1:
             continue
-        side, L = sl
-        slot = lines.setdefault(L, {})
-        slot.setdefault(side, round(price, 2))
+        side, line = sl
+        _put_price(lines, line, side, price)
 
 
 # ------------------------------------------------- HANDICAP (2 vias, casa/fora)
@@ -198,51 +231,48 @@ _HAND_NUM = re.compile(r"^[+-]?\d+(?:\.\d+)?$")
 
 
 def _hand_line(txt):
-    """'+0.5' → 0.5 · '-1.0' → -1.0 · '0.0' → 0.0. Quartada ('0.0,+0.5') = None."""
-    t = str(txt or "").strip()
-    if "," in t or not _HAND_NUM.match(t):
+    value = str(txt if txt is not None else "").strip()
+    if "," in value or not _HAND_NUM.match(value):
         return None
-    return _num(t)
+    line = _num(value)
+    return line if _supported_line(line, signed=True) else None
 
 
 def _collect_hand(lines, odds_list):
-    """Acumula handicap em lines[L] = {'casa','fora'}, L do ponto de vista do mandante."""
-    for o in odds_list or []:
+    if not isinstance(odds_list, list) or _has_exact_outcome(odds_list):
+        return
+    for o in odds_list:
+        if not isinstance(o, dict):
+            continue
         header = str(o.get("header") or "").strip()
-        lado = "casa" if header == "1" else ("fora" if header == "2" else None)
-        if not lado:
-            continue
-        L = _hand_line(o.get("handicap") if o.get("handicap") is not None else o.get("name"))
+        side = "casa" if header == "1" else "fora" if header == "2" else None
+        raw_line = o.get("handicap")
+        if raw_line is None or not str(raw_line).strip():
+            raw_line = o.get("name")
+        line = _hand_line(raw_line)
         price = _num(o.get("odds"))
-        if L is None or not price or price <= 1:
+        if side is None or line is None or price is None or price <= 1:
             continue
-        if lado == "fora":
-            L = -L                      # espelha pro ponto de vista do mandante
-        # -0.0 e 0.0 são a MESMA linha (DNB). Sem isto viram duas chaves no
-        # banco e o par nunca fecha — o lado 'fora' de +0.0 vira -0.0.
-        L = L + 0.0 if L else 0.0
-        lines.setdefault(L, {}).setdefault(lado, round(price, 2))
+        if side == "fora":
+            line = -line
+        _put_price(lines, line + 0.0 if line else 0.0, side, price)
 
 
 def _collect_team(per_team, odds_list, home, away):
-    """Mercados por time: header '1'(casa)/'2'(fora) + handicap 'Over 5.5'."""
-    for o in odds_list or []:
+    if not isinstance(odds_list, list) or _has_exact_outcome(odds_list):
+        return
+    for o in odds_list:
+        if not isinstance(o, dict):
+            continue
         header = str(o.get("header") or "").strip()
-        team = home if header == "1" else (away if header == "2" else None)
-        if not team:
-            continue
-        sl = None
-        for txt in (str(o.get("handicap") or ""), str(o.get("name") or "")):
-            mo = _OU_NAME.match(txt.strip())
-            if mo:
-                sl = (mo.group(1).lower(), float(mo.group(2)))
-                break
+        team = home if header == "1" else away if header == "2" else None
+        # The team's 1/2 header identifies ownership, not the O/U side.
+        sl = _entry_side_line(dict(o, header=""))
         price = _num(o.get("odds"))
-        if not sl or not price or price <= 1:
+        if team is None or sl is None or price is None or price <= 1:
             continue
-        side, L = sl
-        slot = per_team.setdefault(team, {}).setdefault(L, {})
-        slot.setdefault(side, round(price, 2))
+        side, line = sl
+        _put_price(per_team.setdefault(team, {}), line, side, price)
 
 
 # ⚠ ACHADO 21/07: além das seções-DICIONÁRIO (main, corners, cards_fouls, other,
@@ -257,10 +287,10 @@ MATCH_MARKETS = {
     "number_of_cards_in_match": "Cartões",
     "asian_total_cards": "Cartões",
     "corners_2_way": "Escanteios",
-    "alternative_corners": "Escanteios",
+    # alternative_corners is three-way Over/Exactly/Under: intentionally excluded.
     "asian_corners": "Escanteios",
     "asian_total_corners": "Escanteios",
-    "match_shots": "Finalizações",              # existe no catálogo mas a API nunca popula (ver docstring)
+    "match_shots": "Finalizações",              # populated in `others` (verified 11/09)
     "match_shots_on_target": "Chutes no gol",
     # IMPEDIMENTOS e DESARMES: a bet365 abre no "especiais/outros" e, QUANDO abrem, vêm
     # na API (lista `others`). Hoje (21/07) raramente estão abertos, então a nomenclatura
@@ -340,6 +370,8 @@ def _looks_ou_total(odds):
     n_over = n_under = 0
     has_half = False
     for o in odds:
+        if not isinstance(o, dict):
+            continue
         h = str(o.get("header") or "").strip().lower()
         if h == "over":
             n_over += 1
@@ -362,7 +394,9 @@ def _detect_unknown_total(mk, mv, gid, jogo):
         return
     if KNOWN_TOTAL_EXCL.search(str(mk or "")):
         return
-    odds = (mv or {}).get("odds") or []
+    if not isinstance(mv, dict) or not isinstance(mv.get("odds"), list):
+        return
+    odds = [o for o in mv["odds"] if isinstance(o, dict)]
     if len(odds) < 2 or not _looks_ou_total(odds):
         return
     today = datetime.now(BRT).strftime("%Y-%m-%d")
@@ -397,65 +431,68 @@ def _detect_unknown_total(mk, mv, gid, jogo):
 
 
 def _iter_sp(res):
-    """Gera (mercado, mv) de TODAS as fontes: seções-dicionário + lista `others`."""
-    for sec in ("main", "corners", "cards_fouls", "asian_lines", "other", "shots",
-                "goals", "half", "player_stats"):
-        sp = (res.get(sec) or {}).get("sp") or {}
+    """Keep established scopes/order; tolerate malformed optional sections."""
+    if not isinstance(res, dict):
+        return
+    blocks = [res.get(sec) for sec in (
+        "main", "corners", "cards_fouls", "asian_lines", "other", "shots",
+        "goals", "half", "player_stats")]
+    others = res.get("others")
+    if isinstance(others, list):
+        blocks.extend(others)
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        sp = block.get("sp")
         if isinstance(sp, dict):
-            for mk, mv in sp.items():
-                yield mk, mv
-    for blk in (res.get("others") or []):
-        sp = (blk or {}).get("sp") or {}
-        if isinstance(sp, dict):
-            for mk, mv in sp.items():
-                yield mk, mv
+            for key, market in sp.items():
+                if isinstance(market, dict):
+                    yield key, market
 
 
 def parse_prematch(res, home, away, gid=None, jogo=None):
-    """results[0] do /v3/bet365/prematch → (mercados, mercados_time).
-    Varre seções-dicionário E a lista `others`; jogador nunca entra. Mercado não
-    mapeado com cara de O/U-de-total vai pro detector (rede de segurança)."""
+    """v3 prematch -> unchanged normalized schema; complete pairs per block."""
     merc, merc_t_raw, merc_h = {}, {}, {}
     for mk, mv in _iter_sp(res):
         if _is_player_market(mk):
             continue
-        odds = (mv or {}).get("odds") or []
-        if not odds:
+        odds = mv.get("odds")
+        if not isinstance(odds, list) or not odds:
             continue
         canon = MATCH_MARKETS.get(mk)
         if canon:
-            _collect(merc.setdefault(canon, {}), odds)
+            block = {}
+            _collect(block, odds)
+            _merge_complete(merc.setdefault(canon, {}), block)
             continue
         canon_h = HAND_MARKETS.get(mk)
         if canon_h:
-            _collect_hand(merc_h.setdefault(canon_h, {}), odds)
+            block = {}
+            _collect_hand(block, odds)
+            _merge_complete(merc_h.setdefault(canon_h, {}), block, ("casa", "fora"))
             continue
         canon_t = TEAM_MARKETS.get(mk)
         if canon_t:
-            _collect_team(merc_t_raw.setdefault(canon_t, {}), odds, home, away)
+            block = {}
+            _collect_team(block, odds, home, away)
+            for team, lines in block.items():
+                target = merc_t_raw.setdefault(canon_t, {}).setdefault(team, {})
+                _merge_complete(target, lines)
             continue
-        # não mapeado e não é player → rede de segurança (só loga, não entra no board)
         _detect_unknown_total(mk, mv, gid, jogo)
     out = {}
     for canon, lines in merc.items():
-        arr = [{"linha": L, "over": v["over"], "under": v["under"]}
-               for L, v in sorted(lines.items()) if "over" in v and "under" in v]
-        if arr:
-            out[canon] = arr
-    # handicap entra no MESMO dict `mercados` (o ingest lê por lado presente),
-    # mas só com o PAR completo — meia perna não é mercado e não dá pra de-vigar
+        if lines:
+            out[canon] = [dict(linha=line, **pair) for line, pair in sorted(lines.items())]
     for canon, lines in merc_h.items():
-        arr = [{"linha": L, "casa": v["casa"], "fora": v["fora"]}
-               for L, v in sorted(lines.items()) if "casa" in v and "fora" in v]
-        if arr:
-            out[canon] = arr
+        if lines:
+            out[canon] = [dict(linha=line, **pair) for line, pair in sorted(lines.items())]
     merc_t = {}
-    for canon, per_team in merc_t_raw.items():
-        for team, lines in per_team.items():
-            arr = [{"linha": L, "over": v["over"], "under": v["under"]}
-                   for L, v in sorted(lines.items()) if "over" in v and "under" in v]
-            if arr:
-                merc_t.setdefault(canon, {})[team] = arr
+    for canon, teams in merc_t_raw.items():
+        for team, lines in teams.items():
+            if lines:
+                merc_t.setdefault(canon, {})[team] = [
+                    dict(linha=line, **pair) for line, pair in sorted(lines.items())]
     return out, merc_t
 
 
@@ -474,14 +511,16 @@ def _save_json(path, obj):
         print(f"[bet365] aviso: não gravei {Path(path).name}: {type(e).__name__}")
 
 
-def _sweep_upcoming(token, now_utc, max_pages):
+def _sweep_upcoming(token, now_utc, max_pages, start_page=1):
     """Varre o upcoming (barato: 50/página) → eventos reais na janela de DAYS_AHEAD."""
-    events, total, page = [], None, 1
-    while page <= max_pages:
+    events, total, page = [], None, start_page
+    _sweep_upcoming.next_page = start_page
+    while page < start_page + max_pages:
         d = get("/v1/bet365/upcoming", {"sport_id": 1, "page": page}, token)
         if not d:
             break
         total = (d.get("pager") or {}).get("total") or 0
+        _sweep_upcoming.next_page = page + 1 if page * 50 < total else 11
         for r in d.get("results") or []:
             league = ((r.get("league") or {}).get("name")) or ""
             if EXCL_LEAGUE.search(league):
@@ -490,80 +529,127 @@ def _sweep_upcoming(token, now_utc, max_pages):
                 t = int(r.get("time") or 0)
             except Exception:
                 continue
-            dt = datetime.fromtimestamp(t, tz=timezone.utc)
-            if not (now_utc - timedelta(hours=3) <= dt <= now_utc + timedelta(days=DAYS_AHEAD)):
-                continue
+            # Keep observed identities even when no longer eligible: the merge
+            # must evict an old future kickoff corrected to past/cancelled time.
             home = ((r.get("home") or {}).get("name")) or ""
             away = ((r.get("away") or {}).get("name")) or ""
             if not home or not away:
                 continue
             events.append({"fi": r.get("id"), "time": t, "league": league,
+                           "league_id": (r.get("league") or {}).get("id"),
                            "home": home, "away": away})
         if page * 50 >= (total or 0):
             break
         page += 1
         time.sleep(SLEEP)
-    print(f"[bet365] upcoming: {total} eventos brutos · {len(events)} reais na janela de {DAYS_AHEAD}d ({page} páginas)")
+    print(f"[bet365] upcoming: {total} eventos brutos · {len(events)} reais ({start_page}–{page})")
     return events
 
 
+def fetch_batch(lote, token):
+    """Retry each missing FI, including partial (not only empty) responses."""
+    ids = {str(e['fi']) for e in lote}
+    def rows(data):
+        values = (data or {}).get('results') or []
+        return [r for r in values if isinstance(r, dict)] if isinstance(values, list) else []
+    data = get('/v3/bet365/prematch', {'FI': ','.join(str(e['fi']) for e in lote)}, token)
+    found = {str(r.get('FI')): r for r in rows(data) if str(r.get('FI')) in ids}
+    transport_missing = set(ids) if data is None else set()
+    for event in lote:
+        ident = str(event['fi'])
+        if ident not in found and len(lote) > 1:
+            try:
+                data = get('/v3/bet365/prematch', {'FI': ident}, token)
+            except CaptureBudgetExceeded:
+                # Preserve valid rows already returned by the batch.
+                return found, True, sorted(transport_missing | (ids - set(found)))
+            if data is None:
+                transport_missing.add(ident)
+            else:
+                transport_missing.discard(ident)
+            found.update({str(r.get('FI')): r for r in rows(data) if str(r.get('FI')) == ident})
+            time.sleep(SLEEP)
+    return found, False, sorted(transport_missing - set(found))
+
+
 def main():
-    global MIN_EFF
-    token = _token()
+    global MIN_EFF, DEADLINE, FULL_SKIPPED, CAPTURE_INCOMPLETE, N_REQ
+    DEADLINE, N_REQ = time.monotonic() + 420, 0
+    FULL_SKIPPED = CAPTURE_INCOMPLETE = False
     now = datetime.now(BRT)
     now_utc = datetime.now(timezone.utc)
     _wh = odds_window()
 
     if _wh is None:
         # ===== FULL: só a cada FULL_EVERY_H (token compartilhado — ver docstring) =====
-        gate = _load_json(GATE_F) or {}
-        last = float(gate.get("last_full_epoch") or 0)
-        age_h = (time.time() - last) / 3600.0 if last else 1e9
         from capture_common import resolve_odds_pointer
-        if age_h < FULL_EVERY_H:
-            meta, _srcp = resolve_odds_pointer("bet365", prefer_full=False)
+        meta, _srcp = resolve_odds_pointer("bet365", prefer_full=True, max_age_h=FULL_EVERY_H)
+        if meta and meta.get('_pointer') == 'bet365_latest_full.json':
+            age_h = meta.get('_age_h')
             n_prev = int((meta or {}).get("_actual_n") or 0)
-            if n_prev > 0:
+            try:
+                current_contract = all(json.loads(line).get('parser_contract') == 2
+                    for line in _srcp.read_text(encoding='utf-8').splitlines() if line.strip())
+            except (OSError, ValueError, AttributeError):
+                current_contract = False
+            if n_prev > 0 and current_contract:
                 # pulo SEM chamada nenhuma; pointer atual segue valendo (stale-keep honesto)
                 MIN_EFF = 1
+                FULL_SKIPPED = True
                 print(f"[bet365] gate: último full há {age_h:.1f}h (<{FULL_EVERY_H:g}h) — "
                       f"pulando captura (0 req; inventário atual: {n_prev} jogos)")
                 return n_prev
-            print(f"[bet365] gate: dentro da janela mas SEM pointer válido — full de recuperação")
-        events = _sweep_upcoming(token, now_utc, MAX_PAGES)
-        # cache de FIs pro modo close (todos da janela, ANTES do cap)
+            print(f"[bet365] gate: fonte vazia/contrato antigo — full de recuperação")
+        token = _token()
+        cache = _load_json(FIS_F) or {}
+        # Refresh the near horizon and rotate deeper pages, instead of repeatedly
+        # visiting only the same first 1000 events. Keep older future identities.
+        cursor = max(11, int(cache.get('next_page') or 11))
+        front = _sweep_upcoming(token, now_utc, 10)
+        deeper = _sweep_upcoming(token, now_utc, 10, start_page=cursor)
+        events = merge_inventory(cache.get('events') or [], front + deeper, now_utc.timestamp())
+        next_page = _sweep_upcoming.next_page
         _save_json(FIS_F, {"at": now.isoformat(timespec="seconds"),
-                           "at_epoch": time.time(), "events": events})
-        # prioridade: ligas com modelo > competições acompanhadas > resto; depois kickoff
-        def prio(e):
-            lg = e["league"]
-            p = 0 if PRIO_LEAGUE.search(lg) else (1 if SEC_LEAGUE.search(lg) else 2)
-            return (p, e["time"])
-        events.sort(key=prio)
-        events = events[:MAX_EVENTS]
+                           "at_epoch": time.time(), "events": events,
+                           "next_page": next_page, "partial_inventory": True})
     else:
         # ===== CLOSE: sempre roda, mas SÓ iminentes, via cache de FIs do último full =====
+        token = _token()
         cache = _load_json(FIS_F) or {}
         cache_age_h = (time.time() - float(cache.get("at_epoch") or 0)) / 3600.0 \
             if cache.get("at_epoch") else 1e9
-        events = [e for e in (cache.get("events") or []) if in_window(e.get("time"), _wh)]
+        events = eligible_events(cache.get('events') or [], now_utc.timestamp(), hours=_wh, min_lead=180)
         if cache_age_h > FIS_MAX_AGE_H or (not events and not cache.get("events")):
             print(f"[bet365] close: cache de FIs {'velho' if cache else 'ausente'} "
                   f"({cache_age_h:.1f}h) — fallback upcoming (2 páginas)")
             swept = _sweep_upcoming(token, now_utc, 2)
-            events = [e for e in swept if in_window(e.get("time"), _wh)]
+            events = eligible_events(swept, now_utc.timestamp(), hours=_wh, min_lead=180)
         else:
             print(f"[bet365] close: cache de FIs ({cache_age_h:.1f}h) → "
                   f"{len(events)} jogos iminentes na janela {_wh:g}h")
-        events.sort(key=lambda e: e.get("time") or 0)
-        events = events[:MAX_CLOSE_EVENTS]
         MIN_EFF = (min(MIN_EVENTS, 1) if events else 0)
+
+    queue = DiscoveryQueue(STATUS_DIR / 'bet365_discovery.json', now)
+    events = eligible_events(events, now_utc.timestamp(), hours=_wh, min_lead=180 if _wh else 0)
+    inventory = list(events)
+    events = queue.select(events, MAX_CLOSE_EVENTS if _wh is not None else MAX_EVENTS,
+                          id_field='fi', priority_key=league_priority)
+    queue.metrics.update(mode='close' if _wh is not None else 'full', returned=0,
+                         parsed=0, missing_fis=[], no_supported_markets=[], started_before_fetch=[])
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
     out_path = OUTDIR / f"bet365_{stamp}.jsonl"
     from capture_common import write_odds_latest
+    previous = []
+    if _wh is None:
+        old_meta, old_path = resolve_odds_pointer("bet365", prefer_full=True, max_age_h=12)
+        if old_path and old_meta.get('_pointer') == 'bet365_latest_full.json':
+            try:
+                previous = [json.loads(line) for line in old_path.read_text(encoding='utf-8').splitlines() if line.strip()]
+            except (OSError, ValueError):
+                previous = []
     def write_latest(n, promote=None):
-        write_odds_latest("bet365", out_path.name, n,
+        return write_odds_latest("bet365", out_path.name, n,
                           at=now.isoformat(timespec="seconds"), promote_full=promote,
                           min_events=MIN_EFF)
 
@@ -572,40 +658,63 @@ def main():
     f = open(out_path, "w", encoding="utf-8")
     n_out = n_det = 0
     for i in range(0, len(events), FI_BATCH):
-        lote = events[i:i + FI_BATCH]
-        d = get("/v3/bet365/prematch", {"FI": ",".join(str(e["fi"]) for e in lote)}, token)
+        lote = [e for e in events[i:i + FI_BATCH] if float(e['time']) > time.time()]
+        if not lote:
+            continue
+        try:
+            by_fi, budget_exhausted, transport_missing = fetch_batch(lote, token)
+        except CaptureBudgetExceeded:
+            CAPTURE_INCOMPLETE = True
+            break
+        if budget_exhausted or transport_missing:
+            CAPTURE_INCOMPLETE = True
         time.sleep(SLEEP)
-        rs = (d or {}).get("results") or []
-        if not rs and len(lote) > 1:
-            # lote falhou: tenta um a um (não perde a rodada inteira por 1 FI ruim)
-            rs = []
-            for e in lote:
-                d1 = get("/v3/bet365/prematch", {"FI": e["fi"]}, token)
-                time.sleep(SLEEP)
-                rs += (d1 or {}).get("results") or []
-        by_fi = {str(r.get("FI") or r.get("event_id")): r for r in rs}
         for e in lote:
             r = by_fi.get(str(e["fi"]))
             if not r:
+                queue.record(e['fi'], success=False)
+                queue.metrics['missing_fis'].append(str(e['fi']))
                 continue
+            queue.metrics['returned'] += 1
             n_det += 1
+            if float(e['time']) <= time.time():
+                queue.metrics['started_before_fetch'].append(str(e['fi']))
+                queue.record(e['fi'], success=True, useful=False)
+                continue
             merc, merc_t = parse_prematch(r, e["home"], e["away"],
                                           gid=e["fi"], jogo=f"{e['home']} - {e['away']}")
             if not merc and not merc_t:
+                queue.record(e['fi'], success=True, useful=False)
+                queue.metrics['no_supported_markets'].append(str(e['fi']))
                 continue
+            useful = (set(merc) | set(merc_t)) - {'Escanteios', 'Handicap de Cartões'}
+            queue.record(e['fi'], success=True, useful=bool(useful), markets=useful)
+            queue.metrics['parsed'] += 1
             rec = {"casa": "bet365", "event_id": e["fi"],
+                   "parser_contract": 2,
                    "name": f"{e['home']} - {e['away']}",
                    "league": e["league"], "start": e["time"],
-                   "captured_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+                   "captured_at": datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S"),
                    "mercados": merc}
             if merc_t:
                 rec["mercados_time"] = merc_t
             f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
             n_out += 1
+    fresh_count = n_out
+    carried = retained_quotes(previous, inventory, {str(e['fi']) for e in events}, time.time()) if _wh is None else []
+    for rec in carried:
+        f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    n_out += len(carried)
     f.close()
-    write_latest(n_out, promote=None)
-    if _wh is None and n_out > 0:
-        # full concluído: arma o gate das próximas ~3h (auditoria: req da rodada junto)
+    if _wh is None and fresh_count < MIN_EFF:
+        CAPTURE_INCOMPLETE = True
+    queue.metrics.update(requests=N_REQ, incomplete=CAPTURE_INCOMPLETE,
+                         fresh_events=fresh_count, retained_events=len(carried),
+                         unattempted=max(0,len(events)-queue.metrics.get('attempted',0)))
+    queue.save()
+    result = write_latest(n_out, promote=False if CAPTURE_INCOMPLETE else None)
+    if _wh is None and n_out >= MIN_EFF and not CAPTURE_INCOMPLETE and not result.get('promotion_blocked'):
+        # Full concluído: recibo da rodada; o gate consulta o ponteiro validado.
         _save_json(GATE_F, {"last_full_epoch": time.time(),
                             "last_full_at": now.isoformat(timespec="seconds"),
                             "last_full_req": N_REQ, "last_full_n": n_out})
@@ -619,7 +728,8 @@ if __name__ == "__main__":
     from capture_common import finish
     try:
         _n = main() or 0
-        sys.exit(finish("bet365", _n, MIN_EFF, t0=_t0))
+        sys.exit(finish("bet365", _n, MIN_EFF, t0=_t0, reused=FULL_SKIPPED,
+                        error="captura parcial: rede/orçamento; full anterior preservado" if CAPTURE_INCOMPLETE else None))
     except SystemExit:
         raise
     except BaseException as _e:

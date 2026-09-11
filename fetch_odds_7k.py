@@ -303,7 +303,9 @@ def main():
 
     evs = gj("/api/pulse/snapshot/events?lang=BR-PT") or []
     cand = [e for e in evs if str(e.get("SportId")) == "1" and not e.get("IsLive")
-            and (e.get("TotalActiveMarketsCount") or 0) > 0]
+            and (e.get("TotalActiveMarketsCount") or 0) > 0
+            and not re.search(r'esoccer|e-?soccer|\bsrl\b|virtual|simulat', str(e.get('LeagueName') or ''), re.I)
+            and in_window(e.get("StartTimeUtc") or e.get("StartDate") or e.get("StartEventDate"), 120)]
     _wh = odds_window()
     if _wh is not None:   # modo close: filtra ANTES do sort/cap e das 2 chamadas markets/all por evento
         global MIN_EFF
@@ -315,7 +317,7 @@ def main():
     cand.sort(key=lambda e: -(e.get("TotalActiveMarketsCount") or 0))
     from capture_discovery import DiscoveryQueue
     queue = DiscoveryQueue(OUTDIR / "_status" / "7k_discovery.json", now)
-    cand = queue.select(cand, MAX_EVENTS, id_field="_id")
+    cand = queue.select(cand, MAX_EVENTS, id_field="_id", ignored_markets={'Escanteios'})
     print(f"[7k] snapshot {len(evs)} eventos · {len(cand)} selecionados por orçamento/rotação")
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
@@ -406,7 +408,8 @@ def main():
                 arr, dropped = _pick_family(fams)
                 if arr:
                     merc_t.setdefault(c2, {})[team] = arr
-        queue.record(eid, success=True, useful=bool(merc or merc_t), markets=set(merc) | set(merc_t))
+        useful = (set(merc) | set(merc_t)) - {'Escanteios'}
+        queue.record(eid, success=True, useful=bool(useful), markets=useful)
         if not merc and not merc_t: continue
         from bookmaker_contracts import normalize_7k_event_name
         name = normalize_7k_event_name(e.get("EventName"))

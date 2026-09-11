@@ -43,8 +43,42 @@ CRITICAL_FILES = {
 def _fetch_text(url, timeout=20):
     req = urllib.request.Request(url, headers={"User-Agent": "rdu-deploy/1.0",
                                                "Cache-Control": "no-cache"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return r.read().decode("utf-8", errors="replace")
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.read().decode("utf-8")
+        except (OSError, TimeoutError) as exc:
+            # Retry only transport/transient HTTP errors; never bypass the baseline.
+            retryable = not isinstance(exc, urllib.error.HTTPError) or exc.code in (408, 429, 500, 502, 503, 504)
+            if not retryable or attempt == 2:
+                raise
+            print(f"[deploy] leitura pública: {_read_error(exc)}; nova tentativa {attempt + 2}/3")
+            time.sleep(attempt + 1)
+
+
+def _read_error(exc):
+    """Operational diagnosis without leaking URLs, response bodies or credentials."""
+    return f"HTTP {exc.code}" if isinstance(exc, urllib.error.HTTPError) else type(exc).__name__
+
+
+def _coherent_live_history(live_raw):
+    """Read manifest/history from one generation, retrying concurrent publication.
+
+    No fallback to an unverified local baseline, even after repeated failures.
+    """
+    base = DEPLOY_LIVE_BASE.rstrip("/")
+    for attempt in range(3):
+        live = parse_manifest_text(live_raw.decode("utf-8"))
+        meta = ((live.get("artifacts") or {}).get("/data/history.js") or {})
+        history_raw = _fetch_text(base + "/data/history.js").encode("utf-8")
+        after_raw = _fetch_text(base + MANIFEST_REL).encode("utf-8")
+        if live_raw == after_raw and sha256_bytes(history_raw) == meta.get("sha256"):
+            return live, live_raw, meta, history_raw
+        if attempt < 2:
+            print("[deploy] publicação concorrente/cache divergente; relendo baseline completo")
+            live_raw = after_raw
+            time.sleep(attempt + 1)
+    raise ValueError("live history hash differs from manifest or publication changed after 3 coherent reads")
 
 
 def manifest_gate(dirpath, *, history_root=None):
@@ -118,15 +152,13 @@ def _shrink_reason(man):
         live = parse_manifest_text(live_raw.decode("utf-8"))
     except Exception as e:
         if target is not None:
-            return "manifesto ao vivo indisponível; política CLV exige baseline verificável"
+            return "manifesto ao vivo indisponível; política CLV exige baseline verificável (" + _read_error(e) + ")"
         print(f"[deploy] manifesto ao vivo indisponível ({type(e).__name__}) — pulo a trava de encolhimento")
         return None
     live_meta = ((live.get("artifacts") or {}).get("/data/history.js") or {})
     if target is not None or live_meta.get("history_contract") is not None:
         try:
-            live_history_raw = _fetch_text(DEPLOY_LIVE_BASE.rstrip("/") + "/data/history.js").encode("utf-8")
-            if sha256_bytes(live_history_raw) != live_meta.get("sha256"):
-                raise ValueError("live history hash differs from manifest (retry coherent snapshot)")
+            live, live_raw, live_meta, live_history_raw = _coherent_live_history(live_raw)
             live_history = strip_window(live_history_raw.decode("utf-8"), "window.HIST=")
             previous = history_contract(live_history, sha256_bytes(live_history_raw))
             if previous != live_meta.get("history_contract"):

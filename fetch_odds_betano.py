@@ -126,10 +126,9 @@ def main():
                     mks = ((d.get("data") or {}).get("event") or {}).get("markets") or []
                     rec["markets"][label] = extract_ou(mks)
                 time.sleep(0.45)
-            from bookmaker_contracts import betano_market, event_participants
-            recognized = {mapped[0] for tab in rec["markets"].values() if isinstance(tab, list)
-                          for market in tab
-                          if (mapped := betano_market(market.get("market"), event_participants(rec.get("name")), rec.get("league") or ""))}
+            from bookmaker_contracts import normalize_betano_markets
+            match_markets, team_markets = normalize_betano_markets(rec)
+            recognized = set(match_markets) | set(team_markets)
             queue.record(ev["id"], success=succeeded, useful=bool(recognized), markets=recognized)
             if not succeeded:
                 continue

@@ -58,6 +58,7 @@ def board_capture(status_dir, jogos, now=None):
             if ts is None or ts < now-timedelta(days=7):continue
             for house,st in (r.get('casas') or {}).items():
                 if house not in ACTIVE_HOUSES:continue
+                if st.get('attempted') is False:continue
                 a=agg.setdefault(NAMES[house],{'ok':0,'total':0,'protected':0,'legacy_unknown':0})
                 if st.get('source_state')=='protected_feed':a['protected']+=1;continue
                 a['total']+=1;a['ok']+=int(bool(st.get('ok')))

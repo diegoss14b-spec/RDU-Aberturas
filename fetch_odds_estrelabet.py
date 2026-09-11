@@ -17,6 +17,7 @@ try:
     import ctypes; ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)
 except Exception: pass
 import requests
+from capture_discovery import DiscoveryQueue
 
 ROOT = Path(__file__).resolve().parent
 # 11/07: a Altenar passou a rate-limitar IP de datacenter (nuvem capturava ~5 detalhes e era
@@ -169,7 +170,8 @@ def main():
     # ordenar por nº de mercados (os com stats têm muitos) e capar
     def nmk(e): return len(flat_ids(e.get("desktopMarketIds") or e.get("marketIds") or e.get("markets") or []))
     events.sort(key=nmk, reverse=True)
-    events = events[:MAX_EVENTS]
+    queue = DiscoveryQueue(OUTDIR / '_status' / 'estrelabet_discovery.json', now)
+    events = queue.select(events, MAX_EVENTS)
     print(f"[estrelabet] GetEvents: {len(events)} eventos (top por nº de mercados, janela {HOURS}h)")
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
@@ -196,7 +198,9 @@ def main():
     for e in events:
         eid = e.get("id")
         d = details.get(eid)
-        if not d: continue
+        if not d:
+            queue.record(eid, success=False)
+            continue
         allm = (d.get("markets") or []) + (d.get("childMarkets") or [])
         odds = {o["id"]: o for o in (d.get("odds") or [])}
         merc, merc_t = {}, {}
@@ -227,6 +231,8 @@ def main():
                 for row in arr: prev[row["linha"]] = row
                 merc_t.setdefault(c2, {})[team] = [prev[L] for L in sorted(prev)]
         merc = {k: v for k, v in merc.items() if v}
+        useful = (set(merc) | set(merc_t)) - {'Escanteios'}
+        queue.record(eid, success=True, useful=bool(useful), markets=useful)
         if not merc and not merc_t: continue
         name = (d.get("name") or e.get("name") or "").replace(" vs. ", " - ").replace(" vs ", " - ")
         league = champs.get(e.get("champId")) or (d.get("champ") or {}).get("name", "")
@@ -236,7 +242,9 @@ def main():
         if merc_t: rec["mercados_time"] = merc_t
         f.write(json.dumps(rec, ensure_ascii=False) + "\n"); f.flush()
         n_out += 1
-    f.close(); write_latest(n_out, promote=None)
+    f.close()
+    queue.save()
+    write_latest(n_out, promote=None)
     print(f"[estrelabet] {n_det} detalhes · {n_out} jogos com mercado de estatística salvos em {out_path.name}")
     return n_out
 

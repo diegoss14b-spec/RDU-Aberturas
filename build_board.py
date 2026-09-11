@@ -47,7 +47,7 @@ from canonical import (
 )
 from bookmaker_contracts import (
     BETANO_MK, betano_team as _betano_team, betano_market, event_participants,
-    normalize_7k_event_name,
+    normalize_7k_event_name, normalize_betano_markets,
 )
 
 BRT = timezone(timedelta(hours=-3))
@@ -209,30 +209,7 @@ def load_betano():
     for ln in src.read_text(encoding="utf-8").strip().split("\n"):
         if not ln.strip(): continue
         e = json.loads(ln)
-        mk, mk_t = {}, {}
-        participants = event_participants(e.get("name"))
-        for aba in ("cartoes", "estatisticas", "principais_ou", "escanteios"):
-            for m in (e.get("markets", {}).get(aba) or []):
-                mname = m.get("market") or ""
-                L = m.get("line")
-                if not (m.get("over") and m.get("under") and L is not None): continue
-                row = {"linha": L, "over": round(m["over"], 2), "under": round(m["under"], 2)}
-                parsed = betano_market(mname, participants, e.get("league") or "")
-                if not parsed: continue
-                canon, team = parsed
-                if team is None:
-                    lst = mk.setdefault(canon, {})
-                    if L not in lst: lst[L] = row
-                    continue
-                if parsed and parsed[0]:
-                    c, team = parsed
-                    lst = mk_t.setdefault(c, {}).setdefault(team, {})
-                    if L not in lst: lst[L] = row
-        mk = {c: sorted(v.values(), key=lambda x: x["linha"]) for c, v in mk.items() if v}
-        merc_t = {c: {t: sorted(lines.values(), key=lambda x: x["linha"])
-                      for t, lines in teams.items() if lines}
-                  for c, teams in mk_t.items()}
-        merc_t = {c: t for c, t in merc_t.items() if t}
+        mk, merc_t = normalize_betano_markets(e)
         if mk or merc_t:
             rec = {"casa": "Betano", "name": e.get("name"), "league": e.get("league"),
                    "start": e.get("start"), "captured": e.get("captured_at"), "mercados": mk}
@@ -257,12 +234,19 @@ def load_normalized(book, casa_id):
         e = json.loads(ln)
         if casa_id == "7k":
             e["name"] = normalize_7k_event_name(e.get("name"))
+        record_stale = stale
+        if casa_id == "bet365":
+            from bet365_capture_plan import quote_age_hours
+            age = quote_age_hours(e, datetime.now(timezone.utc).timestamp())
+            if age is None or age > BOARD_MAX_AGE_H:
+                continue
+            record_stale = record_stale or age > 2
         if e.get("mercados") or e.get("mercados_time"):
             rec = {"casa": e.get("casa", book), "name": e.get("name"), "league": e.get("league"),
                    "start": e.get("start"), "captured": e.get("captured_at"),
                    "mercados": e.get("mercados") or {}}
             if e.get("mercados_time"): rec["mercados_time"] = e["mercados_time"]
-            if stale: rec["_stale"] = True
+            if record_stale: rec["_stale"] = True
             out.append(rec)
     return out
 

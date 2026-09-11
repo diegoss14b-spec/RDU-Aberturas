@@ -192,7 +192,7 @@ def _jsonl_count(path):
 
 def snapshot_market_counts(path, casa=None):
     """Conta eventos por família de mercado em snapshots normalizados ou da Betano."""
-    from bookmaker_contracts import betano_market, event_participants
+    from bookmaker_contracts import normalize_betano_markets
     aliases = {
         "cartoes": "Cartões", "faltas": "Faltas", "chutes": "Finalizações",
         "finalizacoes": "Finalizações", "chutes no gol": "Chutes no gol",
@@ -221,18 +221,10 @@ def snapshot_market_counts(path, casa=None):
                 present.add(canon(key) or key)
             for key in (rec.get("mercados_time") or {}):
                 present.add(canon(key) or key)
-            for rows in (rec.get("markets") or {}).values():
-                if not isinstance(rows, list):
-                    continue
-                for row in rows:
-                    # Shared name contract. This remains a raw inventory counter,
-                    # not a claim that every row has a valid price pair.
-                    participants = event_participants(rec.get("name")) if rec.get("name") else None
-                    parsed = betano_market((row or {}).get("market"), participants,
-                                           rec.get("league") or "")
-                    c = parsed[0] if parsed else None
-                    if c:
-                        present.add(c)
+            # Count the same complete, scope-checked pairs as board/history.
+            betano_match, betano_teams = normalize_betano_markets(rec)
+            present.update(betano_match)
+            present.update(betano_teams)
             for market in present:
                 if market:
                     counts[market] = counts.get(market, 0) + 1
@@ -527,7 +519,7 @@ def classify_error(error):
     return "Other"
 
 
-def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, sample=None):
+def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, sample=None, reused=False):
     """Grava status estruturado e retorna 0 (ok) ou 2 (soft-fail)."""
     n_events = int(n_events or 0)
     ok = (error is None) and (n_events >= min_events)
@@ -544,7 +536,7 @@ def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, samp
     market_counts = {}
     pointer_meta, pointer_src = (None, None)
     if error is None and n_events > 0:
-        pointer_meta, pointer_src = resolve_odds_pointer(casa, prefer_full=False)
+        pointer_meta, pointer_src = resolve_odds_pointer(casa, prefer_full=reused)
         # Não atribua a esta rodada um ponteiro antigo que sobreviveu a uma falha.
         if not pointer_meta or int(pointer_meta.get("n") or 0) != n_events:
             pointer_meta, pointer_src = None, None
@@ -561,10 +553,21 @@ def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, samp
     if n_markets is None:
         n_markets = len(market_counts)
 
+    observed_at = now
+    if reused:
+        from capture_health import parse_time
+        observed_at = parse_time((pointer_meta or {}).get('at'))
+        if not pointer_src or observed_at is None:
+            ok, err_s = False, "reuso sem full verificável"
+            observed_at = now
+
     st = {
         "casa": casa, "ok": ok,
-        "ts_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "ts_brt": now.astimezone(BRT).strftime("%Y-%m-%d %H:%M"),
+        "ts_utc": observed_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "ts_brt": observed_at.astimezone(BRT).strftime("%Y-%m-%d %H:%M"),
+        "attempted": not reused,
+        "skipped_reason": "full_interval" if reused else None,
+        "last_decision_at": now.isoformat(),
         "n_events": n_events, "n_markets": int(n_markets or 0),
         "market_counts": market_counts,
         "min_events": min_events,

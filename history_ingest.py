@@ -30,7 +30,7 @@ from migrate_history_keys import migrate_keys_dict, migrate_tick_file, unify_key
 # uma régua só pro lado do time: a MESMA que o board usa pra montar times[mercado][home|away].
 # Duas implementações do "de quem é esta linha" divergiriam e o banco discordaria da tela.
 from build_board import _assign_side
-from bookmaker_contracts import BETANO_MK, betano_market, event_participants, normalize_7k_event_name
+from bookmaker_contracts import BETANO_MK, betano_market, event_participants, normalize_7k_event_name, normalize_betano_markets
 from observation_clock import observation_meta, observation_reason, SCHEMA
 
 ODDS = ROOT / "data" / "odds"
@@ -68,27 +68,7 @@ def load_events(casa):
                 e["name"] = normalize_7k_event_name(e.get("name"))
             merc_t = {}
             if casa == "betano":
-                mk, mk_t = {}, {}
-                participants = event_participants(e.get("name"))
-                for aba in ("cartoes", "estatisticas", "principais_ou", "escanteios"):
-                    for m in (e.get("markets", {}).get(aba) or []):
-                        if not (m.get("over") and m.get("under") and m.get("line") is not None):
-                            continue
-                        row = {"linha": m["line"], "over": m["over"], "under": m["under"]}
-                        par = betano_market(m.get("market"), participants, e.get("league") or "")
-                        if not par: continue
-                        canon, team = par
-                        if team is None:
-                            mk.setdefault(canon, {})[m["line"]] = row
-                            continue
-                        # a Betano não tem campo `mercados_time`: o time vem DENTRO do
-                        # nome ('Athletico-PR Total de Cartões'). Mesmo parser do board.
-                        if par and par[0]:
-                            c, team = par
-                            mk_t.setdefault(c, {}).setdefault(team, {})[m["line"]] = row
-                merc = {c: list(v.values()) for c, v in mk.items()}
-                merc_t = {c: {t: list(l.values()) for t, l in times.items() if l}
-                          for c, times in mk_t.items()}
+                merc, merc_t = normalize_betano_markets(e)
             else:
                 merc = e.get("mercados") or {}
                 merc_t = e.get("mercados_time") or {}

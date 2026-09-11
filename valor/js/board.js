@@ -643,7 +643,7 @@
             var h = cap.hist7[c], pct = h.total ? Math.round(100 * h.ok / h.total) : null;
             return c + (pct == null ? " — (sem capturas classificáveis)" : " " + pct + "% (" + h.ok + "/" + h.total + ")")+(h.protected?' · '+h.protected+' feeds preservados':'')+(h.legacy_unknown?' · '+h.legacy_unknown+' falhas legadas sem causa':'');
           });
-          histTxt = '<div class="cap-note">Últimos 7 dias: ' + hs.join(" · ") + "</div>";
+          histTxt = '<div class="cap-note" title="Sucesso das capturas; não representa a porcentagem de linhas disponíveis nas casas">Capturas nos últimos 7 dias: ' + hs.join(" · ") + "</div>";
         }
         capEl.innerHTML = '<span class="fresh-dot ' + fr.band + '"></span> Frescor mesa: <b>' + esc(fr.txt) + "</b> · Casas: " +
           parts.join(" · ") +
