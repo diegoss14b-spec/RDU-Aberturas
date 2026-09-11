@@ -1,6 +1,6 @@
 # Mesa: captura, cobertura e publicação — 11/09/2026
 
-Versão 2, substitui a primeira versão enviada em 11/09. Alterações autorizadas pelo Diego e implementadas pelo Codex. Este brief é o contrato de continuidade para o Mac e o Windows. O recibo final de publicação será enviado separadamente ao Drive, após a validação.
+Versão 3 consolidada, substitui a primeira versão enviada em 11/09 e incorpora o refinamento da versão 2. Alterações autorizadas pelo Diego e implementadas pelo Codex. Este brief é o contrato de continuidade para o Mac e o Windows. O recibo final de publicação será enviado separadamente ao Drive, após a validação.
 
 ## Proprietário e segurança
 
@@ -21,6 +21,16 @@ Versão 2, substitui a primeira versão enviada em 11/09. Alterações autorizad
 8. Reuso do full preserva o horário real, não consulta token/rede e exige contrato do parser atual. `parser_contract=2` identifica as novas observações.
 9. Retenção: somente eventos não selecionados, ainda no inventário, mesmos participantes/kickoff, contrato2, relógio válido e idade≤12h. Mantém `captured_at` original; selecionados com resposta vazia não são ressuscitados. Retidos não satisfazem o piso mínimo de novas capturas.
 10. Board Bet365: frescor por observação, não apenas pelo arquivo. Acima2h, sem sinal acionável de valor; acima12h, relógio ausente ou futuro inválido, omitido. O histórico continua recusando observações duplicadas/fora de ordem.
+
+### Refinamento de desempenho após a primeira rodada oficial
+
+A rodada `34638852635`, publicada às 16:52 BRT, revelou um gargalo adicional: aproximadamente 209,22s gastos nas 20 páginas de inventário; restaram 212,22s para odds/finalização. Houve cinco ReadTimeouts em prematch, 60 eventos recebidos/parseados (28 úteis além de escanteios), 60 não tentados e 31 requests de um teto de 90. O prazo de 420s foi atingido. O full anterior foi corretamente preservado; o sucesso global do workflow NÃO significou sucesso da captura Bet365.
+
+Versão 3: duas varreduras simultâneas, mantendo as 10 páginas iniciais e as 10 profundas; cursor retornado explicitamente pela varredura profunda, sem atributo compartilhado. Dois lotes de prematch simultâneos, com limite global de dois GETs, contador de requests atômico e teto de 90/420s inalterado. Recuperação individual dos FIs ausentes participa dos mesmos limites.
+
+O relógio de cada FI vem do recebimento da resposta, inclusive em recuperações individuais; esperar outro lote/parsing não renova odds antigas. Uma falha parcial continua impedindo promoção. Resultados válidos já em voo são processados, mesmo que outro lote alcance o orçamento. Sem GET iniciado, não renovar `last_attempt` nem contar o evento como consultado.
+
+Logs agora mostram número de request, endpoint sem query/token, tamanho do lote, tentativa, resultado e duração. Métricas separam tempo de inventário e tempo de prematch. O prazo de 420s é lógico/admissão e timeout de socket, não garantia absoluta de término da biblioteca HTTP; o timeout externo de 480s permanece.
 
 ## Outras casas: mudanças e evidências
 
@@ -45,6 +55,8 @@ Reconhecido o nome exato `Asiático (Mais/Menos) Total de Cartões`, jogo inteir
 `normalize_betano_markets` é agora a fonte única para board, reader histórico, contadores e utilidade da fila. Over/under vêm sempre do mesmo registro. Na duplicata, o total convencional tem prioridade; depois prioridade fixa de aba/primeiro par completo. Linhas inteiras usam devolução por igualdade; quarters continuam rejeitados.
 
 Origem/família/semântica da linha seguem em metadados normalizados. O writer histórico legado não persiste todos esses metadados: não alegar migração de schema nem reescrever histórico antigo. A regra de contagem R1/R2 existente não foi alterada. A documentação oficial de cartões confirma vermelho=2; a liquidação segue as restrições de participantes da casa, não soma cega de incidentes.
+
+Refinamento da fila na versão 3: na primeira rodada oficial, 39 dos 60 eventos tinham apenas Escanteios. Das 45 vagas de conhecidos, 38 eram desse grupo; `useful=50` incluía os 39 eventos de um mercado desligado. Agora, quando `MERCADOS_OFF` contém `escanteios`, eles deixam de ocupar a reserva útil. A descoberta continua elegível a encontrá-los; o estado preserva os nomes para diagnóstico. Ativada também a diversidade por famílias dentro das 45 vagas conhecidas, mantendo 15 de exploração e teto de 60 detalhes. Não alterar pisos/gates. Não há inventário completo dos 879 candidatos dessa rodada; não prometer ganho quantitativo com base somente no estado da fila.
 
 Fonte oficial consultada: https://support.betano.bet.br/hc/pt-br/articles/6413994078365-Como-funciona-o-mercado-de-N%C3%BAmero-de-Cart%C3%B5es
 
@@ -72,6 +84,15 @@ Na7k existem cartões dos times no1º/2º tempo (OU6031–6034), além de cantos
 - Retry final: até2 casas paralelas e10min totais, em vez de somar todos os timeouts em sequência.
 - Deploy: leitura pública com retries limitados para erro transitório; manifesto/histórico/manifesta novamente precisam ser da mesma geração. Se não houver baseline verificável, falha fechada. Política CLV, hashes e contagens continuam obrigatórios.
 - Operação mostra a idade do full separada da última coleta. Um close recente não significa catálogo completo atualizado. Percentual de sucesso das capturas NÃO é percentual das linhas da casa.
+- Diagnóstico distingue selecionados, consultados e fora da seleção. `unseen` inicial não é mostrado como se fosse a quantidade restante após a rodada. O texto completo está disponível ao passar o mouse. O relógio de geração do board usa o rótulo “mesa gerada”, não “atualizado” junto do nome da casa.
+
+## Primeira publicação e limites ainda conhecidos
+
+O build `0129fc7766614033937e1ccb1263f687` confirmou scripts publicados iguais aos da versão 1 e hashes coerentes de board/ops/history/moves/openclose. Sportingbet passou de zero para 11 jogos com Chutes no gol nessa publicação. A prova histórica continha 907.570 registros brutos, 346.572 liquidados e zero identidades ausentes nas duas classes.
+
+Bet365 ainda falhou por tempo nessa primeira rodada; 7k e Estrela não foram recapturadas por `FULL_STRIDE=2` na hora UTC ímpar. Portanto, essa rodada não valida a captura completa da versão 3 nem o ganho da seleção nova da 7k. Exigir o recibo posterior para essa confirmação.
+
+Melhoria posterior, não incluída: salvar checkpoints da fila 7k e intercalar exploração durante capturas lentas; atualmente um timeout pode interromper a rodada antes das últimas explorações. O saldo CLV estrito ainda era zero e havia backlog de resultados na primeira publicação; isso não foi resolvido por mudanças de captura e não justifica afrouxar a política de CLV.
 
 ## Arquivos estruturais para preservar
 
@@ -88,6 +109,6 @@ Na7k existem cartões dos times no1º/2º tempo (OU6031–6034), além de cantos
 
 ## Aceite
 
-Suíte local consolidada: 630 testes passaram, 1 ignorado e 140 subtestes passaram. Inclui 10 testes portáveis da seleção equilibrada por família, comparação com a política anterior e preservação da exploração. Verificações de sintaxe de JavaScript e de whitespace também passaram.
+Suíte local consolidada da versão 3: 665 testes passaram, 1 ignorado e 140 subtestes passaram. Inclui testes portáveis da seleção equilibrada por família, comparação com a política anterior, preservação da exploração, chamadas do coletor Betano isoladas de rede, concorrência Bet365, limites compartilhados, clocks por FI e renderização real dos diagnósticos. Verificações de sintaxe de JavaScript e de whitespace também passaram. O recibo de publicação registra a verificação posterior em produção.
 
 Testes offline cobrem parsing/pares, fila, transportes, clock, retenção, zero novos+retidos, promoção e baseline. A confirmação de produção depende de uma rodada oficial concluída e leitura do manifesto público. Não prometer cobertura100%, nem ausência permanente de mercados com base numa amostra de hoje.

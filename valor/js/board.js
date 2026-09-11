@@ -611,7 +611,7 @@
       (!state.mostrarTodos ? " (só próximos)" : "") +
       " · " + esc(Object.keys(nCasas).join(", ") || "—") +
       ' · <span class="fresh fresh-' + fr.band + (fr.stale ? " stale" : "") + '">' +
-      '<span class="fresh-dot ' + fr.band + '"></span> atualizado ' + esc(fr.txt) +
+      '<span class="fresh-dot ' + fr.band + '"></span> mesa gerada ' + esc(fr.txt) +
       (fr.stale ? " ⚠ (pode estar defasado)" : "") + "</span>" +
       ' · <span class="meta-hint">clique no jogo pra expandir</span>';
 

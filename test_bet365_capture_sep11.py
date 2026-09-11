@@ -300,9 +300,9 @@ def test_main_retained_rows_do_not_satisfy_fresh_minimum(monkeypatch, isolated_c
     candidates = inventory([quote(str(i), age=3) for i in range(10)])
     monkeypatch.setattr(fetch, "MAX_EVENTS", 5)
     monkeypatch.setattr(fetch, "_token", lambda: "fake")
-    def sweep(token, now, max_pages, start_page=1):
-        sweep.next_page = 11
-        return candidates if start_page == 1 else []
+    def sweep(token, now, max_pages, start_page=1, *, return_cursor=False):
+        result = candidates if start_page == 1 else []
+        return (result, 11) if return_cursor else result
     monkeypatch.setattr(fetch, "_sweep_upcoming", sweep)
     raw_market = {"cards_fouls": {"sp": {"number_of_cards_in_match": {"odds": [
         {"header": "Over", "name": "4.5", "odds": "1.833"},

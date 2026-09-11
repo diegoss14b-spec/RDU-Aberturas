@@ -150,7 +150,9 @@
       if(h7.protected)rateHtml+=' · '+h7.protected+' preservados';
       if(h7.legacy_unknown)rateHtml+=' · '+h7.legacy_unknown+' falhas legadas sem causa';
       var disc=c.discovery||{};
-      var discoveryTxt=disc.inventory!=null?'Inventário: '+disc.inventory+' · selecionados: '+(disc.selected||0)+' · não visitados: '+(disc.unseen||0):'';
+      var discoveryTxt=disc.inventory!=null?'Inventário: '+disc.inventory+' · selecionados: '+(disc.selected||0)
+        +' · consultados: '+(disc.attempted||0)+' · fora da seleção: '+(disc.not_selected||0):'';
+      var diagnostic=(c.ok ? '' : (c.error || ''))+(discoveryTxt?' · '+discoveryTxt:'');
       return "<tr>"
         + "<td>" + (c.kind === "fixture" ? "<b>" + esc(c.nome) + '</b> <span class="op-muted">fixture</span>'
           : LOGO(c.nome)) + "</td>"
@@ -161,7 +163,7 @@
         + '<td class="'+fullClass+'">' + esc(fullText) + '</td>'
         + "<td>" + esc(proxy) + "</td>"
         + "<td>" + rateHtml + "</td>"
-        + '<td class="op-err">' + esc((c.ok ? "" : (c.error || ""))+(discoveryTxt?' · '+discoveryTxt:'')) + "</td>"
+        + '<td class="op-err" title="'+esc(diagnostic)+'">' + esc(diagnostic) + "</td>"
         + "</tr>";
     }).join("");
 

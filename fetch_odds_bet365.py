@@ -55,6 +55,10 @@ if sys.stderr is None or not hasattr(sys.stderr, "write"): sys.stderr = open(os.
 try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 except Exception: pass
 import requests
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from threading import BoundedSemaphore, Lock
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -85,6 +89,8 @@ REQUEST_LIMIT = 90       # shared token: includes discovery, failures and retrie
 DEADLINE = None          # set by main, below the orchestrator's 480s timeout
 FULL_SKIPPED = False
 CAPTURE_INCOMPLETE = False
+HTTP_SLOTS = BoundedSemaphore(2)  # inventory, batches and single-FI recovery
+REQUEST_LOCK = Lock()
 from bet365_capture_plan import eligible_events, league_priority, merge_inventory, retained_quotes
 from capture_discovery import DiscoveryQueue
 
@@ -109,31 +115,62 @@ def _token():
     raise RuntimeError("BETSAPI_TOKEN ausente (env ou betsapi_config.json)")
 
 
-def get(path, params, token):
-    """GET com retry; loga SEM o token (o token nunca pode vazar em log público)."""
+@contextmanager
+def _request_slot():
+    """Reserve one of two HTTP slots, then charge the shared request budget."""
     global N_REQ
+    remaining = DEADLINE - time.monotonic() if DEADLINE is not None else 30
+    if remaining < 2 or not HTTP_SLOTS.acquire(timeout=max(0, remaining)):
+        raise CaptureBudgetExceeded("orçamento de requests/tempo esgotado")
+    try:
+        with REQUEST_LOCK:
+            remaining = DEADLINE - time.monotonic() if DEADLINE is not None else 30
+            if N_REQ >= REQUEST_LIMIT or remaining < 2:
+                raise CaptureBudgetExceeded("orçamento de requests/tempo esgotado")
+            N_REQ += 1
+            request_no = N_REQ
+        yield request_no, min(30, remaining)
+    finally:
+        HTTP_SLOTS.release()
+
+
+def get(path, params, token):
+    """GET with two global slots; log only safe, low-cardinality diagnostics."""
     url = f"{BASE}{path}"
     q = dict(params); q["token"] = token
-    for a in range(3):
-        remaining = DEADLINE - time.monotonic() if DEADLINE is not None else 30
-        if N_REQ >= REQUEST_LIMIT or remaining < 2:
-            raise CaptureBudgetExceeded("orçamento de requests/tempo esgotado")
-        try:
-            N_REQ += 1
-            r = requests.get(url, params=q, timeout=min(30, remaining))
-            if r.status_code == 200:
-                d = r.json()
-                if d.get("success") == 1:
-                    return d
-                # success:0 = token/quota — não insistir além do retry
-                print(f"[bet365] {path} success=0 (tentativa {a+1})")
-            elif r.status_code == 429:
-                time.sleep(2.0 * (a + 1)); continue
-            else:
-                print(f"[bet365] {path} HTTP {r.status_code} (tentativa {a+1})")
-        except Exception as e:
-            print(f"[bet365] {path} erro: {type(e).__name__} (tentativa {a+1})")
-        time.sleep(1.0)
+    fi_count = len(str(params["FI"]).split(",")) if params.get("FI") else 0
+    local_attempts = 0
+    try:
+        for a in range(3):
+            delay = 1.0
+            # Budget exceptions occur outside the retry handler and remain typed.
+            with _request_slot() as (request_no, timeout):
+                started, outcome = time.monotonic(), "unknown"
+                try:
+                    local_attempts += 1
+                    r = requests.get(url, params=q, timeout=timeout)
+                    if r.status_code == 200:
+                        data = r.json()
+                        outcome = "success" if data.get("success") == 1 else "success_0"
+                        if data.get("success") == 1:
+                            return data
+                    else:
+                        outcome = f"HTTP{r.status_code}"
+                        if r.status_code == 429:
+                            delay = 2.0 * (a + 1)
+                except Exception as error:
+                    # Never print exception text, URL/query, response or credentials.
+                    outcome = type(error).__name__
+                finally:
+                    print(f"[bet365] request={request_no} path={path} FI_count={fi_count} "
+                          f"attempt={a+1} result={outcome} "
+                          f"elapsed_s={time.monotonic()-started:.2f}", flush=True)
+            remaining = DEADLINE - time.monotonic() if DEADLINE is not None else delay
+            time.sleep(min(delay, max(0, remaining)))
+    except CaptureBudgetExceeded as error:
+        # Local to this get() call: another worker can advance N_REQ at any time.
+        error.request_started = bool(local_attempts)
+        raise
     return None
 
 
@@ -511,16 +548,16 @@ def _save_json(path, obj):
         print(f"[bet365] aviso: não gravei {Path(path).name}: {type(e).__name__}")
 
 
-def _sweep_upcoming(token, now_utc, max_pages, start_page=1):
+def _sweep_upcoming(token, now_utc, max_pages, start_page=1, *, return_cursor=False):
     """Varre o upcoming (barato: 50/página) → eventos reais na janela de DAYS_AHEAD."""
     events, total, page = [], None, start_page
-    _sweep_upcoming.next_page = start_page
+    next_page = start_page
     while page < start_page + max_pages:
         d = get("/v1/bet365/upcoming", {"sport_id": 1, "page": page}, token)
         if not d:
             break
         total = (d.get("pager") or {}).get("total") or 0
-        _sweep_upcoming.next_page = page + 1 if page * 50 < total else 11
+        next_page = page + 1 if page * 50 < total else 11
         for r in d.get("results") or []:
             league = ((r.get("league") or {}).get("name")) or ""
             if EXCL_LEAGUE.search(league):
@@ -543,17 +580,45 @@ def _sweep_upcoming(token, now_utc, max_pages, start_page=1):
         page += 1
         time.sleep(SLEEP)
     print(f"[bet365] upcoming: {total} eventos brutos · {len(events)} reais ({start_page}–{page})")
-    return events
+    return (events, next_page) if return_cursor else events
+
+
+def fetch_inventory(token, now_utc, cursor):
+    """Two independent sweeps; only the deeper sweep owns the rotation cursor."""
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="bet365-inventory") as pool:
+        front_future = pool.submit(_sweep_upcoming, token, now_utc, 10, return_cursor=True)
+        deep_future = pool.submit(_sweep_upcoming, token, now_utc, 10,
+                                  start_page=cursor, return_cursor=True)
+        front, _ = front_future.result()
+        deeper, next_page = deep_future.result()
+    return front + deeper, next_page
+
+
+class ObservedRows(dict):
+    """Rows plus source receipt clocks, independent of ordered parser execution."""
+    def __init__(self):
+        super().__init__()
+        self.observed_at = {}
+
+
+def _record_received(found, data, allowed_ids):
+    values = (data or {}).get("results") or []
+    observed_at = datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S")
+    if not isinstance(values, list):
+        return
+    for row in values:
+        if isinstance(row, dict) and str(row.get("FI")) in allowed_ids:
+            ident = str(row["FI"])
+            found[ident] = row
+            found.observed_at[ident] = observed_at
 
 
 def fetch_batch(lote, token):
     """Retry each missing FI, including partial (not only empty) responses."""
     ids = {str(e['fi']) for e in lote}
-    def rows(data):
-        values = (data or {}).get('results') or []
-        return [r for r in values if isinstance(r, dict)] if isinstance(values, list) else []
     data = get('/v3/bet365/prematch', {'FI': ','.join(str(e['fi']) for e in lote)}, token)
-    found = {str(r.get('FI')): r for r in rows(data) if str(r.get('FI')) in ids}
+    found = ObservedRows()
+    _record_received(found, data, ids)
     transport_missing = set(ids) if data is None else set()
     for event in lote:
         ident = str(event['fi'])
@@ -567,9 +632,56 @@ def fetch_batch(lote, token):
                 transport_missing.add(ident)
             else:
                 transport_missing.discard(ident)
-            found.update({str(r.get('FI')): r for r in rows(data) if str(r.get('FI')) == ident})
+            _record_received(found, data, {ident})
             time.sleep(SLEEP)
     return found, False, sorted(transport_missing - set(found))
+
+
+def iter_batches(events, token):
+    """At most two submitted batches; consume in selection order, drain on budget.
+
+    Transport failures remain visible to main. A deadline in one worker never
+    discards already valid observations returned by the other in-flight worker.
+    Only the main thread parses markets, records queue state and writes files.
+    """
+    chunks = iter(events[i:i + FI_BATCH] for i in range(0, len(events), FI_BATCH))
+    pending = deque()
+    stopped = False
+    with ThreadPoolExecutor(max_workers=2, thread_name_prefix="bet365-prematch") as pool:
+        def submit_next():
+            for chunk in chunks:
+                lote = [e for e in chunk if float(e["time"]) > time.time()]
+                if not lote:
+                    continue
+                submitted_at = datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S")
+                pending.append((lote, submitted_at, pool.submit(fetch_batch, lote, token)))
+                return True
+            return False
+        for _ in range(2):
+            if not submit_next():
+                break
+        while pending:
+            lote, submitted_at, future = pending.popleft()
+            try:
+                found, exhausted, missing = future.result()
+            except CaptureBudgetExceeded as error:
+                found, exhausted, missing = ObservedRows(), True, sorted(str(e["fi"]) for e in lote)
+                if getattr(error, "request_started", None) is False:
+                    # Budget denied before this batch's first HTTP. Keep it
+                    # unattempted; the complete selected-ID tombstone set in
+                    # main still prevents unsafe retention of these identities.
+                    lote = []
+            if not isinstance(found, ObservedRows):
+                # Compatibility with adapters/tests: conservative submission
+                # clock, NEVER the delayed moment at which main parses this.
+                observed = ObservedRows()
+                observed.update(found)
+                observed.observed_at.update({ident: submitted_at for ident in found})
+                found = observed
+            stopped = stopped or exhausted
+            yield lote, found, exhausted, missing
+            if not stopped:
+                submit_next()
 
 
 def main():
@@ -579,6 +691,7 @@ def main():
     now = datetime.now(BRT)
     now_utc = datetime.now(timezone.utc)
     _wh = odds_window()
+    inventory_started = time.monotonic()
 
     if _wh is None:
         # ===== FULL: só a cada FULL_EVERY_H (token compartilhado — ver docstring) =====
@@ -605,10 +718,8 @@ def main():
         # Refresh the near horizon and rotate deeper pages, instead of repeatedly
         # visiting only the same first 1000 events. Keep older future identities.
         cursor = max(11, int(cache.get('next_page') or 11))
-        front = _sweep_upcoming(token, now_utc, 10)
-        deeper = _sweep_upcoming(token, now_utc, 10, start_page=cursor)
-        events = merge_inventory(cache.get('events') or [], front + deeper, now_utc.timestamp())
-        next_page = _sweep_upcoming.next_page
+        swept, next_page = fetch_inventory(token, now_utc, cursor)
+        events = merge_inventory(cache.get('events') or [], swept, now_utc.timestamp())
         _save_json(FIS_F, {"at": now.isoformat(timespec="seconds"),
                            "at_epoch": time.time(), "events": events,
                            "next_page": next_page, "partial_inventory": True})
@@ -635,7 +746,8 @@ def main():
     events = queue.select(events, MAX_CLOSE_EVENTS if _wh is not None else MAX_EVENTS,
                           id_field='fi', priority_key=league_priority)
     queue.metrics.update(mode='close' if _wh is not None else 'full', returned=0,
-                         parsed=0, missing_fis=[], no_supported_markets=[], started_before_fetch=[])
+                         parsed=0, missing_fis=[], no_supported_markets=[], started_before_fetch=[],
+                         inventory_elapsed_s=round(time.monotonic()-inventory_started, 2))
 
     stamp = now.strftime("%Y-%m-%d_%H%M")
     out_path = OUTDIR / f"bet365_{stamp}.jsonl"
@@ -657,15 +769,8 @@ def main():
     #    request, validado. Derruba o full de ~75 req pra ~20 e o close pra 1-2.)
     f = open(out_path, "w", encoding="utf-8")
     n_out = n_det = 0
-    for i in range(0, len(events), FI_BATCH):
-        lote = [e for e in events[i:i + FI_BATCH] if float(e['time']) > time.time()]
-        if not lote:
-            continue
-        try:
-            by_fi, budget_exhausted, transport_missing = fetch_batch(lote, token)
-        except CaptureBudgetExceeded:
-            CAPTURE_INCOMPLETE = True
-            break
+    prematch_started = time.monotonic()
+    for lote, by_fi, budget_exhausted, transport_missing in iter_batches(events, token):
         if budget_exhausted or transport_missing:
             CAPTURE_INCOMPLETE = True
         time.sleep(SLEEP)
@@ -694,7 +799,7 @@ def main():
                    "parser_contract": 2,
                    "name": f"{e['home']} - {e['away']}",
                    "league": e["league"], "start": e["time"],
-                   "captured_at": datetime.now(BRT).strftime("%Y-%m-%d %H:%M:%S"),
+                   "captured_at": by_fi.observed_at[str(e["fi"])],
                    "mercados": merc}
             if merc_t:
                 rec["mercados_time"] = merc_t
@@ -709,6 +814,7 @@ def main():
     if _wh is None and fresh_count < MIN_EFF:
         CAPTURE_INCOMPLETE = True
     queue.metrics.update(requests=N_REQ, incomplete=CAPTURE_INCOMPLETE,
+                         prematch_elapsed_s=round(time.monotonic()-prematch_started, 2),
                          fresh_events=fresh_count, retained_events=len(carried),
                          unattempted=max(0,len(events)-queue.metrics.get('attempted',0)))
     queue.save()

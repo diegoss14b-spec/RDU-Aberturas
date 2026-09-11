@@ -97,9 +97,11 @@ def main():
         MIN_EFF = (min(MIN_EVENTS, 1) if events else 0)   # janela curta: 1+ ok; lista vazia não é falha
         log(f"[betano] modo close: janela {_wh:g}h -> {len(events)} de {_tot} eventos")
     now = datetime.now(BRT)
-    from capture_discovery import DiscoveryQueue
+    from capture_discovery import DiscoveryQueue, ACTIVE_FT_FAMILIES
     queue = DiscoveryQueue(OUT / "_status" / "betano_discovery.json", now)
-    selected = queue.select(events, MAX_EVENTS)
+    ignored_markets = {"Escanteios"} if "escanteios" in _MK_OFF else set()
+    selected = queue.select(events, MAX_EVENTS, ignored_markets=ignored_markets,
+                            coverage_markets=ACTIVE_FT_FAMILIES)
     stamp = now.strftime("%Y-%m-%d_%H%M")
     fp = OUT / f"betano_{stamp}.jsonl"
     n_ok = 0
@@ -129,7 +131,8 @@ def main():
             from bookmaker_contracts import normalize_betano_markets
             match_markets, team_markets = normalize_betano_markets(rec)
             recognized = set(match_markets) | set(team_markets)
-            queue.record(ev["id"], success=succeeded, useful=bool(recognized), markets=recognized)
+            queue.record(ev["id"], success=succeeded,
+                         useful=bool(recognized - ignored_markets), markets=recognized)
             if not succeeded:
                 continue
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
