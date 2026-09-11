@@ -1,29 +1,35 @@
 {
  "casa": "betano",
- "ok": true,
- "ts_utc": "2026-09-11T06:17:02Z",
- "ts_brt": "2026-09-11 03:17",
+ "ok": false,
+ "ts_utc": "2026-09-11T06:54:01Z",
+ "ts_brt": "2026-09-11 03:54",
  "n_events": 60,
- "n_markets": 6,
+ "n_markets": 9,
  "market_counts": {
-  "Cartões": 10,
-  "Chutes no gol": 6,
-  "Escanteios": 47,
-  "Faltas": 2,
-  "Finalizações": 6,
-  "Impedimentos": 4
+  "Cartões": 7,
+  "Chutes no gol": 2,
+  "Desarmes": 1,
+  "Escanteios": 45,
+  "Faltas": 1,
+  "Finalizações": 2,
+  "Impedimentos": 1,
+  "Laterais": 1,
+  "Tiros de meta": 1
  },
  "min_events": 15,
- "duration_sec": 436.4,
- "error": null,
- "error_class": null,
+ "duration_sec": 455.5,
+ "error": "promoção full bloqueada: mercado Chutes no gol caiu >65%: 8 → 2 eventos; mercado Finalizações caiu >65%: 8 → 2 eventos",
+ "error_class": "Other",
  "mode": "full",
  "sample_events": [],
  "proxy_br": true,
  "pointer_valid": true,
- "pointer_file": "betano_2026-09-11_0309.jsonl",
- "pointer_at": "2026-09-11T03:09:48-03:00",
- "pointer_age_h": 0.121,
- "promotion_blocked": [],
- "source_state": "ok"
+ "pointer_file": "betano_2026-09-11_0346.jsonl",
+ "pointer_at": "2026-09-11T03:46:27-03:00",
+ "pointer_age_h": 0.126,
+ "promotion_blocked": [
+  "mercado Chutes no gol caiu >65%: 8 → 2 eventos",
+  "mercado Finalizações caiu >65%: 8 → 2 eventos"
+ ],
+ "source_state": "failed"
 }
