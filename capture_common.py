@@ -573,7 +573,7 @@ def finish(casa, n_events, min_events, n_markets=None, error=None, t0=None, samp
         "min_events": min_events,
         "duration_sec": round(time.time() - t0, 1) if t0 else None,
         "error": err_s,
-        "error_class": classify_error(err_s) if err_s else None,
+        "error_class": classify_error(error if error is not None else err_s) if err_s else None,
         "mode": "close" if is_close_mode() else "full",
         "sample_events": (sample or [])[:3],
         # ⚠ 05/08: era `bool(os.environ.get("DECODO_USER"))` — respondia "existe

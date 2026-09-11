@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """fetch_odds_bet365.py — captura odds da BET365 via BetsAPI (api.b365api.com), pra
-a Mesa de Aberturas. Plano do Diego: 30 req/s, 3.600 req/h — cada captura usa
-~15 páginas de upcoming + ≤MAX_EVENTS prematch (~75 req, folga enorme).
+a Mesa de Aberturas. Até90 requests/420s por processo, incluindo inventário,
+detalhes em lote, recuperação de FIs ausentes e retries; token compartilhado.
 
   lista : GET /v1/bet365/upcoming?sport_id=1&token=&page=   (50/página, ~700 eventos,
           horizonte de meses; POLUÍDO de Esoccer/SRL — filtrar por nome de liga)
@@ -10,7 +10,7 @@ a Mesa de Aberturas. Plano do Diego: 30 req/s, 3.600 req/h — cada captura usa
           name:'5.5'|'Over 5.5', odds:'2.000', handicap?})
   ⚠ A resposta tem seções-DICIONÁRIO (main/corners/cards_fouls/other/asian_lines/shots)
   E a lista `others` (~79 blocos, cada um com seu `sp`). MUITO mercado de partida só
-  existe na LISTA (match_shots_on_target, alternative_corners com 63 odds, asiáticos
+  existe na LISTA (match_shots_on_target, asiáticos
   de escanteios/cartões, team_shots…). O parser varre as duas fontes.
 
 Mercados capturados (só O/U de linha; faixas/race/exatos/3-vias ficam FORA):
@@ -18,12 +18,12 @@ Mercados capturados (só O/U de linha; faixas/race/exatos/3-vias ficam FORA):
   Escanteios : corners_2_way + asian_corners + asian_total_corners
                (+ team_corners por time)  — corners.corners é 3-VIAS (Over/Exactly/Under), NÃO entra
   Finalizações / Chutes no gol: match_shots / match_shots_on_target (+ team_*)
-  Impedimentos / Desarmes: a bet365 abre só em "especiais/outros" e raramente — QUANDO
-      abrem vêm na lista `others`. Mapeamos as variantes plausíveis do padrão BetsAPI
-      (match_/total_/asian_total_/.._2_way/number_of_.._in_match + team_*); se abrirem
-      com nome fora da lista, o DETECTOR (abaixo) loga o nome oficial pra mapear.
-  Faltas de JOGO / laterais / tiros de meta: a bet365 só abre no "Criar Aposta" (bet
-      builder), NÃO na API — não captáveis, casa entra sem eles.
+  Impedimentos / Desarmes: há aliases históricos no parser, mas sua existência
+      não comprova oferta atual. O detector abaixo registra nomes desconhecidos;
+      qualquer ampliação exige evidência de período, escopo e liquidação.
+  Faltas de JOGO / laterais / tiros de meta: não confirmados nos payloads auditados
+      em11/09. Isso NÃO prova indisponibilidade permanente na API. Mercados do
+      Criar Aposta não são convertidos automaticamente em totais convencionais.
 DETECTOR (rede de segurança, 21/07): parse_prematch flagra QUALQUER mercado com cara de
   O/U-de-total (Over+Under+linha .5) que não seja mapeado, nem player, nem ruído conhecido
   (gols/faixa/meio-tempo/handicap/timing) e LOGA em _status/bet365_unknown_markets.jsonl

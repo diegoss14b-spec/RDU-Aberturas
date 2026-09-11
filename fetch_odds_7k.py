@@ -315,9 +315,10 @@ def main():
         MIN_EFF = (min(MIN_EVENTS, 1) if cand else 0)   # janela curta: 1+ ok; lista vazia não é falha
         print(f"[7k] modo close: janela {_wh:g}h -> {len(cand)} de {_tot} eventos")
     cand.sort(key=lambda e: -(e.get("TotalActiveMarketsCount") or 0))
-    from capture_discovery import DiscoveryQueue
+    from capture_discovery import DiscoveryQueue, ACTIVE_FT_FAMILIES
     queue = DiscoveryQueue(OUTDIR / "_status" / "7k_discovery.json", now)
-    cand = queue.select(cand, MAX_EVENTS, id_field="_id", ignored_markets={'Escanteios'})
+    cand = queue.select(cand, MAX_EVENTS, id_field="_id", ignored_markets={'Escanteios'},
+                        coverage_markets=ACTIVE_FT_FAMILIES)
     print(f"[7k] snapshot {len(evs)} eventos · {len(cand)} selecionados por orçamento/rotação")
 
     stamp = now.strftime("%Y-%m-%d_%H%M")

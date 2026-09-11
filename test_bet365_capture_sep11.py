@@ -261,6 +261,14 @@ def test_get_exhausted_budget_makes_no_http(monkeypatch, hit_limit):
         fetch.get("/v3/bet365/prematch", {"FI": "a"}, "fake")
 
 
+def test_budget_exception_class_survives_finish_and_blocks_outer_retry(isolated_capture):
+    import run_capture
+    assert cc.finish('bet365',0,5,error=fetch.CaptureBudgetExceeded('orçamento de requests/tempo esgotado')) == 2
+    status = json.loads((isolated_capture.status / 'bet365.json').read_text())
+    assert status['error_class'] == 'CaptureBudgetExceeded'
+    assert not run_capture.should_retry(status, 'bet365')
+
+
 def seed_full(paths, rows, age=3):
     source = paths.snapshots / "previous.jsonl"
     write_rows(source, rows)

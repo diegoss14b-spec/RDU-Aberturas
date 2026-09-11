@@ -5,10 +5,14 @@ owns it. At least 25% of the request budget explores oldest/unseen candidates;
 the rest refreshes known useful games. Every inspection consumes the same cap.
 """
 import json
+from collections import deque
 from pathlib import Path
 from datetime import timedelta
 from history_quality import ensure_aware, parse_ts
 from history_merge import atomic_write_text
+
+ACTIVE_FT_FAMILIES = ('Cartões', 'Chutes no gol', 'Desarmes', 'Faltas',
+                      'Finalizações', 'Impedimentos', 'Laterais', 'Tiros de meta')
 
 class DiscoveryQueue:
     def __init__(self, path, now):
@@ -23,7 +27,8 @@ class DiscoveryQueue:
         self.rows = {str(k):v for k,v in self.rows.items() if isinstance(v,dict)} if isinstance(self.rows,dict) else {}
         self.metrics = {}
 
-    def select(self, events, budget, id_field="id", priority_key=None, ignored_markets=()):
+    def select(self, events, budget, id_field="id", priority_key=None,
+               ignored_markets=(), coverage_markets=()):
         # Dedupe provider identity, never fuzzy teams. Keep input order as a tie
         # break (7k sorts by market count), then rotate using the persisted clock.
         unique = {}
@@ -42,8 +47,32 @@ class DiscoveryQueue:
         ignored = set(ignored_markets)
         known = sorted([x for x in items if self.rows.get(x[0], {}).get("useful")
                         and (not ignored or set(self.rows[x[0]].get('markets') or []) - ignored)], key=age)
-        chosen = known[:max(0, budget-explore_budget)]
-        chosen_ids = {x[0] for x in chosen}
+        known_budget = max(0, budget-explore_budget)
+        families = tuple(dict.fromkeys(m for m in coverage_markets if m not in ignored))
+        chosen, chosen_ids = [], set()
+        buckets = {family: deque(item for item in known
+                    if family in (self.rows[item[0]].get('markets') or [])) for family in families}
+        # Optional diversity inside the known 75%, never extra requests. A large
+        # pool of cards-only games must not displace all rare-stat fixtures.
+        while len(chosen) < known_budget and buckets:
+            added = False
+            for family in families:
+                bucket = buckets[family]
+                while bucket and bucket[0][0] in chosen_ids:
+                    bucket.popleft()
+                if bucket:
+                    item = bucket.popleft()
+                    chosen.append(item); chosen_ids.add(item[0]); added = True
+                if len(chosen) >= known_budget:
+                    break
+            if not added:
+                break
+        # Empty/unknown family configuration preserves the original behavior.
+        for item in known:
+            if len(chosen) >= known_budget:
+                break
+            if item[0] not in chosen_ids:
+                chosen.append(item); chosen_ids.add(item[0])
         # Exploration must rotate even when the priority tier never fits the
         # budget. Oldest/unseen first; league priority only breaks age ties.
         remaining = sorted([x for x in items if x[0] not in chosen_ids],

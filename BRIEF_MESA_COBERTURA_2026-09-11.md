@@ -1,6 +1,6 @@
 # Mesa: captura, cobertura e publicação — 11/09/2026
 
-Alterações autorizadas pelo Diego e implementadas pelo Codex. Este brief é o contrato de continuidade para o Mac e o Windows. O recibo de publicação acompanha o pacote no Drive.
+Versão 2, substitui a primeira versão enviada em 11/09. Alterações autorizadas pelo Diego e implementadas pelo Codex. Este brief é o contrato de continuidade para o Mac e o Windows. O recibo final de publicação será enviado separadamente ao Drive, após a validação.
 
 ## Proprietário e segurança
 
@@ -31,6 +31,10 @@ O workflow34632976037 foi bloqueado porque desarmes caíram de13 para0 instrumen
 Limite da prova: o inventário bruto completo daquele ciclo não foi persistido. Os horários da fila provam que os cinco não foram inspecionados, mas não distinguem definitivamente exclusão pelo orçamento de ausência momentânea na listagem upstream. A prioridade inadequada por escanteios foi reproduzida e corrigida sem relaxar o gate.
 
 Corrigido: escanteios isolados não consomem a reserva de jogos úteis (inclusive estado legado da fila), janela de5 dias e exclusão de simulações. O orçamento de120 consultas foi preservado. Escanteios continuam elegíveis à exploração, mas não deslocam os mercados ativos da Mesa.
+
+Refinamento validado às19:35UTC: ignorar cantos isolados não bastou. Havia186 conhecidos úteis elegíveis,101 com consulta mais antiga que os cinco jogos. Foi adicionada reserva opcional por família: dentro dos90 conhecidos, alternar oito famílias FT, com idade por família e deduplicação de IDs; os30 lugares de exploração permanecem.
+
+No inventário real sanitizado de1.502 elegíveis, os cinco passaram dos ranks102–108 (fora do corte) para27–40. Oferta conhecida no estado selecionado, antes→depois: Cartões81→76, Chutes no gol44→74, Desarmes15→21, Faltas35→59, Finalizações35→60, Impedimentos35→59, Laterais16→23 e Tiros de meta16→23. Isto é cobertura ESPERADA pelas consultas anteriores, não prova de que as odds continuam abertas agora. O total continua120 IDs e a exploração mantém os mesmos30 inéditos. O parâmetro é opcional e foi ativado somente na7k.
 
 Os desarmes de jogo e de ambos os times já eram reconhecidos: OU5518/5519/5520, confirmados em dois detalhes atuais. Não adicionar alias redundante alegando cobertura nova.
 
@@ -64,6 +68,7 @@ Na7k existem cartões dos times no1º/2º tempo (OU6031–6034), além de cantos
 
 - Status distingue coleta nova, reuso/stride e fonte local preservada. Skip não renova timestamp nem entra como captura nova nas taxas futuras. Os registros históricos antigos não foram reclassificados sem evidência.
 - Fontes residenciais protegidas, falhas de autenticação/geografia/parse e orçamento já esgotado não provocam retries improdutivos.
+- A classificação preserva o tipo original da exceção: `CaptureBudgetExceeded` não pode virar `Other` ao gravar o status e gerar outra captura completa por engano.
 - Retry final: até2 casas paralelas e10min totais, em vez de somar todos os timeouts em sequência.
 - Deploy: leitura pública com retries limitados para erro transitório; manifesto/histórico/manifesta novamente precisam ser da mesma geração. Se não houver baseline verificável, falha fechada. Política CLV, hashes e contagens continuam obrigatórios.
 - Operação mostra a idade do full separada da última coleta. Um close recente não significa catálogo completo atualizado. Percentual de sucesso das capturas NÃO é percentual das linhas da casa.
@@ -82,5 +87,7 @@ Na7k existem cartões dos times no1º/2º tempo (OU6031–6034), além de cantos
 6. Conferir o recibo final: commit publicado, workflow, manifesto, hashes e preservação histórica. Avisar em caso de divergência; não afrouxar gates para obter verde.
 
 ## Aceite
+
+Suíte local consolidada: 630 testes passaram, 1 ignorado e 140 subtestes passaram. Inclui 10 testes portáveis da seleção equilibrada por família, comparação com a política anterior e preservação da exploração. Verificações de sintaxe de JavaScript e de whitespace também passaram.
 
 Testes offline cobrem parsing/pares, fila, transportes, clock, retenção, zero novos+retidos, promoção e baseline. A confirmação de produção depende de uma rodada oficial concluída e leitura do manifesto público. Não prometer cobertura100%, nem ausência permanente de mercados com base numa amostra de hoje.
