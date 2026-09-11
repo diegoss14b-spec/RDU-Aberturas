@@ -513,6 +513,41 @@ def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures, *, expect
     # local to the exact-ID fixture guard; do not globally classify every
     # continental Champions League as UEFA.
     league_key = " ".join(re.sub(r"[^a-z0-9 ]", " ", n(league or "")).split())
+    # 11/09: ingestion already recognizes country-scoped Wolves, but the purity
+    # gate deliberately starts from RAW names. Re-prove the alias here instead
+    # of trusting stored home_norm/away_norm or making Wolves a global alias.
+    # The team ID (3), exact current opponent, English competition, time and
+    # expected event all bind the proof. Youth/women/reserve suffixes stay intact.
+    if league_key in {
+        "championship", "england championship", "english championship", "inglaterra championship",
+    } and hn and an and start_dt is not None and (hn == "wolves") != (an == "wolves"):
+        nh = "wolverhampton" if hn == "wolves" else hn
+        na = "wolverhampton" if an == "wolves" else an
+        hits = []
+        for f in fixtures:
+            if f.get("day_brt") != day or f.get("league_id") != 18 or f.get("label") != "ENG2":
+                continue
+            if _kickoff_delta_min(start_dt, f) > SOFA_TIME_TOL_MIN:
+                continue
+            fh, fa = f.get("_hn"), f.get("_an")
+            if not flags_compatible(hn, an, fh, fa):
+                continue
+            # Require both identities in the source fixture, not only an event
+            # with a similar name. Reverse raw order retains existing semantics.
+            if (nh, na) == (fh, fa):
+                ih, ia = f.get("home_id"), f.get("away_id")
+            elif (nh, na) == (fa, fh):
+                ih, ia = f.get("away_id"), f.get("home_id")
+            else:
+                continue
+            alias_id, opponent_id = (ih, ia) if hn == "wolves" else (ia, ih)
+            if alias_id != 3 or type(opponent_id) is not int or opponent_id <= 0 or opponent_id == 3:
+                continue
+            hits.append(f.get("sofa_id"))
+        if len(set(hits)) == 1 and hits[0] is not None and (
+            expected_sofa_id is None or str(hits[0]) == str(expected_sofa_id)
+        ):
+            return nh, na, "England - Championship"
     if league_key in {"champions league", "uefa champions league", "liga dos campeoes"} and hn and an and start_dt is not None:
         reviewed = {
             "aek atenas": (3250, "aek athens"), "aek athens": (3250, "aek athens"),
