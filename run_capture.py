@@ -114,6 +114,8 @@ def should_retry(st, casa):
         return False
     if casa == "bet365" and "captura parcial: rede/orçamento" in str(st.get("error") or ""):
         return False  # bounded collector already retries missing FIs internally
+    if casa == "superbet" and st.get("error_class") == "CaptureIncomplete":
+        return False  # each failed detail already had bounded retries; do not repeat the full catalog
     return st.get("error_class") not in ("Auth", "Geo", "Parse", "CaptureBudgetExceeded")
 
 

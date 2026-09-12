@@ -11,7 +11,7 @@ Escreve: valor/data/ops.js  →  window.OPS = {...};
 Roda no workflow após captura/board (e localmente antes do deploy).
 """
 from __future__ import annotations
-import json, sys, re
+import json, sys, re, math
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict
@@ -93,6 +93,92 @@ def age_mins(ts_brt_str, now=None):
     return max(0, int((now - dt).total_seconds() / 60))
 
 
+def superbet_coverage(status):
+    """Expose capture diagnostics without changing source health or full freshness.
+
+    A diagnostic may belong to a previous run while the status file is already
+    pending/failed for another one. Keep its own clocks and only project it into
+    the existing UI when the attempt window (or unique output file) matches.
+    """
+    raw = load_json(STATUS / "superbet_diag.json")
+    if not isinstance(raw, dict) or not raw:
+        return {}
+    fields = (
+        "mode", "at", "updated_at", "complete", "inventory_complete",
+        "n_list", "n_eligible", "n_scheduled", "n_det", "n_ok",
+        "n_unavailable", "n_failed", "n_unattempted", "n_out",
+        "detail_requests", "horizon_h", "budget_seconds", "budget_exhausted",
+        "workers", "output_file", "first_kickoff", "last_kickoff",
+        "last_kickoff_saved", "last_kickoff_processed", "error",
+    )
+    coverage = {key: raw[key] for key in fields if key in raw}
+    coverage.update(source="superbet_diag.json", matches_status=False)
+    at, updated = parse_ts_brt(raw.get("at")), parse_ts_brt(raw.get("updated_at"))
+    if raw.get("mode") not in ("full", "close") or raw.get("mode") != status.get("mode"):
+        coverage["status_match_reason"] = "mode_mismatch"
+        return coverage
+    if at is None or updated is None or updated < at:
+        coverage["status_match_reason"] = "invalid_diagnostic_clock"
+        return coverage
+    if status.get("attempted") is False:
+        coverage["status_match_reason"] = "no_new_capture"
+        return coverage
+
+    def epoch(value):
+        return float(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) else None
+
+    started = epoch(status.get("attempt_started_epoch"))
+    if started is None:
+        started = epoch(status.get("run_started_epoch"))
+    ended = epoch(status.get("attempt_finished_epoch"))
+    status_at = parse_ts_brt(status.get("ts_utc") or status.get("ts_brt"))
+    if ended is None and status_at is not None:
+        ended = now_brt().timestamp() if status.get("error_class") == "Pending" else status_at.timestamp()
+    if started is None and ended is not None:
+        duration = epoch(status.get("duration_sec"))
+        if duration is not None and duration >= 0:
+            started = ended - duration
+
+    output = raw.get("output_file")
+    pointer = status.get("pointer_file")
+    if output and pointer and output != pointer:
+        coverage["status_match_reason"] = "output_file_mismatch"
+        return coverage
+    if started is not None and ended is not None:
+        # Diagnostic/status timestamps are rounded to seconds by their writers.
+        if ended < started or not (started - 2 <= at.timestamp() <= updated.timestamp() <= ended + 2):
+            coverage["status_match_reason"] = "outside_attempt_window"
+            return coverage
+        coverage.update(matches_status=True, status_match_reason="attempt_window")
+    elif output and pointer and output == pointer:
+        coverage.update(matches_status=True, status_match_reason="unique_output_file")
+    else:
+        coverage["status_match_reason"] = "unverified_attempt"
+    return coverage
+
+
+def superbet_discovery(coverage):
+    """Reuse UI labels only when all consulted-event counts are unambiguous.
+
+    n_det counts completed futures; on budget failure it can include events that
+    never reached HTTP. detail_requests includes retries. Neither is a truthful
+    consulted-event count for a partial run, whose explicit counters stay under
+    coverage instead of being forced into the discovery labels.
+    """
+    if not coverage.get("matches_status") or coverage.get("complete") is not True:
+        return {}
+    keys = ("n_list", "n_eligible", "n_det", "n_ok", "n_unavailable", "n_failed", "n_unattempted")
+    if any(not isinstance(coverage.get(key), int) or isinstance(coverage.get(key), bool) or coverage[key] < 0 for key in keys):
+        return {}
+    if (coverage["n_failed"] or coverage["n_unattempted"]
+            or coverage["n_det"] != coverage["n_eligible"]
+            or coverage["n_ok"] + coverage["n_unavailable"] != coverage["n_det"]
+            or coverage["n_list"] < coverage["n_eligible"]):
+        return {}
+    return {"inventory": coverage["n_list"], "selected": coverage["n_eligible"],
+            "attempted": coverage["n_det"], "not_selected": coverage["n_list"] - coverage["n_eligible"]}
+
+
 def load_casa_status():
     from capture_common import resolve_odds_pointer
     rows = []
@@ -103,7 +189,7 @@ def load_casa_status():
         full, _ = resolve_odds_pointer(c, prefer_full=True)
         if not full or full.get('_pointer') != f'{c}_latest_full.json':
             full = {}
-        rows.append({
+        row = {
             "id": c,
             "nome": DISP.get(c, c),
             "ok": health == "ok",
@@ -130,7 +216,11 @@ def load_casa_status():
             "error_class": st.get("error_class"),
             "proxy_br": st.get("proxy_br"),
             "age_min": age_mins(st.get("ts_brt")),
-        })
+        }
+        if c == "superbet":
+            row["coverage"] = superbet_coverage(st)
+            row["discovery"] = superbet_discovery(row["coverage"])
+        rows.append(row)
     # sofa fixture status (best-effort)
     sofa = load_json(STATUS / "sofa.json")
     if sofa:
