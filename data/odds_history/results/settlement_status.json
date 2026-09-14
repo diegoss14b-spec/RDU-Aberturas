@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-13T23:51:27.120458-03:00",
+  "generated_at": "2026-09-14T00:21:44.599259-03:00",
   "results_rows": 4575,
   "result_field_coverage": {
     "cards": {
@@ -40,10 +40,10 @@
     }
   },
   "totals_by_status": {
-    "unavailable": 141720,
+    "unavailable": 141744,
     "settled": 32541,
-    "pending_result": 129775,
-    "open": 17811
+    "pending_result": 129751,
+    "open": 17609
   },
   "settled_date_offsets": {
     "0": 27752,
@@ -51,72 +51,73 @@
   },
   "by_market": {
     "Cartões": {
-      "total": 20923,
+      "total": 20925,
       "status": {
         "settled": 4941,
-        "pending_result": 14792,
-        "open": 1190
+        "pending_result": 14788,
+        "unavailable": 4,
+        "open": 1192
       },
       "pending_age": {
-        "7-30d": 2875,
-        "3-7d": 3840,
-        "1-3d": 5295,
-        "0-24h": 2782
+        "7-30d": 2871,
+        "3-7d": 3858,
+        "1-3d": 5305,
+        "0-24h": 2754
       },
       "pending_reasons": {
-        "game_not_in_results": 14744,
+        "game_not_in_results": 14740,
         "stat_missing:cards": 48
       }
     },
     "Cartões@away": {
-      "total": 10265,
+      "total": 10261,
       "status": {
         "unavailable": 9805,
-        "open": 460
-      },
-      "pending_age": {},
-      "pending_reasons": {}
-    },
-    "Cartões@home": {
-      "total": 10235,
-      "status": {
-        "unavailable": 9779,
         "open": 456
       },
       "pending_age": {},
       "pending_reasons": {}
     },
+    "Cartões@home": {
+      "total": 10233,
+      "status": {
+        "unavailable": 9779,
+        "open": 454
+      },
+      "pending_age": {},
+      "pending_reasons": {}
+    },
     "Chutes no gol": {
-      "total": 19761,
+      "total": 19773,
       "status": {
         "settled": 4669,
         "pending_result": 14174,
-        "open": 918
+        "open": 930
       },
       "pending_age": {
         "7-30d": 2797,
-        "3-7d": 3737,
-        "1-3d": 4897,
-        "0-24h": 2743
+        "3-7d": 3772,
+        "1-3d": 4906,
+        "0-24h": 2699
       },
       "pending_reasons": {
         "game_not_in_results": 14174
       }
     },
     "Chutes no gol@away": {
-      "total": 12906,
+      "total": 12868,
       "status": {
         "unavailable": 12014,
-        "open": 892
+        "open": 854
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Chutes no gol@home": {
-      "total": 13237,
+      "total": 13197,
       "status": {
         "unavailable": 12315,
-        "open": 922
+        "open": 882
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -157,53 +158,54 @@
       "pending_reasons": {}
     },
     "Escanteios": {
-      "total": 90876,
+      "total": 90840,
       "status": {
         "settled": 12387,
-        "pending_result": 73263,
-        "open": 5226
+        "pending_result": 73243,
+        "unavailable": 20,
+        "open": 5190
       },
       "pending_age": {
-        "7-30d": 26740,
-        "3-7d": 12596,
-        "1-3d": 22442,
-        "0-24h": 11485
+        "7-30d": 26720,
+        "3-7d": 12656,
+        "1-3d": 22464,
+        "0-24h": 11403
       },
       "pending_reasons": {
-        "game_not_in_results": 73261,
+        "game_not_in_results": 73241,
         "stat_missing:corners": 2
       }
     },
     "Escanteios@away": {
-      "total": 23565,
+      "total": 23555,
       "status": {
         "unavailable": 21882,
-        "open": 1683
+        "open": 1673
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Escanteios@home": {
-      "total": 23488,
+      "total": 23480,
       "status": {
         "unavailable": 21724,
-        "open": 1764
+        "open": 1756
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Faltas": {
-      "total": 4604,
+      "total": 4606,
       "status": {
         "settled": 1402,
         "pending_result": 3054,
-        "open": 148
+        "open": 150
       },
       "pending_age": {
         "7-30d": 218,
-        "3-7d": 960,
-        "1-3d": 1184,
-        "0-24h": 692
+        "3-7d": 964,
+        "1-3d": 1182,
+        "0-24h": 690
       },
       "pending_reasons": {
         "game_not_in_results": 3054
@@ -228,17 +230,17 @@
       "pending_reasons": {}
     },
     "Finalizações": {
-      "total": 22522,
+      "total": 22512,
       "status": {
         "settled": 5322,
         "pending_result": 16258,
-        "open": 942
+        "open": 932
       },
       "pending_age": {
         "7-30d": 2950,
-        "3-7d": 4658,
-        "1-3d": 5524,
-        "0-24h": 3126
+        "3-7d": 4694,
+        "1-3d": 5550,
+        "0-24h": 3064
       },
       "pending_reasons": {
         "game_not_in_results": 16228,
@@ -246,28 +248,28 @@
       }
     },
     "Finalizações@away": {
-      "total": 14813,
+      "total": 14775,
       "status": {
         "unavailable": 13997,
-        "open": 816
+        "open": 778
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Finalizações@home": {
-      "total": 15064,
+      "total": 15026,
       "status": {
         "unavailable": 14234,
-        "open": 830
+        "open": 792
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Handicap de Cartões": {
-      "total": 2234,
+      "total": 2240,
       "status": {
         "unavailable": 2102,
-        "open": 132
+        "open": 138
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -281,9 +283,9 @@
       },
       "pending_age": {
         "7-30d": 386,
-        "3-7d": 928,
-        "1-3d": 1270,
-        "0-24h": 762
+        "3-7d": 930,
+        "1-3d": 1278,
+        "0-24h": 752
       },
       "pending_reasons": {
         "game_not_in_results": 3346
@@ -316,9 +318,9 @@
       },
       "pending_age": {
         "7-30d": 106,
-        "3-7d": 1008,
-        "1-3d": 640,
-        "0-24h": 410
+        "3-7d": 1012,
+        "1-3d": 638,
+        "0-24h": 408
       },
       "pending_reasons": {
         "game_not_in_results": 2164
@@ -351,9 +353,9 @@
       },
       "pending_age": {
         "7-30d": 16,
-        "3-7d": 754,
+        "3-7d": 756,
         "1-3d": 548,
-        "0-24h": 302
+        "0-24h": 300
       },
       "pending_reasons": {
         "game_not_in_results": 1620
@@ -379,218 +381,218 @@
     }
   },
   "backlog": {
-    "total": 129775,
+    "total": 129751,
     "age": {
-      "7-30d": 36098,
-      "3-7d": 28985,
-      "1-3d": 42212,
-      "0-24h": 22480
+      "7-30d": 36074,
+      "3-7d": 29146,
+      "1-3d": 42283,
+      "0-24h": 22248
     },
     "age_unknown": 0,
     "reasons": {
-      "game_not_in_results": 129695,
+      "game_not_in_results": 129671,
       "stat_missing:shots": 30,
       "stat_missing:cards": 48,
       "stat_missing:corners": 2
     },
     "oldest_samples": [
       {
-        "key": "7k|sofa:16280812|Escanteios|7.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "7k|sofa:16280812|Escanteios|7.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "7k|sofa:16280812|Escanteios|8.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "7k|sofa:16280812|Escanteios|8.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "7k|sofa:16280812|Escanteios|9.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "7k|sofa:16280812|Escanteios|9.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "7k|sofa:16280812|Cartões|5.5|over",
-        "market": "Cartões",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "7k|sofa:16280812|Cartões|5.5|under",
-        "market": "Cartões",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|6.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|6.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|7.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|7.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|8.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|8.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|9.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|9.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|10.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Escanteios|10.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Cartões|5.5|over",
-        "market": "Cartões",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "superbet|sofa:16280812|Cartões|5.5|under",
-        "market": "Cartões",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 45
-      },
-      {
-        "key": "7k|sofa:16280812|Escanteios|6.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 44
-      },
-      {
-        "key": "7k|sofa:16280812|Escanteios|6.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 44
-      },
-      {
-        "key": "7k|sofa:16280812|Escanteios|10.5|over",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 44
-      },
-      {
-        "key": "7k|sofa:16280812|Escanteios|10.5|under",
-        "market": "Escanteios",
-        "kickoff": "2026-08-31T17:00:00-0300",
-        "age_days": 13.29,
-        "reason": "game_not_in_results",
-        "attempts": 44
-      },
-      {
         "key": "superbet|2026-09-01|dalian yingbo|shanghai shenhua|Escanteios|8.5|over",
         "market": "Escanteios",
         "kickoff": "2026-09-01T08:35:00-0300",
-        "age_days": 12.64,
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|dalian yingbo|shanghai shenhua|Escanteios|8.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|dalian yingbo|shanghai shenhua|Escanteios|9.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|dalian yingbo|shanghai shenhua|Escanteios|9.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|dalian yingbo|shanghai shenhua|Escanteios|10.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|dalian yingbo|shanghai shenhua|Escanteios|10.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|lanzhou longyuan|beijing guoan|Escanteios|8.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|lanzhou longyuan|beijing guoan|Escanteios|8.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|lanzhou longyuan|beijing guoan|Escanteios|9.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|lanzhou longyuan|beijing guoan|Escanteios|9.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|lanzhou longyuan|beijing guoan|Escanteios|10.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|lanzhou longyuan|beijing guoan|Escanteios|10.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|shandong taishan|shanghai port|Escanteios|8.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|shandong taishan|shanghai port|Escanteios|8.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|shandong taishan|shanghai port|Escanteios|9.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|shandong taishan|shanghai port|Escanteios|9.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|shandong taishan|shanghai port|Escanteios|10.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|shandong taishan|shanghai port|Escanteios|10.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T08:35:00-0300",
+        "age_days": 12.66,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|brunei dpmm|terengganu|Escanteios|9.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T09:15:00-0300",
+        "age_days": 12.63,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|brunei dpmm|terengganu|Escanteios|9.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T09:15:00-0300",
+        "age_days": 12.63,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|korona kielce ii|radomiak radom|Escanteios|9.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T09:30:00-0300",
+        "age_days": 12.62,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|korona kielce ii|radomiak radom|Escanteios|9.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T09:30:00-0300",
+        "age_days": 12.62,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|korona kielce ii|radomiak radom|Escanteios|10.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T09:30:00-0300",
+        "age_days": 12.62,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|korona kielce ii|radomiak radom|Escanteios|10.5|under",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T09:30:00-0300",
+        "age_days": 12.62,
+        "reason": "game_not_in_results",
+        "attempts": 42
+      },
+      {
+        "key": "superbet|2026-09-01|korona kielce ii|radomiak radom|Escanteios|11.5|over",
+        "market": "Escanteios",
+        "kickoff": "2026-09-01T09:30:00-0300",
+        "age_days": 12.62,
         "reason": "game_not_in_results",
         "attempts": 42
       }
