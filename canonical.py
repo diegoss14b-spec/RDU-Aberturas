@@ -518,14 +518,30 @@ def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures, *, expect
     # of trusting stored home_norm/away_norm or making Wolves a global alias.
     # The team ID (3), exact current opponent, English competition, time and
     # expected event all bind the proof. Youth/women/reserve suffixes stay intact.
+    wolves_competition = None
     if league_key in {
         "championship", "england championship", "english championship", "inglaterra championship",
-    } and hn and an and start_dt is not None and (hn == "wolves") != (an == "wolves"):
+    }:
+        wolves_competition = (18, "ENG2", "England - Championship")
+    elif league_key in {"efl cup", "england efl cup", "english efl cup", "inglaterra efl cup"}:
+        # 14/09: Everton x Wolves (16992612) uses the SAME club, but a different
+        # competition. Bind the reviewed cup spelling to its own exact Sofa IDs;
+        # never reuse Championship's proof or enable a worldwide Wolves alias.
+        wolves_competition = (21, "EFLC", "England - EFL Cup")
+    if wolves_competition and hn and an and start_dt is not None and (hn == "wolves") != (an == "wolves"):
+        league_id, league_label, league_context = wolves_competition
         nh = "wolverhampton" if hn == "wolves" else hn
         na = "wolverhampton" if an == "wolves" else an
         hits = []
         for f in fixtures:
-            if f.get("day_brt") != day or f.get("league_id") != 18 or f.get("label") != "ENG2":
+            if f.get("day_brt") != day or f.get("league_id") != league_id or f.get("label") != league_label:
+                continue
+            # This new cup proof uses typed fixture IDs, not coercion such as
+            # 3.0 == 3. Historical expected_sofa_id may still be a string.
+            if league_id == 21 and any(
+                type(f.get(key)) is not int or f[key] <= 0
+                for key in ("sofa_id", "league_id", "home_id", "away_id")
+            ):
                 continue
             if _kickoff_delta_min(start_dt, f) > SOFA_TIME_TOL_MIN:
                 continue
@@ -547,7 +563,7 @@ def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures, *, expect
         if len(set(hits)) == 1 and hits[0] is not None and (
             expected_sofa_id is None or str(hits[0]) == str(expected_sofa_id)
         ):
-            return nh, na, "England - Championship"
+            return nh, na, league_context
     if league_key in {"champions league", "uefa champions league", "liga dos campeoes"} and hn and an and start_dt is not None:
         reviewed = {
             "aek atenas": (3250, "aek athens"), "aek athens": (3250, "aek athens"),
