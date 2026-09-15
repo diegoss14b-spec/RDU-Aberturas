@@ -1,28 +1,31 @@
 {
  "casa": "pinnacle",
- "ok": true,
- "ts_utc": "2026-09-15T09:31:57Z",
- "ts_brt": "2026-09-15 06:31",
+ "ok": false,
+ "ts_utc": "2026-09-15T09:42:13Z",
+ "ts_brt": "2026-09-15 06:42",
  "attempted": true,
  "skipped_reason": null,
- "last_decision_at": "2026-09-15T09:31:57.976508+00:00",
- "n_events": 87,
- "n_markets": 2,
+ "last_decision_at": "2026-09-15T09:42:13.001618+00:00",
+ "n_events": 9,
+ "n_markets": 1,
  "market_counts": {
-  "Cartões": 17,
-  "Escanteios": 83
+  "Cartões": 9
  },
  "min_events": 3,
- "duration_sec": 114.9,
- "error": null,
- "error_class": null,
+ "duration_sec": 106.5,
+ "error": "promoção full bloqueada: feed local fresco mais rico (n=87 há 12min > n_novo=9; guarda 75min)",
+ "error_class": "Other",
  "mode": "full",
  "sample_events": [],
- "proxy_br": false,
+ "proxy_br": true,
  "pointer_valid": true,
- "pointer_file": "pinnacle_2026-09-15_0630.jsonl",
- "pointer_at": "2026-09-15T06:30:03-03:00",
- "pointer_age_h": 0.032,
- "promotion_blocked": [],
- "source_state": "ok"
+ "pointer_file": "pinnacle_2026-09-15_0640.jsonl",
+ "pointer_at": "2026-09-15T06:40:26-03:00",
+ "pointer_age_h": 0.03,
+ "promotion_blocked": [
+  "feed local fresco mais rico (n=87 há 12min > n_novo=9; guarda 75min)"
+ ],
+ "source_state": "protected_feed",
+ "attempt_started_epoch": 1789465226.3503473,
+ "attempt_finished_epoch": 1789465333.0549645
 }
