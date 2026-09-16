@@ -1,36 +1,34 @@
 {
  "casa": "sofa",
  "kind": "fixture",
- "ok": false,
- "ts_utc": "2026-09-16T03:13:04Z",
- "ts_brt": "2026-09-16 00:13",
- "n_events": 698,
- "n_fixtures": 698,
+ "ok": true,
+ "ts_utc": "2026-09-16T04:09:35Z",
+ "ts_brt": "2026-09-16 01:09",
+ "n_events": 708,
+ "n_fixtures": 708,
  "n_markets": 0,
  "min_events": 177,
- "promoted": false,
+ "promoted": true,
  "pointer_valid": true,
- "pointer_file": "_snapshots/sofa_6b1308f771cdcf53afac.json",
- "pointer_at": "2026-09-15T23:44:11-03:00",
- "pointer_n": 707,
- "pointer_age_h": 0.481,
- "duration_sec": 224.9,
- "error": "snapshot não saudável: n=698, mínimo=177; fallback preservado n=707; transporte req=150 proxy=150 direto=0 http=200:142,404:4 ultimo=- circuito=0 falhas=SerieA inativos=WC,Uruguay,CDF,CDR",
- "error_class": "Other",
+ "pointer_file": "_snapshots/sofa_a171cf6f5b8ca9d85b96.json",
+ "pointer_at": "2026-09-16T01:09:35-03:00",
+ "pointer_n": 708,
+ "pointer_age_h": 0.0,
+ "duration_sec": 215.3,
+ "error": null,
+ "error_class": null,
  "transport": {
-  "requests": 150,
-  "proxy_attempts": 150,
+  "requests": 148,
+  "proxy_attempts": 148,
   "direct_attempts": 0,
   "statuses": {
-   "200": 142,
+   "200": 144,
    "404": 4
   },
   "last_error": null,
   "consecutive_failures": 0,
   "circuit_open": false,
-  "failed_tournaments": [
-   "SerieA"
-  ],
+  "failed_tournaments": [],
   "inactive_tournaments": [
    "WC",
    "Uruguay",
@@ -39,7 +37,7 @@
   ]
  },
  "attempted": true,
- "attempt_started_epoch": 1789528158.7546225,
- "attempt_finished_epoch": 1789528384.0494366,
- "source_state": "failed"
+ "attempt_started_epoch": 1789531559.7032545,
+ "attempt_finished_epoch": 1789531775.0722997,
+ "source_state": "ok"
 }
