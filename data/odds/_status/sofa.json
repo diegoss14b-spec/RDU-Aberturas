@@ -1,34 +1,36 @@
 {
  "casa": "sofa",
  "kind": "fixture",
- "ok": true,
- "ts_utc": "2026-09-18T07:13:14Z",
- "ts_brt": "2026-09-18 04:13",
+ "ok": false,
+ "ts_utc": "2026-09-18T08:16:10Z",
+ "ts_brt": "2026-09-18 05:16",
  "n_events": 663,
  "n_fixtures": 663,
  "n_markets": 0,
  "min_events": 166,
- "promoted": true,
+ "promoted": false,
  "pointer_valid": true,
- "pointer_file": "_snapshots/sofa_1311e3551a17c5dcb673.json",
- "pointer_at": "2026-09-18T04:13:14-03:00",
+ "pointer_file": "_snapshots/sofa_e7c9703804c26e75ada3.json",
+ "pointer_at": "2026-09-18T03:10:56-03:00",
  "pointer_n": 663,
- "pointer_age_h": 0.0,
- "duration_sec": 210.9,
- "error": null,
- "error_class": null,
+ "pointer_age_h": 2.087,
+ "duration_sec": 227.8,
+ "error": "snapshot não saudável: n=663, mínimo=166; fallback preservado n=663; transporte req=149 proxy=149 direto=0 http=200:143,404:3 ultimo=- circuito=0 falhas=CHI inativos=WC,CDF,CDR",
+ "error_class": "Other",
  "transport": {
-  "requests": 150,
-  "proxy_attempts": 150,
+  "requests": 149,
+  "proxy_attempts": 149,
   "direct_attempts": 0,
   "statuses": {
-   "200": 145,
+   "200": 143,
    "404": 3
   },
   "last_error": null,
   "consecutive_failures": 0,
   "circuit_open": false,
-  "failed_tournaments": [],
+  "failed_tournaments": [
+   "CHI"
+  ],
   "inactive_tournaments": [
    "WC",
    "CDF",
@@ -36,7 +38,7 @@
   ]
  },
  "attempted": true,
- "attempt_started_epoch": 1789715383.7480848,
- "attempt_finished_epoch": 1789715594.9986196,
- "source_state": "ok"
+ "attempt_started_epoch": 1789719142.3206506,
+ "attempt_finished_epoch": 1789719370.2507548,
+ "source_state": "failed"
 }
