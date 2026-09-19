@@ -1,45 +1,35 @@
 {
- "ts_brt": "2026-09-18 20:06",
+ "ts_brt": "2026-09-18 21:01",
  "reasons": [
   "identidade impura sofa:16391693 — 2 partidas reais sob o mesmo id (wolverhampton x west brom ×VS× wolves x west brom); board não pode publicar odds misturadas"
  ],
  "now": {
-  "n_games": 229,
-  "sofa_games": 218,
-  "sofa_pct": 95.19650655021834,
-  "value_games": 94,
-  "value_sofa": 94,
+  "n_games": 221,
+  "sofa_games": 210,
+  "sofa_pct": 95.02262443438914,
+  "value_games": 81,
+  "value_sofa": 81,
   "value_sofa_pct": 100.0,
   "houses": {
-   "Betano": 47,
    "Superbet": 136,
-   "EstrelaBet": 150,
-   "Pinnacle": 66,
-   "7k": 90,
    "Sportingbet": 65,
-   "bet365": 90
+   "Betano": 47,
+   "bet365": 90,
+   "7k": 84,
+   "EstrelaBet": 126,
+   "Pinnacle": 66
   },
   "markets": {
-   "Cartões": 221,
-   "Chutes no gol": 161,
-   "Finalizações": 152,
-   "Faltas": 97,
-   "Impedimentos": 105,
-   "Laterais": 37,
-   "Tiros de meta": 30,
-   "Desarmes": 49
+   "Cartões": 206,
+   "Chutes no gol": 162,
+   "Finalizações": 153,
+   "Faltas": 86,
+   "Impedimentos": 93,
+   "Laterais": 35,
+   "Tiros de meta": 28,
+   "Desarmes": 48
   },
   "house_markets": {
-   "Betano": {
-    "Cartões": 123,
-    "Chutes no gol": 86,
-    "Finalizações": 86,
-    "Faltas": 90,
-    "Impedimentos": 90,
-    "Desarmes": 78,
-    "Laterais": 24,
-    "Tiros de meta": 24
-   },
    "Superbet": {
     "Cartões": 400,
     "Chutes no gol": 309,
@@ -50,37 +40,47 @@
     "Tiros de meta": 59,
     "Desarmes": 24
    },
-   "EstrelaBet": {
-    "Cartões": 270,
-    "Chutes no gol": 279,
-    "Finalizações": 284,
-    "Impedimentos": 191,
-    "Faltas": 126,
-    "Desarmes": 30,
-    "Laterais": 21
-   },
-   "Pinnacle": {
-    "Cartões": 198
-   },
-   "7k": {
-    "Cartões": 270,
-    "Chutes no gol": 177,
-    "Faltas": 174,
-    "Finalizações": 175,
-    "Impedimentos": 174,
-    "Desarmes": 135,
-    "Laterais": 48,
-    "Tiros de meta": 47
-   },
    "Sportingbet": {
     "Cartões": 185
    },
+   "Betano": {
+    "Cartões": 127,
+    "Chutes no gol": 88,
+    "Finalizações": 88,
+    "Desarmes": 78,
+    "Faltas": 90,
+    "Impedimentos": 90,
+    "Laterais": 24,
+    "Tiros de meta": 24
+   },
    "bet365": {
-    "Cartões": 242,
+    "Cartões": 244,
     "Chutes no gol": 229,
     "Finalizações": 231,
     "Desarmes": 12,
     "Impedimentos": 12
+   },
+   "7k": {
+    "Cartões": 243,
+    "Chutes no gol": 180,
+    "Desarmes": 135,
+    "Faltas": 168,
+    "Finalizações": 180,
+    "Impedimentos": 168,
+    "Laterais": 47,
+    "Tiros de meta": 47
+   },
+   "EstrelaBet": {
+    "Cartões": 175,
+    "Chutes no gol": 242,
+    "Desarmes": 3,
+    "Faltas": 8,
+    "Finalizações": 247,
+    "Impedimentos": 50,
+    "Laterais": 21
+   },
+   "Pinnacle": {
+    "Cartões": 198
    }
   }
  },
@@ -169,19 +169,19 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-09-18T22:39:23Z",
-  "ts_brt": "2026-09-18 19:39",
-  "n_events": 614,
-  "n_fixtures": 614,
+  "ts_utc": "2026-09-18T23:31:45Z",
+  "ts_brt": "2026-09-18 20:31",
+  "n_events": 613,
+  "n_fixtures": 613,
   "n_markets": 0,
   "min_events": 165,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_cb47075b09f05d6744ab.json",
-  "pointer_at": "2026-09-18T19:39:23-03:00",
-  "pointer_n": 614,
-  "pointer_age_h": 0.4481812186111111,
-  "duration_sec": 216.3,
+  "pointer_file": "_snapshots/sofa_52a8267ea69fb61ed310.json",
+  "pointer_at": "2026-09-18T20:31:45-03:00",
+  "pointer_n": 613,
+  "pointer_age_h": 0.4952753583333333,
+  "duration_sec": 226.7,
   "error": null,
   "error_class": null,
   "transport": {
@@ -189,8 +189,8 @@
    "proxy_attempts": 148,
    "direct_attempts": 0,
    "statuses": {
-    "200": 145,
-    "404": 3
+    "200": 144,
+    "404": 4
    },
    "last_error": null,
    "consecutive_failures": 0,
@@ -198,13 +198,14 @@
    "failed_tournaments": [],
    "inactive_tournaments": [
     "WC",
+    "BOL",
     "CDF",
     "CDR"
    ]
   },
   "attempted": true,
-  "attempt_started_epoch": 1789770947.05001,
-  "attempt_finished_epoch": 1789771163.5230663,
+  "attempt_started_epoch": 1789774078.6860478,
+  "attempt_finished_epoch": 1789774305.734285,
   "source_state": "ok"
  },
  "model": {
