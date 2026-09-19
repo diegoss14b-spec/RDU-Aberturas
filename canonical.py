@@ -528,6 +528,39 @@ def fixture_scoped_alias_pair(hn, an, league, day, start_dt, fixtures, *, expect
         # competition. Bind the reviewed cup spelling to its own exact Sofa IDs;
         # never reuse Championship's proof or enable a worldwide Wolves alias.
         wolves_competition = (21, "EFLC", "England - EFL Cup")
+    # 18/09: both clubs can be abbreviated (Wolves x West Brom). Neither raw
+    # name is then an exact anchor for the single-alias guard below. Prove BOTH
+    # reviewed identities against the same fixture; do not add global aliases.
+    english_pair = {
+        "wolves": (3, "wolverhampton"), "wolverhampton": (3, "wolverhampton"),
+        "west brom": (8, "west bromwich albion"),
+        "west bromwich albion": (8, "west bromwich albion"),
+    }
+    rh, ra = english_pair.get(hn), english_pair.get(an)
+    if wolves_competition and rh and ra and {rh[0], ra[0]} == {3, 8}:
+        league_id, league_label, league_context = wolves_competition
+        hits = set()
+        if start_dt is not None:
+            for f in fixtures:
+                if any(type(f.get(key)) is not int or f[key] <= 0
+                       for key in ("sofa_id", "league_id", "home_id", "away_id")):
+                    continue
+                if f.get("day_brt") != day or f["league_id"] != league_id or f.get("label") != league_label:
+                    continue
+                if _kickoff_delta_min(start_dt, f) > SOFA_TIME_TOL_MIN:
+                    continue
+                fh, fa = f.get("_hn"), f.get("_an")
+                if not flags_compatible(hn, an, fh, fa):
+                    continue
+                direct = (rh[0], ra[0], rh[1], ra[1]) == (f["home_id"], f["away_id"], fh, fa)
+                reverse = (rh[0], ra[0], rh[1], ra[1]) == (f["away_id"], f["home_id"], fa, fh)
+                if direct or reverse:
+                    hits.add(f["sofa_id"])
+        if len(hits) == 1 and (expected_sofa_id is None or str(next(iter(hits))) == str(expected_sofa_id)):
+            return rh[1], ra[1], league_context
+        # A failed proof for this known pair must not fall through to the older
+        # one-sided guard, which does not bind the opponent to West Brom's ID.
+        return hn, an, league
     if wolves_competition and hn and an and start_dt is not None and (hn == "wolves") != (an == "wolves"):
         league_id, league_label, league_context = wolves_competition
         nh = "wolverhampton" if hn == "wolves" else hn
