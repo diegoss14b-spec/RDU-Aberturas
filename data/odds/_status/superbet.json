@@ -1,18 +1,18 @@
 {
  "casa": "superbet",
- "ok": true,
- "ts_utc": "2026-09-22T18:18:04Z",
- "ts_brt": "2026-09-22 15:18",
+ "ok": false,
+ "ts_utc": "2026-09-22T19:01:57Z",
+ "ts_brt": "2026-09-22 16:01",
  "attempted": true,
  "skipped_reason": null,
- "last_decision_at": "2026-09-22T18:18:04.375370+00:00",
- "n_events": 54,
+ "last_decision_at": "2026-09-22T19:01:57.412752+00:00",
+ "n_events": 45,
  "n_markets": 9,
  "market_counts": {
-  "Cartões": 7,
+  "Cartões": 4,
   "Chutes no gol": 1,
   "Desarmes": 1,
-  "Escanteios": 52,
+  "Escanteios": 43,
   "Faltas": 1,
   "Finalizações": 3,
   "Impedimentos": 1,
@@ -20,16 +20,20 @@
   "Tiros de meta": 1
  },
  "min_events": 10,
- "duration_sec": 35.3,
- "error": null,
- "error_class": null,
+ "duration_sec": 20.1,
+ "error": "promoção full bloqueada: feed local fresco mais rico (n=54 há 44min > n_novo=45; guarda 75min)",
+ "error_class": "Other",
  "mode": "full",
  "sample_events": [],
  "proxy_br": false,
  "pointer_valid": true,
- "pointer_file": "superbet_2026-09-22_151729_124432_7220_1790101050474011200.jsonl",
- "pointer_at": "2026-09-22T15:18:03-03:00",
+ "pointer_file": "superbet_2026-09-22_160137_319492_5381_1790103697719584635.jsonl",
+ "pointer_at": "2026-09-22T16:01:57-03:00",
  "pointer_age_h": 0.0,
- "promotion_blocked": [],
- "source_state": "ok"
+ "promotion_blocked": [
+  "feed local fresco mais rico (n=54 há 44min > n_novo=45; guarda 75min)"
+ ],
+ "source_state": "protected_feed",
+ "attempt_started_epoch": 1790103697.182629,
+ "attempt_finished_epoch": 1790103717.4390736
 }
