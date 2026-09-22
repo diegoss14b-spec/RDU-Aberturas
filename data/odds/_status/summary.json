@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-09-22T02:50:22Z",
- "ts_brt": "2026-09-21 23:50",
+ "ts_utc": "2026-09-22T03:47:59Z",
+ "ts_brt": "2026-09-22 00:47",
  "casas_ok": [
   "betano",
   "superbet",
@@ -20,7 +20,7 @@
  ],
  "n_ok": 5,
  "n_fail": 2,
- "total_events": 293,
+ "total_events": 295,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -29,20 +29,20 @@
    "market_counts": {
     "Cartões": 8,
     "Chutes no gol": 1,
-    "Escanteios": 21,
+    "Escanteios": 35,
     "Faltas": 1,
     "Finalizações": 1,
     "Impedimentos": 1
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-21_2340.jsonl",
+   "pointer_file": "betano_2026-09-22_0038.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-22T02:49:04Z"
+   "ts_utc": "2026-09-22T03:46:54Z"
   },
   "superbet": {
    "ok": true,
@@ -53,14 +53,14 @@
     "Escanteios": 59
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-21_234054_629939_5676_1790044854927460167.jsonl",
+   "pointer_file": "superbet_2026-09-22_003842_783684_5572_1790048323251011025.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-22T02:41:10Z"
+   "ts_utc": "2026-09-22T03:39:01Z"
   },
   "estrelabet": {
    "ok": true,
@@ -77,8 +77,8 @@
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": true,
-   "skipped_reason": null,
+   "attempted": false,
+   "skipped_reason": "full_stride",
    "mode": "full",
    "ts_utc": "2026-09-22T02:41:35Z"
   },
@@ -99,8 +99,8 @@
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": true,
-   "skipped_reason": null,
+   "attempted": false,
+   "skipped_reason": "full_stride",
    "mode": "full",
    "ts_utc": "2026-09-22T02:44:42Z"
   },
@@ -117,29 +117,29 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-22T02:49:18Z"
+   "ts_utc": "2026-09-22T03:47:09Z"
   },
   "bet365": {
    "ok": true,
-   "n_events": 127,
+   "n_events": 129,
    "n_markets": 6,
    "market_counts": {
     "Cartões": 1,
     "Chutes no gol": 8,
     "Desarmes": 2,
-    "Escanteios": 127,
+    "Escanteios": 129,
     "Finalizações": 8,
     "Impedimentos": 1
    },
    "pointer_valid": true,
-   "pointer_file": "_snapshots/bet365_full_858b650c41de211b5e74.jsonl",
+   "pointer_file": "bet365_2026-09-22_0038.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": false,
-   "skipped_reason": "full_interval",
+   "attempted": true,
+   "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-22T01:57:44Z"
+   "ts_utc": "2026-09-22T03:39:54Z"
   },
   "sportingbet": {
    "ok": false,
@@ -150,21 +150,21 @@
     "Escanteios": 7
    },
    "pointer_valid": true,
-   "pointer_file": "sportingbet_2026-09-21_2349.jsonl",
+   "pointer_file": "sportingbet_2026-09-22_0046.jsonl",
    "error": "7 eventos < mínimo 8 — fonte respondeu vazia/rala sem exceção (manutenção ou rate-limit da fonte?)",
    "source_state": "failed",
    "error_class": "HTTP429",
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-22T02:50:22Z"
+   "ts_utc": "2026-09-22T03:47:59Z"
   }
  },
  "market_counts": {
   "Cartões": 21,
   "Chutes no gol": 19,
   "Desarmes": 2,
-  "Escanteios": 253,
+  "Escanteios": 269,
   "Faltas": 2,
   "Finalizações": 14,
   "Impedimentos": 3
@@ -173,24 +173,24 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": true,
-  "ts_utc": "2026-09-22T02:44:52Z",
-  "ts_brt": "2026-09-21 23:44",
+  "ts_utc": "2026-09-22T03:42:41Z",
+  "ts_brt": "2026-09-22 00:42",
   "n_events": 231,
   "n_fixtures": 231,
   "n_markets": 0,
   "min_events": 58,
   "promoted": true,
   "pointer_valid": true,
-  "pointer_file": "_snapshots/sofa_0ae3c1c83796c90952b7.json",
-  "pointer_at": "2026-09-21T23:44:52-03:00",
+  "pointer_file": "_snapshots/sofa_09cef07b3dc110f07677.json",
+  "pointer_at": "2026-09-22T00:42:41-03:00",
   "pointer_n": 231,
   "pointer_age_h": 0.0,
-  "duration_sec": 224.9,
+  "duration_sec": 238.9,
   "error": null,
   "error_class": null,
   "transport": {
-   "requests": 146,
-   "proxy_attempts": 146,
+   "requests": 145,
+   "proxy_attempts": 145,
    "direct_attempts": 0,
    "statuses": {
     "200": 142,
@@ -207,8 +207,8 @@
    ]
   },
   "attempted": true,
-  "attempt_started_epoch": 1790044867.2717273,
-  "attempt_finished_epoch": 1790045092.3325093,
+  "attempt_started_epoch": 1790048322.555471,
+  "attempt_finished_epoch": 1790048561.8803704,
   "source_state": "ok"
  },
  "deploy_allowed": true,
