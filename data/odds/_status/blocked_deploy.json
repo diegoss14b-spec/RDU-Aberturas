@@ -1,0 +1,183 @@
+{
+ "ts_brt": "2026-09-22 00:08",
+ "reasons": [
+  "casa/mercado EstrelaBet/Impedimentos caiu >65%: 6 → 0 instrumentos"
+ ],
+ "now": {
+  "n_games": 26,
+  "sofa_games": 13,
+  "sofa_pct": 50.0,
+  "value_games": 2,
+  "value_sofa": 2,
+  "value_sofa_pct": 100.0,
+  "houses": {
+   "Betano": 8,
+   "7k": 8,
+   "EstrelaBet": 5,
+   "bet365": 8,
+   "Sportingbet": 2,
+   "Superbet": 4
+  },
+  "markets": {
+   "Cartões": 14,
+   "Chutes no gol": 13,
+   "Faltas": 1,
+   "Finalizações": 8,
+   "Impedimentos": 2,
+   "Desarmes": 2
+  },
+  "house_markets": {
+   "Betano": {
+    "Cartões": 10,
+    "Chutes no gol": 1,
+    "Faltas": 3,
+    "Finalizações": 1,
+    "Impedimentos": 3
+   },
+   "7k": {
+    "Cartões": 9,
+    "Chutes no gol": 18,
+    "Faltas": 3,
+    "Finalizações": 3,
+    "Impedimentos": 3
+   },
+   "EstrelaBet": {
+    "Cartões": 7,
+    "Finalizações": 9,
+    "Chutes no gol": 8
+   },
+   "bet365": {
+    "Cartões": 3,
+    "Chutes no gol": 24,
+    "Finalizações": 24,
+    "Desarmes": 6,
+    "Impedimentos": 3
+   },
+   "Sportingbet": {
+    "Cartões": 6
+   },
+   "Superbet": {
+    "Cartões": 12
+   }
+  }
+ },
+ "prev": {
+  "n_games": 27,
+  "sofa_games": 13,
+  "sofa_pct": 48.148148148148145,
+  "value_games": 2,
+  "value_sofa": 2,
+  "value_sofa_pct": 100.0,
+  "houses": {
+   "Betano": 8,
+   "7k": 10,
+   "EstrelaBet": 7,
+   "bet365": 8,
+   "Sportingbet": 2,
+   "Superbet": 4
+  },
+  "markets": {
+   "Cartões": 15,
+   "Chutes no gol": 15,
+   "Faltas": 2,
+   "Finalizações": 10,
+   "Impedimentos": 4,
+   "Desarmes": 2
+  },
+  "house_markets": {
+   "Betano": {
+    "Cartões": 10,
+    "Chutes no gol": 1,
+    "Faltas": 3,
+    "Finalizações": 1,
+    "Impedimentos": 3
+   },
+   "7k": {
+    "Cartões": 15,
+    "Chutes no gol": 21,
+    "Faltas": 6,
+    "Finalizações": 6,
+    "Impedimentos": 6
+   },
+   "EstrelaBet": {
+    "Cartões": 13,
+    "Finalizações": 15,
+    "Chutes no gol": 13,
+    "Impedimentos": 6,
+    "Faltas": 2
+   },
+   "bet365": {
+    "Cartões": 3,
+    "Chutes no gol": 24,
+    "Finalizações": 24,
+    "Desarmes": 6,
+    "Impedimentos": 3
+   },
+   "Sportingbet": {
+    "Cartões": 6
+   },
+   "Superbet": {
+    "Cartões": 12
+   }
+  }
+ },
+ "sofa": {
+  "casa": "sofa",
+  "kind": "fixture",
+  "ok": true,
+  "ts_utc": "2026-09-22T02:44:52Z",
+  "ts_brt": "2026-09-21 23:44",
+  "n_events": 231,
+  "n_fixtures": 231,
+  "n_markets": 0,
+  "min_events": 58,
+  "promoted": true,
+  "pointer_valid": true,
+  "pointer_file": "_snapshots/sofa_0ae3c1c83796c90952b7.json",
+  "pointer_at": "2026-09-21T23:44:52-03:00",
+  "pointer_n": 231,
+  "pointer_age_h": 0.38929407972222224,
+  "duration_sec": 224.9,
+  "error": null,
+  "error_class": null,
+  "transport": {
+   "requests": 146,
+   "proxy_attempts": 146,
+   "direct_attempts": 0,
+   "statuses": {
+    "200": 142,
+    "404": 3
+   },
+   "last_error": null,
+   "consecutive_failures": 0,
+   "circuit_open": false,
+   "failed_tournaments": [],
+   "inactive_tournaments": [
+    "WC",
+    "BOL",
+    "CDF"
+   ]
+  },
+  "attempted": true,
+  "attempt_started_epoch": 1790044867.2717273,
+  "attempt_finished_epoch": 1790045092.3325093,
+  "source_state": "ok"
+ },
+ "model": {
+  "status": "promoted",
+  "source": "candidate_pricer",
+  "markets": [
+   "Cartões",
+   "Faltas",
+   "Finalizações",
+   "Escanteios"
+  ],
+  "cards_regime": {
+   "w_global": 1.6169,
+   "r_global": 0.9088,
+   "corte": "2026-07-01",
+   "n_jogos_pos": 2098,
+   "ligas_com_offset": 66
+  }
+ }
+}
