@@ -57,18 +57,63 @@ class CardsContractTests(unittest.TestCase):
         self.assertGreater(n,40000);self.assertLessEqual(worst,5.01e-5)
         print({'r1_lookup_cells':n,'max_probability_delta_rounding':worst})
 
+    def _cards_override(self):
+        # 22/09/2026: next() SEM default quebrava com StopIteration quando o bundle não
+        # tinha nenhum árbitro de cartões verificado — e a CI é bloqueante, então a Mesa
+        # congelaria ("captura insuficiente") num dia de agenda sem árbitro. Sem override
+        # de cartões no bundle publicado, o teste de override é pulado (o de feed vencido
+        # abaixo usa um override sintético e segue ativo).
+        record=next((v for v in (cp._B or {}).get('fixture_ref_overrides',{}).values()
+                     if 'cards' in (v.get('markets') or {})),None)
+        if record is None:self.skipTest('bundle sem override de cartões verificado (agenda sem árbitro)')
+        return record
+
     def test_verified_override_and_negative_fingerprints(self):
-        pr=cp.CardsPricer();record=next(v for v in cp._B['fixture_ref_overrides'].values() if 'cards' in v['markets'])
+        pr=cp.CardsPricer();record=self._cards_override()
         now=datetime.fromisoformat(record['observed_at']).replace(tzinfo=timezone(timedelta(hours=-3)))+timedelta(hours=1)
         fx={k:record[k] for k in ('eid','comp','home_id','away_id','date','kickoff_ts')}
         def price(f):return pr.price(record['comp'],record['home_id'],record['away_id'],4.5,fixture=f,bookmaker='betano',now=now)
-        correct=price(fx);self.assertTrue(correct['ref_applied'])
-        self.assertEqual(correct['mu_raw'],record['markets']['cards']['mu_model'])
-        for key,value in [('eid',-1),('comp','WRONG'),('home_id',999),('away_id',999),('date','2000-01-01'),('kickoff_ts',1)]:
-            wrong={**fx,key:value};self.assertFalse(price(wrong)['ref_applied'],key)
-        stale=pr.price(record['comp'],record['home_id'],record['away_id'],4.5,fixture=fx,bookmaker='betano',now=now+timedelta(days=4))
-        self.assertFalse(stale['ref_applied']);self.assertEqual(stale['ref_reason'],'ref_override_stale')
-        with patch.dict(record,{'version':'bad'}):self.assertFalse(price(fx)['ref_applied'])
+        # o feed do bundle é congelado no momento do teste: sem isto o relógio real
+        # (dias depois do export) tornaria o FEED vencido e o teste mediria outra coisa
+        fresh={**cp._B.get('ref_feed',{}),'generated_at':now.isoformat()}
+        with patch.dict(cp._B,{'ref_feed':fresh}):
+            correct=price(fx);self.assertTrue(correct['ref_applied'])
+            self.assertEqual(correct['mu_raw'],record['markets']['cards']['mu_model'])
+            for key,value in [('eid',-1),('comp','WRONG'),('home_id',999),('away_id',999),('date','2000-01-01'),('kickoff_ts',1)]:
+                wrong={**fx,key:value};self.assertFalse(price(wrong)['ref_applied'],key)
+            # override individual vencido com o feed ainda válido → ref_override_stale
+            with patch.dict(cp._B,{'ref_feed':{**fresh,'generated_at':(now+timedelta(days=4)).isoformat()}}):
+                stale=pr.price(record['comp'],record['home_id'],record['away_id'],4.5,fixture=fx,bookmaker='betano',now=now+timedelta(days=4))
+            self.assertFalse(stale['ref_applied']);self.assertEqual(stale['ref_reason'],'ref_override_stale')
+            with patch.dict(record,{'version':'bad'}):self.assertFalse(price(fx)['ref_applied'])
+        # o FEED inteiro vencido tem motivo próprio (preço neutro + selo), não "sem árbitro"
+        vencido=pr.price(record['comp'],record['home_id'],record['away_id'],4.5,fixture=fx,bookmaker='betano',now=now+timedelta(days=4))
+        self.assertFalse(vencido['ref_applied']);self.assertEqual(vencido['ref_reason'],'ref_feed_stale')
+
+    def test_ref_feed_stale_is_distinct_from_no_referee(self):
+        """Feed vencido → ref_feed_stale (neutro); feed fresco sem o jogo → no_verified_fixture_override;
+        mercado sem ajuste de árbitro (chutes) nunca herda o motivo do feed; fronteira = max_age_hours."""
+        comp=next(iter(cp.FoulsPricer().pairs));pair=next(iter(cp.FoulsPricer().pairs[comp]))
+        h,a=map(int,pair.split('|'))
+        now=datetime(2026,9,22,20,0,tzinfo=timezone.utc)
+        fx={'eid':999999991,'comp':comp,'home_id':h,'away_id':a,'date':'2026-09-22','kickoff_ts':int(now.timestamp())}
+        def feed(age_h,max_h=48):return {'generated_at':(now-timedelta(hours=age_h)).isoformat(),'max_age_hours':max_h}
+        fp=cp.FoulsPricer()
+        with patch.dict(cp._B,{'ref_feed':feed(49)}):
+            r=fp.price(comp,h,a,24.5,fixture=fx,now=now)
+            self.assertEqual(r['ref_reason'],'ref_feed_stale');self.assertFalse(r['ref_applied'])
+            self.assertAlmostEqual(r['mu_raw'],fp.pairs[comp][pair])          # preço neutro
+        with patch.dict(cp._B,{'ref_feed':feed(47)}):
+            self.assertEqual(fp.price(comp,h,a,24.5,fixture=fx,now=now)['ref_reason'],'no_verified_fixture_override')
+        with patch.dict(cp._B,{'ref_feed':feed(30,max_h=24)}):             # validade declarada manda
+            self.assertEqual(fp.price(comp,h,a,24.5,fixture=fx,now=now)['ref_reason'],'ref_feed_stale')
+        sp=cp.ShotsPricer();sc=next(iter(sp.pairs));sh,sa=map(int,next(iter(sp.pairs[sc])).split('|'))
+        with patch.dict(cp._B,{'ref_feed':feed(200)}):
+            r=sp.price(sc,sh,sa,24.5,fixture={**fx,'comp':sc,'home_id':sh,'away_id':sa},now=now)
+            self.assertEqual(r['ref_reason'],'market_without_referee_adjustment')
+        legacy=dict(cp._B);legacy.pop('ref_feed',None)
+        with patch.object(cp,'_B',legacy):
+            self.assertEqual(cp.FoulsPricer().price(comp,h,a,24.5,fixture=fx,now=now)['ref_reason'],'no_verified_fixture_override')
 
     def test_contract_unknown_quarter_and_incomplete_bundle(self):
         pr=cp.CardsPricer()

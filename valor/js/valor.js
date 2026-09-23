@@ -24,6 +24,11 @@
     if (j.sofa_id) s += 30;
     else s += 5;
 
+    // 22/09/2026 (auditoria A01b/A01c): modelo atrás do RDU / velho / não verificado e
+    // feed de árbitros vencido entram como PENALIDADE (decisão do Diego: selo +
+    // penalidade; só "atrás do RDU" comprovado sai de Acionáveis, no build_board).
+    s -= modelPenalty(b);
+
     var mins = ageMins(B.gerado_iso || B.gerado);
     if (mins != null) {
       if (mins <= 90) s += 20;
@@ -40,7 +45,25 @@
     else if (toKo > 0 && toKo < 15) s += 6;
     else if (toKo <= 48 * 60) s += 10;
     var score = Math.max(0, Math.min(100, Math.round(s)));
+    if (b.model_state === "behind_rdu") score = Math.min(score, 49);
     return j.sofa_id ? score : Math.min(score, 69);
+  }
+
+  var MODEL_PENALTY = { behind_rdu: 25, stale_age: 15, unverified: 5 };
+  function modelPenalty(b) {
+    var p = MODEL_PENALTY[b.model_state] || 0;
+    if (b.ref_reason === "ref_feed_stale") p += 10;
+    return p;
+  }
+
+  /** Selos curtos do modelo/árbitro no sinal (vazio quando está tudo em dia). */
+  function modelSeal(b) {
+    var out = [];
+    if (b.model_state === "behind_rdu") out.push("modelo atrás do RDU");
+    else if (b.model_state === "stale_age") out.push("modelo " + (b.model_age_days != null ? b.model_age_days + " d" : "velho"));
+    else if (b.model_state === "unverified") out.push("modelo não verificado");
+    if (b.ref_reason === "ref_feed_stale") out.push("árbitro: feed vencido");
+    return out.length ? ' · <b class="vb-seal" style="color:#a16207">⚠ ' + esc(out.join(" · ")) + "</b>" : "";
   }
 
   function parseBrt(value) {
@@ -102,7 +125,9 @@
           p_push: v.p_push || 0, push_line: !!v.push_line, fair_odd: v.fair_odd,
           actionable: v.actionable !== false, game_state: j.game_state || null,
           stale: (j.stale_casas || []).indexOf(v.casa) >= 0,
-          model_status: v.model_status || (B.model && B.model.status) || ""
+          model_status: v.model_status || (B.model && B.model.status) || "",
+          model_state: v.model_state || null, model_gate: v.model_gate || null,
+          model_age_days: v.model_age_days, ref_reason: v.ref_reason || null
         });
       });
     });
@@ -166,6 +191,13 @@
     var staleBanner = boardStale
       ? '<div class="disc" style="border-color:var(--red);color:var(--red)"><b>Board desatualizado</b> (' + boardAge + ' min). Valor acionável desabilitado até nova captura.</div>'
       : '';
+    // 22/09/2026 (A01b): uma linha só quando o modelo da Mesa está atrás do RDU
+    var fr = (B.model && B.model.freshness) || {};
+    if (fr.state === "behind_rdu") {
+      staleBanner += '<div class="disc" style="border-color:' + (fr.block ? 'var(--red);color:var(--red)' : '#e7c77a;color:#a16207') + '">'
+        + '<b>Modelo da Mesa ' + esc(fr.bundle_version) + ' atrás do RDU ' + esc(fr.rdu_version) + '</b> ('
+        + esc(fr.hours_behind) + ' h)' + (fr.block ? ' — sinais fora de Acionáveis.' : ' — confiança reduzida.') + '</div>';
+    }
 
     if (!bets.length) {
       root.innerHTML = head + staleBanner + '<div class="empty"><div class="big">🎯</div>Nenhuma aposta de valor no momento.<br>'
@@ -207,6 +239,7 @@
         + ' · ' + b.nCasas + ' casa' + (b.nCasas > 1 ? 's' : '')
         + pushMeta
         + (b.stale ? ' · <b style="color:#a16207">⚠ odd pode estar desatualizada (casa stale)</b>' : '')
+        + modelSeal(b)
         + '</div>'
         + '</div>'
         + '<div class="vb-num">'

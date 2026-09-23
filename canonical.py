@@ -151,6 +151,16 @@ ALIASES = {
     "sao paulo w": "sao paulo f",
     "rio negro rr w": "atletico rio negro rr f",
     "rio negro rr women": "atletico rio negro rr f",
+    # 22/09/2026 (auditoria A13e): UCL feminina duplicada no board — "Real Madrid (F) -
+    # PSG (F)" (Superbet/bet365), "... Paris Saint Germain (F)" (Betano) e "Real Madrid
+    # [W] - Paris St-Germain [W]" (7k); idem "Arsenal (F) - HB Koge (F)" × "Arsenal [W]
+    # - Herfolge Koge [W]". O marcador já colapsa ([W]→f no FLAG_CANON); faltava o NOME.
+    # Chaves SÓ com o sufixo feminino: o PSG masculino continua sem alias global (a
+    # tradução dele é por fixture na UCL, fixture_scoped_alias_pair). Sem fuzzy novo.
+    "psg f": "paris saint germain f", "psg w": "paris saint germain f",
+    "paris st germain f": "paris saint germain f", "paris st germain w": "paris saint germain f",
+    "paris saint germain w": "paris saint germain f",
+    "herfolge koge f": "hb koge f", "herfolge koge w": "hb koge f", "hb koge w": "hb koge f",
     # guardas de identidade (auditoria 23/07): sem eles o STATE come a UF e o
     # clube homônimo cai no balde ERRADO ("Operário-MS"→operario→ferroviário;
     # "Botafogo PB"→botafogo do RJ; "Fluminense PI"→fluminense). Identidade
@@ -402,7 +412,23 @@ def league_incompatible(a, b) -> bool:
     return bool(a) and bool(b) and a != b
 
 
+# 22/09/2026 (auditoria A13e): marcador de competição FEMININA no rótulo da liga. Só
+# formas inequívocas — "(f)"/"[w]" entre delimitadores e as palavras; um "f" solto não
+# ("Grupo F" é grupo de copa, não feminino).
+_LEAGUE_FEM = re.compile(r"[(\[](?:f|w|fem)[)\]]|femin|femen|women|womens|frauen|ladies|\bwsl\b")
+
+
 def league_fp(lg: str):
+    """Fingerprint da competição. Feminina ganha sufixo ':f' (22/09/2026): 'UEFA -
+    Champions League (F)' devolvia 'ucl', o MESMO da UCL masculina, e ativava o ramo
+    reviewed dela — agora nunca casa com a masculina (league_incompatible)."""
+    base = _league_fp_base(lg)
+    if base and _LEAGUE_FEM.search(n(lg or "")):
+        return base + ":f"
+    return base
+
+
+def _league_fp_base(lg: str):
     l = n(lg or "")
     # competições continentais/regionais que já se confundiram (caso Sporting):
     if "sudamericana" in l or "sul-americana" in l or "sul americana" in l or "sulamericana" in l:

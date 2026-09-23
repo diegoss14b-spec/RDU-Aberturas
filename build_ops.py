@@ -24,7 +24,7 @@ except Exception:
 ROOT_FOR_IMPORT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT_FOR_IMPORT))
 from history_quality import parse_iso_flex  # noqa: E402  (parser único §10)
-from capture_health import ACTIVE_HOUSES, DISABLED_HOUSES, NAMES, state as source_state
+from capture_health import ACTIVE_HOUSES, DISABLED_HOUSES, NAMES, state as source_state, local_feed_age_min
 
 ROOT = Path(__file__).resolve().parent
 STATUS = ROOT / "data" / "odds" / "_status"
@@ -184,7 +184,11 @@ def load_casa_status():
     rows = []
     for c in [*CASAS, *DISABLED_HOUSES]:
         st = load_json(STATUS / f"{c}.json") or {}
-        health = source_state(st, c)
+        # 22/09/2026 (A13a): classifica pelo FEED EFETIVO (full local fresco), não só pela
+        # tentativa do Actions, que leva 429 desde 20/09 com o feeder do Windows em dia
+        lf_min = local_feed_age_min(c, ODDS)
+        # só passa o argumento novo quando há feed local (assinatura antiga segue válida)
+        health = source_state(st, c, local_feed_min=lf_min) if lf_min is not None else source_state(st, c)
         discovery = load_json(STATUS / f"{c}_discovery.json") or {}
         full, _ = resolve_odds_pointer(c, prefer_full=True)
         if not full or full.get('_pointer') != f'{c}_latest_full.json':
@@ -216,6 +220,7 @@ def load_casa_status():
             "error_class": st.get("error_class"),
             "proxy_br": st.get("proxy_br"),
             "age_min": age_mins(st.get("ts_brt")),
+            "local_feed_age_min": round(lf_min) if lf_min is not None else None,
         }
         if c == "superbet":
             row["coverage"] = superbet_coverage(st)
@@ -244,12 +249,59 @@ def load_casa_status():
     return rows
 
 
-def load_runs(days=7, limit=40):
+def _hist_agg(rows):
+    """Taxa de sucesso por casa sobre as linhas do history.jsonl dadas (22/09/2026:
+    uma função só pras janelas de 7 dias e de 24 h — o aviso usa a de 24 h)."""
+    agg = defaultdict(lambda: {"ok": 0, "total": 0, "n_sum": 0, "n_cnt": 0, "protected": 0,
+                               "legacy_unknown": 0, "local_feed": 0, "motivos": defaultdict(int)})
+    for r in rows:
+        for c, v in (r.get("casas") or {}).items():
+            if c not in CASAS: continue
+            a = agg[c]
+            if v.get("attempted") is False:
+                # 22/09/2026 (A13a): tentativa do Actions PULADA porque o feed local da
+                # casa estava fresco — não é falha nem sucesso, mas fica visível
+                if v.get("skipped_reason") == "local_feed_fresh":
+                    a["local_feed"] += 1
+                continue
+            if v.get("source_state") == "protected_feed":
+                a["protected"] += 1
+                continue
+            a["total"] += 1
+            if not v.get("source_state") and not v.get("ok"):
+                a["legacy_unknown"] += 1
+            if v.get("ok"):
+                a["ok"] += 1
+            elif v.get("error"):
+                # 22/09/2026 (A13b): motivo curto gravado pelo run_capture (antes só
+                # error_class="Other" — não dava pra separar rede de orçamento)
+                a["motivos"][str(v.get("error"))[:80]] += 1
+            n = v.get("n")
+            if isinstance(n, (int, float)) and n is not None:
+                a["n_sum"] += n
+                a["n_cnt"] += 1
+    out = {}
+    for c, a in agg.items():
+        rate = round(100 * a["ok"] / a["total"], 1) if a["total"] else None
+        avg_n = round(a["n_sum"] / a["n_cnt"], 1) if a["n_cnt"] else None
+        row = {"ok": a["ok"], "total": a["total"], "rate": rate, "avg_n": avg_n,
+               "protected": a["protected"], "legacy_unknown": a["legacy_unknown"]}
+        if a["local_feed"]:
+            row["local_feed"] = a["local_feed"]
+        if a["motivos"]:
+            row["motivos"] = dict(sorted(a["motivos"].items(), key=lambda kv: -kv[1])[:3])
+        out[DISP.get(c, c)] = row
+    return out
+
+
+def load_runs(days=7, limit=40, hist24_out=None):
     hf = STATUS / "history.jsonl"
     if not hf.exists():
         return [], {}
-    cut = (now_brt() - timedelta(days=days)).strftime("%Y-%m-%d %H:%M")
-    runs, agg = [], defaultdict(lambda: {"ok": 0, "total": 0, "n_sum": 0, "n_cnt": 0, "protected":0, "legacy_unknown":0})
+    agora = now_brt()
+    cut = (agora - timedelta(days=days)).strftime("%Y-%m-%d %H:%M")
+    cut24 = (agora - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M")
+    runs = []
     for ln in hf.read_text(encoding="utf-8").splitlines():
         try:
             r = json.loads(ln)
@@ -259,31 +311,12 @@ def load_runs(days=7, limit=40):
         if ts < cut:
             continue
         runs.append(r)
-        for c, v in (r.get("casas") or {}).items():
-            if c not in CASAS: continue
-            if v.get("attempted") is False: continue
-            a = agg[c]
-            if v.get("source_state") == "protected_feed":
-                a["protected"] += 1
-                continue
-            a["total"] += 1
-            if not v.get("source_state") and not v.get("ok"):
-                a["legacy_unknown"] += 1
-            if v.get("ok"):
-                a["ok"] += 1
-            n = v.get("n")
-            if isinstance(n, (int, float)) and n is not None:
-                a["n_sum"] += n
-                a["n_cnt"] += 1
     runs.sort(key=lambda x: x.get("ts") or "")
-    hist7 = {}
-    for c, a in agg.items():
-        rate = round(100 * a["ok"] / a["total"], 1) if a["total"] else None
-        avg_n = round(a["n_sum"] / a["n_cnt"], 1) if a["n_cnt"] else None
-        hist7[DISP.get(c, c)] = {
-            "ok": a["ok"], "total": a["total"], "rate": rate, "avg_n": avg_n,
-            "protected":a["protected"], "legacy_unknown":a["legacy_unknown"],
-        }
+    hist7 = _hist_agg(runs)
+    # 22/09/2026 (A13b): a taxa de 7 dias carregava o incidente da bet365 de 16-20/09
+    # (47%) dias depois de ele acabar. A de 24 h vai ao lado e é ela que dispara o aviso.
+    if hist24_out is not None:
+        hist24_out.update(_hist_agg([r for r in runs if (r.get("ts") or "") >= cut24]))
     # últimas N runs (mais recentes no fim do arquivo → pega o final)
     tail = runs[-limit:]
     slim = []
@@ -585,10 +618,93 @@ def build_avisos(summary, casas, board_cov, hist_h, runs):
     return avisos
 
 
+def model_avisos(board):
+    """Avisos do MODELO e do FEED DE ÁRBITROS (22/09/2026, A01b/A01c).
+
+    De 08/09 a 22/09 o board mostrou 16 de 16 sinais acionáveis com modelo de 24 dias
+    e feed de árbitros de 07/09, e o painel não dizia nada. Estado 'unverified' também
+    aparece: se a proteção de URLs do RDU for ligada, a checagem cai nele em silêncio.
+    """
+    model = (board or {}).get("model") or {}
+    fr = model.get("freshness") or {}
+    out = []
+    if fr.get("state") == "behind_rdu":
+        txt = ("Modelo da Mesa %s atrás do RDU (%s) há %sh" %
+               (fr.get("bundle_version"), fr.get("rdu_version"), fr.get("hours_behind")))
+        out.append({"level": "bad" if fr.get("block") else "warn",
+                    "txt": txt + (" — sinais FORA de Acionáveis até o bundle novo chegar"
+                                  if fr.get("block") else " — sinais com selo e confiança reduzida")})
+    elif fr.get("state") == "unverified":
+        out.append({"level": "info", "txt": "Versão do modelo não verificada contra o RDU (%s) — sinais com selo"
+                    % (fr.get("reason") or "?")})
+    rf = model.get("ref_feed") or {}
+    if rf.get("stale"):
+        out.append({"level": "warn",
+                    "txt": "Feed de árbitros vencido há %sh (limite %sh): cartões/faltas com preço neutro"
+                    % (rf.get("age_hours"), rf.get("max_age_hours"))})
+    return out
+
+
+BACKLOG_ALARME = ("universo_sem_resultado", "feed_sem_o_dia", "stat_missing", "cartoes_sem_divisao_vermelho")
+
+
+def backlog_avisos(backlog):
+    """Liquidação: alarme só pro que é problema; espera por desenho à parte (22/09/2026, A13c)."""
+    out = []
+    classes = backlog.get("classes")
+    velho = lambda d: (d.get("7-30d") or 0) + (d.get("30d+") or 0)
+    if classes is None:   # status antigo, sem classes: comportamento de antes
+        stale = velho(backlog.get("age") or {})
+        if stale:
+            out.append({"level": "warn", "txt": f"Liquidação atrasada: {stale} keys aguardam resultado há 7+ dias"})
+    else:
+        rot = {"universo_sem_resultado": "jogo do universo RDU sem resultado (identidade ou feed)",
+               "feed_sem_o_dia": "dia sem resultados no feed",
+               "stat_missing": "estatística ausente no resultado",
+               "cartoes_sem_divisao_vermelho": "cartões sem divisão direto/2º amarelo (R2)"}
+        partes = [f"{rot[c]}: {velho(classes.get(c) or {})}" for c in BACKLOG_ALARME
+                  if velho(classes.get(c) or {})]
+        if partes:
+            total = sum(velho(classes.get(c) or {}) for c in BACKLOG_ALARME)
+            out.append({"level": "warn", "txt": f"Liquidação atrasada: {total} keys há 7+ dias — " + " · ".join(partes)})
+        fora = velho(classes.get("fora_do_universo") or {})
+        cron = sum((classes.get("stat_missing_cronico") or {}).values())
+        if fora or cron:
+            out.append({"level": "info", "txt": "Aguardando por desenho: "
+                        + " · ".join(x for x in (
+                            f"{fora} fora do universo RDU (viram sem-fonte aos 14 dias)" if fora else "",
+                            f"{cron} com estatística ausente há +{backlog.get('stat_missing_teto_dias', 21)} dias" if cron else "")
+                            if x)})
+    # §10: data não parseável vira age=unknown e ESCONDE o backlog. Com o parser
+    # único isso deve ser ~0; qualquer valor relevante é bug de formato, não "recente".
+    unk = backlog.get("age_unknown") or (backlog.get("age") or {}).get("unknown") or 0
+    total_pending = backlog.get("total") or 0
+    if unk and total_pending and unk >= max(50, 0.05 * total_pending):
+        out.append({"level": "bad",
+                    "txt": f"{unk} pendências com data ilegível (age=unknown) — backlog pode estar "
+                           f"subnotificado; conferir formato do kickoff (§10)"})
+    return out
+
+
+def confiabilidade_avisos(hist24, hist7, n_min=4):
+    """Aviso de confiabilidade pela janela de 24 h (com n mínimo), 7 d ao lado (22/09/2026, A13b)."""
+    out = []
+    for nome, h in (hist24 or {}).items():
+        if h.get("total", 0) >= n_min and (h.get("rate") if h.get("rate") is not None else 100) < 70:
+            h7 = (hist7 or {}).get(nome) or {}
+            mot = "; ".join(f"{k} ({v}x)" for k, v in (h.get("motivos") or {}).items())
+            out.append({"level": "warn",
+                        "txt": f"{nome}: confiabilidade 24h em {h['rate']}% ({h['ok']}/{h['total']} ok)"
+                               + (f" · 7d {h7.get('rate')}%" if h7.get("rate") is not None else "")
+                               + (f" · motivo: {mot}" if mot else "")})
+    return out
+
+
 def main():
     summary = load_json(STATUS / "summary.json") or {}
     casas = load_casa_status()
-    runs, hist7 = load_runs(days=7, limit=36)
+    hist24 = {}
+    runs, hist7 = load_runs(days=7, limit=36, hist24_out=hist24)
 
     board = load_js_window(ROOT / "valor" / "data" / "board.js", "window.BOARD=")
     board_cov = board_coverage(board)
@@ -597,31 +713,10 @@ def main():
     fx = fixtures_info()
 
     avisos = build_avisos(summary, casas, board_cov, hist_h, runs)
+    avisos += model_avisos(board)
     if settle_h:
-        backlog = settle_h.get("backlog") or {}
-        age = backlog.get("age") or {}
-        stale = (age.get("7-30d") or 0) + (age.get("30d+") or 0)
-        if stale:
-            avisos.append({
-                "level": "warn",
-                "txt": f"Liquidação atrasada: {stale} keys aguardam resultado há 7+ dias",
-            })
-        # §10: data não parseável vira age=unknown e ESCONDE o backlog. Com o parser
-        # único isso deve ser ~0; qualquer valor relevante é bug de formato, não "recente".
-        unk = backlog.get("age_unknown") or age.get("unknown") or 0
-        total_pending = backlog.get("total") or 0
-        if unk and total_pending and unk >= max(50, 0.05 * total_pending):
-            avisos.append({
-                "level": "bad",
-                "txt": f"{unk} pendências com data ilegível (age=unknown) — backlog pode estar "
-                       f"subnotificado; conferir formato do kickoff (§10)",
-            })
-    for nome, h in (hist7 or {}).items():
-        if h.get("total", 0) >= 3 and (h.get("rate") or 100) < 70:
-            avisos.append({
-                "level": "warn",
-                "txt": f"{nome}: confiabilidade 7d em {h['rate']}% ({h['ok']}/{h['total']} ok)",
-            })
+        avisos += backlog_avisos(settle_h.get("backlog") or {})   # inclui o §10 (age=unknown)
+    avisos += confiabilidade_avisos(hist24, hist7)
 
     # heatmap casas × rodadas (últimas 14 runs) — compacto p/ sparkline
     heat = {"casas": [DISP[c] for c in CASAS], "cols": []}
@@ -661,6 +756,7 @@ def main():
         },
         "casas": casas,
         "hist7": hist7,
+        "hist24": hist24,
         "runs": runs[-24:],
         "heat": heat,
         "board": board_cov,

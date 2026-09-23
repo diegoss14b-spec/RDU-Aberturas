@@ -67,6 +67,7 @@
     var casas = O.casas || [];
     var avisos = O.avisos || [];
     var hist7 = O.hist7 || {};
+    var hist24 = O.hist24 || {};   // 22/09/2026 (A13b): janela de 24 h ao lado da de 7 dias
     var heat = O.heat || { casas: [], cols: [] };
     var runs = O.runs || [];
     var fx = O.fixtures || {};
@@ -147,6 +148,9 @@
       var rateHtml = rate != null
         ? '<span class="' + clsRate(rate) + '">' + br(rate, 0) + "% <span class=\"op-muted\">(" + h7.ok + "/" + h7.total + ")</span></span>"
         : "—";
+      var h24 = hist24[c.nome] || {};
+      if(h24.rate != null)rateHtml+=' · 24h <span class="' + clsRate(h24.rate) + '">' + br(h24.rate, 0) + '%</span>';
+      if(h7.local_feed)rateHtml+=' · '+h7.local_feed+' via feed local';
       if(h7.protected)rateHtml+=' · '+h7.protected+' preservados';
       if(h7.legacy_unknown)rateHtml+=' · '+h7.legacy_unknown+' falhas legadas sem causa';
       var disc=c.discovery||{};

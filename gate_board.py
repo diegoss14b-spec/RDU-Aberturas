@@ -271,6 +271,10 @@ def main():
         _atomic_write_text(STATUS / "blocked_deploy.json", json.dumps(blocked, ensure_ascii=False, indent=1))
         print("[gate] ❌ DEPLOY BLOQUEADO — site antigo permanece no ar:")
         for reason in reasons: print(f"   - {reason}")
+        # 22/09/2026 (auditoria A13d): o motivo vira annotation do Actions — em 22/09
+        # dois "gate bloqueou" apareceram sem motivo legível pela API pública.
+        _txt = " | ".join(map(str, reasons)).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        print("::error title=gate::gate bloqueou: " + _txt[:300], flush=True)
         sys.exit(3)
     clear_blocked_marker()
     print("[gate] ✅ liberado pra deploy")

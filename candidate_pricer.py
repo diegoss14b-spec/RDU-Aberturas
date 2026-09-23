@@ -53,6 +53,37 @@ def _nb_cdf_size(k, mu, phi):
     return min(1.0, s)
 
 
+REF_FEED_MAX_HOURS_DEFAULT = 48.0
+
+
+def _ref_feed_max_hours():
+    """Validade do feed de árbitros declarada no bundle (22/09/2026); 48 h se ausente/inválida."""
+    try:
+        v = float(((_B or {}).get("ref_feed") or {}).get("max_age_hours"))
+        return v if math.isfinite(v) and v > 0 else REF_FEED_MAX_HOURS_DEFAULT
+    except (TypeError, ValueError):
+        return REF_FEED_MAX_HOURS_DEFAULT
+
+
+def _ref_feed_age_hours(now=None):
+    """Idade (h) do feed de árbitros do bundle, ou None se o bundle não declara o feed.
+
+    Stamp ingênuo ('2026-09-22 01:26', o home_fixtures do RDU) é BRT. Sem ref_feed
+    (bundle legado) → None: o comportamento antigo segue, sem motivo inventado.
+    """
+    rf = (_B or {}).get("ref_feed") or {}
+    stamp = rf.get("generated_at")
+    if not stamp:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone(timedelta(hours=-3)))
+    return ((now or datetime.now(timezone.utc)) - dt).total_seconds() / 3600
+
+
 class _Pricer:
     market = None          # sobrescrito pelas subclasses (nome do mercado no bundle)
 
@@ -87,6 +118,15 @@ class _Pricer:
             meta['ref_reason']='market_without_referee_adjustment';return raw,meta
         if not fixture or not all(fixture.get(k) is not None for k in ('eid','comp','home_id','away_id','date')):
             meta['ref_reason']='fixture_identity_missing';return raw,meta
+        # 22/09/2026 (auditoria A01c): feed de árbitros VENCIDO não é "jogo sem árbitro".
+        # O bundle de 08/09 chegou a 22/09 com o feed de 07/09 e 36 de 37 contextos
+        # saíam como no_verified_fixture_override — igual a jogo sem designação. Preço
+        # segue NEUTRO (decisão do Diego 22/09: preço neutro + selo, nunca "sem árbitro");
+        # só o motivo muda, pra ops/front mostrarem o selo. Fica DEPOIS do check de
+        # mercado (chutes não ganham motivo falso) e ANTES do `if not override`.
+        feed_age=_ref_feed_age_hours(now)
+        if feed_age is not None and feed_age>_ref_feed_max_hours():
+            meta.update(ref_reason='ref_feed_stale',ref_feed_age_hours=round(feed_age,1));return raw,meta
         override=((_B or {}).get('fixture_ref_overrides') or {}).get(str(fixture['eid']))
         if not override:return raw,meta
         expected=(comp,int(home_id),int(away_id),str(fixture['date'])[:10])
@@ -103,7 +143,8 @@ class _Pricer:
             if observed.tzinfo is None:observed=observed.replace(tzinfo=timezone(timedelta(hours=-3)))
             instant=now or datetime.now(timezone.utc)
             age=(instant-observed).total_seconds()/3600
-            if age<-.1 or age>48:raise ValueError('stale referee feed')
+            # validade declarada pelo próprio bundle (ref_feed.max_age_hours), não um 48 fixo
+            if age<-.1 or age>_ref_feed_max_hours():raise ValueError('stale referee feed')
         except (ValueError,TypeError,KeyError):
             meta['ref_reason']='ref_override_stale';return raw,meta
         selected=(override.get('markets') or {}).get(self.market)

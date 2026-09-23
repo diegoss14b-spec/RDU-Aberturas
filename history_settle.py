@@ -576,6 +576,38 @@ def _age_bucket(kickoff, now):
     return "30d+", age_days
 
 
+# 22/09/2026 (auditoria A13c): stat_missing nunca expira (Volos×Kalamata de 01/09 com
+# 75 tentativas) — segue retryable, mas depois do teto sai do ALARME e vai pra uma
+# classe crônica visível (a fonte não tem a estatística). Não muda status nem CLV.
+STAT_MISSING_TETO_DIAS = 21
+
+
+def backlog_class(record, age_days, cobertura):
+    """Classe OPERACIONAL de uma pendência (22/09/2026, A13c). Só pro painel.
+
+    O alarme de 7 dias do ops contava junto o que é problema (jogo do universo do RDU
+    sem resultado = identidade ou feed) e o que é espera por desenho (liga fora do
+    feed que vira no_result_source aos 14 dias): 90% do backlog era isso. Separação
+    pelo UNIVERSO (sofa_id casado = torneio das fixtures do RDU), não pela cobertura
+    do dia — senão jogo do universo que não casou num dia coberto sumiria do alarme
+    por 14 dias e viraria no_result_source em silêncio (cético 22/09).
+    """
+    reason = str(record.get("settlement_reason") or "")
+    if record.get("status") == "pending_semantics":
+        return "cartoes_sem_divisao_vermelho"
+    if reason.startswith("stat_missing"):
+        if age_days is not None and age_days > STAT_MISSING_TETO_DIAS:
+            return "stat_missing_cronico"
+        return "stat_missing"
+    if reason == "game_not_in_results":
+        if record.get("sofa_id") or record.get("sofa_id_settle"):
+            return "universo_sem_resultado"
+        game_date = (record.get("kickoff") or "")[:10]
+        coberto = sum(cobertura.get(d, 0) for d in _janela_datas(game_date)) >= SEM_FONTE_MIN_JOGOS
+        return "fora_do_universo" if coberto else "feed_sem_o_dia"
+    return "outros"
+
+
 def build_settlement_status(records, results, now):
     """Resumo operacional por mercado, status, motivo e idade do backlog."""
     total_status = Counter()
@@ -588,6 +620,8 @@ def build_settlement_status(records, results, now):
         }
     )
     backlog_age, backlog_reasons = Counter(), Counter()
+    backlog_classes = defaultdict(Counter)   # 22/09/2026 (A13c): classe × idade
+    cobertura = cobertura_por_dia(results)
     backlog_samples = []
     # Quantas liquidações vieram da janela de ±1 dia (§ JANELA_DIAS) — se um dia a
     # origem do feed passar a emitir data BRT, isso cai para 0 sozinho e a auditoria vê.
@@ -610,6 +644,7 @@ def build_settlement_status(records, results, now):
             market_row["pending_reasons"][reason] += 1
             backlog_age[bucket] += 1
             backlog_reasons[reason] += 1
+            backlog_classes[backlog_class(record, age_days, cobertura)][bucket] += 1
             backlog_samples.append(
                 {
                     "key": key,
@@ -654,6 +689,8 @@ def build_settlement_status(records, results, now):
             # um valor alto = kickoff corrompido ou formato novo → alerta, não "recente".
             "age_unknown": backlog_age.get("unknown", 0),
             "reasons": dict(backlog_reasons),
+            "classes": {k: dict(v) for k, v in sorted(backlog_classes.items())},
+            "stat_missing_teto_dias": STAT_MISSING_TETO_DIAS,
             "oldest_samples": backlog_samples[:25],
         },
     }

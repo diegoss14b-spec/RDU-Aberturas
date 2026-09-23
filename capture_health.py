@@ -1,6 +1,7 @@
 """Shared capture status semantics. Does not relax capture/deploy eligibility."""
 from datetime import datetime, timezone, timedelta
 import json
+import os
 from pathlib import Path
 
 BRT = timezone(timedelta(hours=-3))
@@ -15,8 +16,46 @@ def parse_time(value):
         return dt if dt.tzinfo else dt.replace(tzinfo=BRT)
     except (ValueError,TypeError): return None
 
-def state(status, house=None, now=None, max_age_minutes=90):
-    """A guard-protected feed is not a failed capture, nor proof of current odds."""
+def local_feed_guard_min():
+    """Mesma régua do capture_common._local_feed_guard_reason (env LOCAL_FEED_GUARD_MIN, 75)."""
+    try:
+        return float(os.environ.get("LOCAL_FEED_GUARD_MIN", "75"))
+    except ValueError:
+        return 75.0
+
+def local_feed_age_min(house, odds_dir, now=None):
+    """Idade (min) do full LOCAL da casa (captured_by=local), ou None (22/09/2026, A13a).
+
+    É o FEED EFETIVO: desde 20/09 a Pinnacle devolve 429 pro IP do Actions/proxy, mas o
+    feeder do Windows mantém o full dela fresco (60 pushes em 34 h, maior intervalo
+    37 min). Ponteiro sem alvo, vazio ou sem carimbo não conta como feed.
+    """
+    try:
+        meta=json.loads((Path(odds_dir)/f"{house}_latest_full.json").read_text(encoding='utf-8'))
+    except (OSError,ValueError):
+        return None
+    if not isinstance(meta,dict) or meta.get('captured_by')!='local' or not meta.get('file'):
+        return None
+    try:
+        if int(meta.get('n') or 0)<=0 or not (Path(odds_dir)/str(meta['file'])).is_file():
+            return None
+    except (TypeError,ValueError):
+        return None
+    at=parse_time(meta.get('at'))
+    if at is None:
+        return None
+    return ((now or datetime.now(timezone.utc))-at).total_seconds()/60
+
+def state(status, house=None, now=None, max_age_minutes=90, local_feed_min=None):
+    """A guard-protected feed is not a failed capture, nor proof of current odds.
+
+    22/09/2026 (A13a): a tentativa do Actions que falha (429) enquanto o feed LOCAL
+    da casa está fresco (< LOCAL_FEED_GUARD_MIN) é 'protected_feed', não 'failed' —
+    antes só virava protected quando o Actions pegava n>0 e a guarda barrava, e o
+    429 (n=0) gerava o aviso falso "Captura parcial: Pinnacle". Feeder morto (feed
+    local passou da guarda) volta a 'failed': o teste de fronteira 74/76 trava isso.
+    Nada disso conta como 'ok' — a elegibilidade de deploy não afrouxa.
+    """
     if house in DISABLED_HOUSES:return 'disabled'
     if not status:return 'unknown'
     now=now or datetime.now(timezone.utc)
@@ -31,7 +70,12 @@ def state(status, house=None, now=None, max_age_minutes=90):
     msg='; '.join(map(str,reasons))+' '+str(status.get('error') or '')
     if 'feed local fresco mais rico' in msg:
         return 'protected_feed'
-    return 'ok' if status.get('ok') else 'failed'
+    local_fresco=local_feed_min is not None and 0<=local_feed_min<local_feed_guard_min()
+    if status.get('skipped_reason')=='local_feed_fresh':
+        # tentativa do Actions PULADA de propósito (run_capture): nunca é 'ok' desta rodada
+        return 'protected_feed' if (local_feed_min is None or local_fresco) else 'failed'
+    if status.get('ok'):return 'ok'
+    return 'protected_feed' if local_fresco else 'failed'
 
 def load_status(path):
     try:return json.loads(Path(path).read_text(encoding='utf-8'))
@@ -41,8 +85,10 @@ def board_capture(status_dir, jogos, now=None):
     now=now or datetime.now(timezone.utc)
     cap={'casas_ok':[],'casas_fail':[],'casas_stale':[], 'casas_protected':[],
          'casas_disabled':[NAMES[h] for h in DISABLED_HOUSES],'source_states':{}}
+    odds_dir=Path(status_dir).parent   # data/odds/_status → data/odds (ponteiros *_latest_full)
     for house in ACTIVE_HOUSES:
-        st=load_status(Path(status_dir)/(house+'.json')); s=state(st,house,now)
+        st=load_status(Path(status_dir)/(house+'.json'))
+        s=state(st,house,now,local_feed_min=local_feed_age_min(house,odds_dir,now))
         name=NAMES[house];cap['source_states'][name]=s
         if s=='ok':cap['casas_ok'].append(name)
         elif s=='protected_feed':cap['casas_protected'].append(name)

@@ -172,6 +172,17 @@ def judge_board(board: Dict[str, Any]) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     n_skip_id = n_skip_price = n_skip_gate = 0
 
+    # 22/09/2026 (auditoria A01b): "modelo atrás do RDU" COMPROVADO tira TODOS os
+    # sinais de Acionáveis no build_board (actionable False). O juiz lê a MESMA decisão
+    # do board — sem isto a paridade acusaria "só no JUIZ" e o Telegram mandaria
+    # sinal precificado com o modelo velho. Selo/penalidade (warn) não bloqueia.
+    fresh = ((board.get("model") or {}).get("freshness") or {})
+    if fresh.get("block"):
+        print("judge: modelo da Mesa %s atrás do RDU %s há %sh — sem sinais (bloqueio comprovado)"
+              % (fresh.get("bundle_version"), fresh.get("rdu_version"), fresh.get("hours_behind")),
+              flush=True)
+        return out
+
     for j in board.get("jogos") or []:
         if not isinstance(j, dict):
             continue

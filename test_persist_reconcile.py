@@ -477,3 +477,56 @@ def test_persist_sh_sem_avanco_e_sem_artefatos_sai_limpo(repos):
     rc, log = roda_persist(r, env)
     assert rc == 0 and "Sem artefatos novos" in log, log
     assert not (r["ci"] / "_reingest.log").exists()
+
+
+# ───────────────── 22/09/2026: arquivos publicados pelo RDU (Git Data API) ─────────────────
+
+def test_rdu_push_paths_sao_baratos_e_nao_escondem_o_resto():
+    rdu = ["data/candidate_pricer_data.json", "data/odds_history/results/results_auto.json"]
+    assert pr.fora_do_feeder(rdu) == []
+    assert all(pr.eh_caminho_do_rdu(p) for p in rdu)
+    mistura = rdu + ["data/odds_history/ticks/2026-09-22.jsonl"]
+    assert pr.fora_do_feeder(mistura) == ["data/odds_history/ticks/2026-09-22.jsonl"]
+    # vizinhos que a RODADA escreve continuam caros (settlement_status, ledger, keys)
+    for p in ("data/odds_history/results/settlement_status.json", "data/candidate_pricer_data.json.bak",
+              "data/odds_history/results/results_auto.json/x"):
+        assert not pr.eh_caminho_do_rdu(p), p
+
+
+def test_rdu_push_paths_nunca_escritos_pela_rodada():
+    """Se algum script da Mesa passar a ESCREVER o bundle ou o feed de resultados, o
+    caminho barato traria a versão do main por cima e apagaria o que a rodada gravou."""
+    alvos = ("candidate_pricer_data.json", "results_auto.json", "BUNDLE_PATH", "RES_AUTO")
+    ruins = []
+    for py in RAIZ.glob("*.py"):
+        if py.name.startswith("test_") or py.name == "persist_reconcile.py":
+            continue
+        for n, linha in enumerate(py.read_text(encoding="utf-8").splitlines(), 1):
+            if any(a in linha for a in alvos) and re.search(r"write|dump|atomic|open\(.*['\"]w", linha):
+                ruins.append(f"{py.name}:{n}: {linha.strip()}")
+    sh = PERSIST_SH.read_text(encoding="utf-8")
+    assert "candidate_pricer_data" not in sh and "results_auto" not in sh
+    assert not ruins, ruins
+
+
+def test_push_do_rdu_no_meio_da_rodada_reconcilia_barato(repos):
+    r = repos
+    f, env = r["feeder"], r["env"]
+    git(f, "fetch", "-q", "origin", "main", env=env)
+    git(f, "reset", "-q", "--hard", "origin/main", env=env)
+    escreve(f, "data/candidate_pricer_data.json", '{"version":"2026-09-21"}\n')
+    escreve(f, "data/odds_history/results/results_auto.json", '[{"date":"2026-09-21"}]\n')
+    git(f, "add", "data/candidate_pricer_data.json", "data/odds_history/results/results_auto.json", env=env)
+    git(f, "commit", "-q", "-m", "Mesa: sync pós-deploy RDU [skip ci]", env=env)
+    git(f, "push", "-q", "origin", "HEAD:main", env=env)
+    rodada_local_produz(r["ci"])
+    git(r["ci"], "fetch", "-q", "origin", "main", env=env)
+    assert pr.classifica_avanco("HEAD", "origin/main", cwd=str(r["ci"]))[0] == "feeder"
+    pr.aplica_avanco_feeder("HEAD", "origin/main", cwd=str(r["ci"]))
+    ci = Path(r["ci"])
+    assert (ci / "data/candidate_pricer_data.json").read_text() == '{"version":"2026-09-21"}\n'
+    assert (ci / "valor/data/history.js").read_text() == "window.H={v:2};\n"   # rodada preservada
+    git(r["ci"], "add", "-A", "data/odds/_status", "data/odds_history", "valor/data", env=env)
+    staged = git(r["ci"], "diff", "--cached", "--name-only", env=env).stdout.split()
+    assert "data/candidate_pricer_data.json" not in staged                  # nada do RDU revertido
+    assert "data/odds_history/results/results_auto.json" not in staged

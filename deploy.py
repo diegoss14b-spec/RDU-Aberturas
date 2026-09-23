@@ -211,25 +211,40 @@ def cachebust(html_bytes, base):
     return re.sub(r'(["\'])((?:js|data)/[A-Za-z0-9_.\-]+\.js)\1', repl, txt).encode("utf-8")
 
 
+def annotate(motivo):
+    """22/09/2026 (auditoria A13d): o motivo da falha vira ANNOTATION do Actions.
+
+    Em 22/09 o passo "Publicar no Netlify" falhou 4x em 0,3-0,4 min e a API pública só
+    mostrava o genérico "Netlify não confirmou a publicação" — o motivo real saía só no
+    stdout, que pede token pra ler. `::error::` aparece nas annotations do run.
+    Quebra de linha e % são escapados (sintaxe dos workflow commands do GitHub).
+    """
+    txt = str(motivo).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print("::error title=deploy::" + txt[:300], flush=True)
+
+
+def falha(motivo):
+    print("❌ " + motivo)
+    annotate(motivo)
+    return 1
+
+
 def main():
     if not TOKEN:
-        print("❌ sem NETLIFY_TOKEN")
-        return 1
+        return falha("sem NETLIFY_TOKEN")
     # Guard anti-stub (P0.1, 18/07): nunca publicar um diretório que não seja o app completo
     # da Mesa (4 views + index substancial). Em 20/07 o STUB de /Claude/valor foi publicado
     # por cima do site pela rota legada — esta é a última linha de defesa no deploy correto.
     _views = [DIR / "js" / (v + ".js") for v in ("board", "valor", "history", "ops")]
     _idx = DIR / "index.html"
     if not (_idx.is_file() and _idx.stat().st_size > 15000 and all(v.is_file() for v in _views)):
-        print("❌ ABORTADO — esta pasta NÃO é o app completo da Mesa (parece um STUB).")
         print("   pasta alvo: " + str(DIR))
-        return 1
+        return falha("ABORTADO — esta pasta NÃO é o app completo da Mesa (parece um STUB).")
     # §8 — publicação atômica: board/ops/history/moves/openclose têm que ser do MESMO build,
     # frescos e íntegros. Bloqueia build misturado/defasado ANTES de tocar a produção.
     _mreason = manifest_gate(DIR, history_root=ROOT / "data" / "odds_history")
     if _mreason:
-        print("❌ ABORTADO — manifesto/atômico: " + _mreason)
-        return 1
+        return falha("ABORTADO — manifesto/atômico: " + _mreason)
     files = {}
     for p in DIR.rglob("*"):
         if p.is_file() and not any(x in p.name for x in EXCLUDE):
@@ -241,15 +256,13 @@ def main():
 
     missing_local = sorted(CRITICAL_FILES - set(files))
     if missing_local:
-        print("❌ arquivos críticos ausentes: " + ", ".join(missing_local))
-        return 1
+        return falha("arquivos críticos ausentes: " + ", ".join(missing_local))
 
     digest = {rel: sha for rel, (sha, _) in files.items()}
     dep = api("POST", f"/sites/{SITE_ID}/deploys", {"files": digest, "draft": False})
     deploy_id = dep.get("id")
     if not deploy_id:
-        print("❌ Netlify não retornou o id do deploy")
-        return 1
+        return falha("Netlify não retornou o id do deploy")
 
     required = set(dep.get("required", []))
     print(f"[valor] deploy {deploy_id[:12]} · {len(required)} hashes a subir")
@@ -282,7 +295,9 @@ def main():
             print(f"❌ upload falhou: {rel}: {error}")
         if missing_uploads:
             print(f"❌ {len(missing_uploads)} hashes exigidos não foram enviados")
-        return 1
+        return falha(f"upload incompleto: {len(failures)} arquivo(s) falharam, "
+                     f"{len(missing_uploads)} hash(es) exigidos não enviados"
+                     + (f" — 1º: {failures[0][0]}: {failures[0][1]}" if failures else ""))
 
     print(f"[valor] {len(uploaded)} hashes subidos · aguardando ready…")
     for _ in range(40):
@@ -291,11 +306,24 @@ def main():
             print(f"✅ PUBLICADO: {d.get('ssl_url') or d.get('url')}")
             return 0
         if d.get("state") == "error":
-            print(f"❌ erro: {d.get('error_message')}")
-            return 1
+            return falha(f"Netlify marcou o deploy como error: {d.get('error_message')}")
         time.sleep(3)
 
-    print("❌ timeout: Netlify não confirmou o deploy como ready")
-    return 1
+    return falha("timeout: Netlify não confirmou o deploy como ready (estado final: %s)" % d.get("state"))
+
+
+def run():
+    """Exceção da API (HTTP 4xx/5xx, rede) também vira annotation com o motivo."""
+    try:
+        return main()
+    except urllib.error.HTTPError as exc:
+        # .filename é a URL (py3.9-3.12); getattr(exc, "url") estoura KeyError com fp=None no 3.9
+        return falha("API do Netlify HTTP %s em %s" % (exc.code, exc.__dict__.get("filename", "?")))
+    except Exception as exc:  # noqa: BLE001 — o traceback continua no log; o motivo vai pra annotation
+        import traceback
+        traceback.print_exc()
+        return falha("%s: %s" % (type(exc).__name__, exc))
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run())

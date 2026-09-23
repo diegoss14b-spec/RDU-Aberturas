@@ -4,7 +4,7 @@ from datetime import timedelta
 import unittest
 from unittest.mock import patch
 
-from canonical import fixture_scoped_alias_pair, norm_team, parse_start, sofa_purity
+from canonical import fixture_scoped_alias_pair, flags_compatible, norm_team, parse_start, sofa_purity
 
 
 class TestIdentityPurityAliases(unittest.TestCase):
@@ -136,6 +136,50 @@ class TestIdentityPurityAliases(unittest.TestCase):
         self.assertEqual(sofa_purity(keys, only_ids={"other"}, fixtures=fixtures), {})
         sofa_purity(keys, fixtures=fixtures)
         self.assertEqual((keys, fixtures), original)
+
+
+class TestWomenAliasesAndLeaguePurity(unittest.TestCase):
+    """22/09/2026 (auditoria A13e): UCL feminina duplicada no board por grafia de nome.
+
+    Os aliases só existem com o sufixo feminino; o masculino segue sem alias global e
+    competição feminina nunca tem o mesmo fingerprint da masculina.
+    """
+
+    def test_women_spellings_unify(self):
+        psg = {norm_team(x) for x in ("PSG (F)", "Paris Saint Germain (F)", "Paris St-Germain [W]",
+                                      "PSG [W]", "Paris Saint-Germain (W)")}
+        self.assertEqual(psg, {"paris saint germain f"})
+        self.assertEqual({norm_team(x) for x in ("HB Koge (F)", "Herfolge Koge [W]", "HB Køge (W)")},
+                         {"hb koge f"})
+
+    def test_board_groups_the_observed_women_pairs(self):
+        from canonical import gscore
+        for a, b in ((("Real Madrid (F)", "PSG (F)"), ("Real Madrid [W]", "Paris St-Germain [W]")),
+                     (("Arsenal (F)", "HB Koge (F)"), ("Arsenal [W]", "Herfolge Koge [W]"))):
+            na, nb = tuple(map(norm_team, a)), tuple(map(norm_team, b))
+            self.assertTrue(flags_compatible(*na, *nb))
+            self.assertGreaterEqual(gscore(*na, *nb), 88)   # GROUP_FUZZ_NAME do build_board
+
+    def test_aliases_never_merge_men_and_women(self):
+        self.assertNotEqual(norm_team("PSG"), norm_team("Paris Saint-Germain"))   # sem alias global
+        self.assertEqual(norm_team("PSG"), "psg")
+        self.assertFalse(flags_compatible(norm_team("Paris Saint-Germain"), norm_team("Slovan Bratislava"),
+                                          norm_team("PSG (F)"), norm_team("Slovan Bratislava (F)")))
+        self.assertFalse(flags_compatible(norm_team("HB Koge"), norm_team("Arsenal"),
+                                          norm_team("Herfolge Koge [W]"), norm_team("Arsenal [W]")))
+
+    def test_women_league_fingerprint_never_matches_men(self):
+        from canonical import league_fp, league_incompatible
+        for fem, masc in (("UEFA - Champions League (F)", "UEFA - Champions League"),
+                          ("UEFA Women's Champions League", "UEFA Champions League"),
+                          ("Brasil - Brasileiro - Série A (F)", "Brasileirão Série A")):
+            with self.subTest(fem=fem):
+                self.assertIsNotNone(league_fp(fem))
+                self.assertNotEqual(league_fp(fem), league_fp(masc))
+                self.assertTrue(league_incompatible(league_fp(fem), league_fp(masc)))
+        # "F" de GRUPO não é feminino
+        self.assertEqual(league_fp("World Cup Group F"), league_fp("World Cup"))
+        self.assertEqual(league_fp("Copa do Mundo - Grupo F"), "wc")
 
 
 if __name__ == "__main__":

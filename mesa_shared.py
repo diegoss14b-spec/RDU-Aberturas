@@ -15,6 +15,17 @@ Regras:
 
 # MARGIN_MIN: margem implícita negativa = par promocional/incompatível (brief §4)
 EV_MIN, EDGE_MIN = 0.05, 0.04
+
+# FRESCOR DO MODELO (22/09/2026, auditoria A01b). O bundle ficou de 08/09 a 22/09 na
+# versão 2026-08-29 com o RDU publicando a 2026-09-21 — 16 de 16 sinais "acionáveis"
+# com modelo de 24 dias, e ninguém via. Decisão do Diego (22/09): modelo atrás do RDU
+# = SELO + penalidade na confiança; BLOQUEIO (sai de Acionáveis e do Telegram) só com
+# "atrás do RDU" COMPROVADO — manifesto do RDU lido E versão diferente há mais de
+# MODEL_BEHIND_BLOCK_H horas. Idade alta sozinha NÃO bloqueia: um retreino semanal que
+# aborta deixaria a Mesa inteira sem sinal (cético 22/09). Manifesto ilegível = só aviso.
+MODEL_MAX_AGE_DAYS = 14
+MODEL_BEHIND_BLOCK_H = 6
+RDU_MANIFEST_URL = "https://rdustats.netlify.app/data/models_manifest.js"
 MARGIN_MIN, MARGIN_CAP = 0.0, 0.12
 P_LO, P_HI = 0.15, 0.85  # P∈[15,85]% = região calibrada (evita artefato longe do μ)
 

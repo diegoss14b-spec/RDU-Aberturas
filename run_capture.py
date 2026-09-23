@@ -10,7 +10,28 @@ ROOT = Path(__file__).resolve().parent
 STATUS = ROOT / "data" / "odds" / "_status"
 BRT = timezone(timedelta(hours=-3))
 from capture_common import _atomic_write_text
-from capture_health import state as capture_state
+from capture_health import state as capture_state, local_feed_age_min, local_feed_guard_min
+
+ODDS = ROOT / "data" / "odds"
+# 22/09/2026 (auditoria A13a): desde 20/09 a Pinnacle devolve 429 pro IP do Actions e do
+# proxy BR em TODA tentativa, enquanto o feeder do Windows mantém o full dela fresco. Com
+# o full LOCAL mais novo que a guarda (LOCAL_FEED_GUARD_MIN, 75 min) a tentativa daqui só
+# gasta Decodo e toma 429 — nem poderia promover (a guarda local-feed barra n menor).
+# Pula em modo FULL (o close segue tentando: fechamento de CLV). Feeder morto → o full
+# local passa dos 75 min e a tentativa volta sozinha. Desligar: LOCAL_FEED_SKIP=0.
+LOCAL_FEED_SKIP_HOUSES = tuple(h.strip() for h in
+                               os.environ.get("LOCAL_FEED_SKIP_HOUSES", "pinnacle").split(",") if h.strip())
+
+
+def local_feed_skip_min(casa, is_full, odds_dir=None, env=None, now=None):
+    """Idade (min) do full local quando a tentativa do Actions deve ser PULADA; senão None."""
+    env = os.environ if env is None else env
+    if not is_full or casa not in LOCAL_FEED_SKIP_HOUSES:
+        return None
+    if str(env.get("LOCAL_FEED_SKIP", "1")).strip().lower() in ("0", "false", "off"):
+        return None
+    age = local_feed_age_min(casa, odds_dir or ODDS, now)
+    return age if (age is not None and 0 <= age < local_feed_guard_min()) else None
 
 FETCHERS = [
     ("betano",     "fetch_odds_betano.py",    13 * 60),
@@ -76,7 +97,7 @@ def run_one(casa, script, tmo):
     st = load_status(casa)
     st.update({"attempted": not bool(st.get("skipped_reason")), "attempt_started_epoch": t0,
                "attempt_finished_epoch": time.time()})
-    st["source_state"] = capture_state(st, casa)
+    st["source_state"] = capture_state(st, casa, local_feed_min=local_feed_age_min(casa, ODDS))
     _atomic_write_text(STATUS / f"{casa}.json", json.dumps(st, ensure_ascii=False, indent=1))
     return rc
 
@@ -149,6 +170,13 @@ def main():
     _hr = _dt.datetime.utcnow().hour
     _run = []
     for c, script, tmo in FETCHERS:
+        _lf = local_feed_skip_min(c, _is_full)
+        if _lf is not None:
+            print(f"[local-feed] {c}: full local de {_lf:.0f} min (< {local_feed_guard_min():.0f}) — "
+                  "tentativa do Actions pulada (sem 429, sem Decodo)")
+            results[c] = 0
+            record_skip(c, "local_feed_fresh")
+            continue
         st = _stride.get(c.lower(), 1)
         if _is_full and st > 1 and (_hr % st) != 0:
             print(f"[stride] {c}: full pulado (hora {_hr} %% {st} != 0) — pointer anterior segue valendo")
@@ -208,6 +236,8 @@ def main():
                 per_market[market] = per_market.get(market, 0) + int(count or 0)
         else:
             detail = st.get("error") or f"exit={results.get(casa)}"
+            if st.get("skipped_reason") == "local_feed_fresh":
+                detail = "tentativa pulada: feed local fresco (feeder)"
             if st.get("ok") and not valid:
                 detail = "status inconsistente (pointer/n_markets)"
             casas_fail.append({"casa": casa, "error": detail})
@@ -235,6 +265,23 @@ def main():
                           "error_class":v.get("error_class")} for c, v in per_casa.items()}
         for c, v in per_casa.items():
             hist_casas[c].update({"attempted": v.get("attempted"), "skipped_reason": v.get("skipped_reason")})
+            # 22/09/2026 (A13b): motivo curto no histórico — antes só error_class="Other",
+            # e não dava pra separar rede de orçamento no incidente da bet365 (16-20/09)
+            if not v["ok"] and v.get("error"):
+                hist_casas[c]["error"] = str(v.get("error"))[:80]
+        # bet365: requests e FIs sem resposta da rodada (cota da BetsAPI é compartilhada
+        # com o betlink desde 21/09 — "orçamento" × "rede" só se separa com isto)
+        try:
+            _d = json.loads((STATUS / "bet365_discovery.json").read_text(encoding="utf-8"))
+            _m = _d.get("metrics") or {}
+            _st365 = load_status("bet365")
+            _gerado = datetime.fromisoformat(str(_d.get("generated_at"))).timestamp()
+            if ("bet365" in hist_casas and _m.get("requests") is not None
+                    and (_st365.get("attempt_started_epoch") or 0) <= _gerado):
+                hist_casas["bet365"].update({"req": _m.get("requests"),
+                                             "missing": len(_m.get("missing_fis") or [])})
+        except (OSError, ValueError, TypeError):
+            pass
         hist_line = {"ts": brt, "casas": hist_casas, "total": total_events,
                      "market_counts": summary["market_counts"],
                      "sofa": {"ok": bool(sofa.get("ok")),

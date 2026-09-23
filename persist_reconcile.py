@@ -19,8 +19,16 @@ Este módulo classifica o avanço (base local → origin/main) pelo `git diff
              persist produziu nesta rodada (ticks, keys, ledger, valor/data/*.js,
              snapshots das OUTRAS casas) fica intacto no index/árvore e vira o
              commit de sempre. Segundos, sem re-rodar nada.
-  'outro'  — qualquer arquivo fora do conjunto (outra rodada da Mesa, feed de
-             resultados, código) → o persist cai no reingest completo de antes.
+  'outro'  — qualquer arquivo fora do conjunto (outra rodada da Mesa, código) →
+             o persist cai no reingest completo de antes.
+
+22/09/2026 (auditoria da Mesa, risco do crítico): os dois arquivos que o RDU publica
+pela Git Data API (post_deploy_mesa_sync.py no Mac) — o bundle dos modelos e o feed de
+resultados — também entram no caminho barato (RDU_PUSH_PATHS). Nenhuma rodada da Mesa
+escreve neles (só LÊ: candidate_pricer/build_model_ledger e history_settle), então
+trazer a versão do main por cima é exatamente o que o reingest faria, sem os ~15-18 min
+que empurravam o job pro teto de 75 (gotcha 52). A rodada corrente já precificou/
+liquidou com a versão anterior; a próxima usa a nova — igual ao reingest.
 
 Fail-closed: base que NÃO é ancestral do head (force-push, histórico reescrito)
 é 'outro' mesmo que o diff pareça só do feeder — o reset --hard do reingest é o
@@ -54,6 +62,14 @@ FEEDER_PATHS = (
     "data/odds/_status/superbet*.json",
 )
 
+# Arquivos que SÓ o RDU escreve (commit sintético da Git Data API, 1 commit por sync).
+# Se um passo da Mesa passar a ESCREVER aqui, tirar daqui — o teste
+# test_rdu_push_paths_nunca_escritos_pela_rodada confere o persist_snapshot.sh.
+RDU_PUSH_PATHS = (
+    "data/candidate_pricer_data.json",
+    "data/odds_history/results/results_auto.json",
+)
+
 RC_FEEDER = 0
 RC_ERRO = 1
 RC_OUTRO = 3
@@ -71,6 +87,7 @@ def _glob_re(pattern):
 
 
 _FEEDER_RES = tuple(_glob_re(p) for p in FEEDER_PATHS)
+_RDU_RES = tuple(_glob_re(p) for p in RDU_PUSH_PATHS)
 
 
 def eh_caminho_do_feeder(path):
@@ -79,8 +96,15 @@ def eh_caminho_do_feeder(path):
     return any(r.match(path) for r in _FEEDER_RES)
 
 
+def eh_caminho_do_rdu(path):
+    """True se `path` é um dos arquivos que só o RDU publica (RDU_PUSH_PATHS)."""
+    path = str(path).replace(os.sep, "/")
+    return any(r.match(path) for r in _RDU_RES)
+
+
 def fora_do_feeder(paths):
-    return [p for p in paths if not eh_caminho_do_feeder(p)]
+    """Caminhos que NÃO são de escritor externo (feeder ou RDU) — esses forçam o reingest."""
+    return [p for p in paths if not (eh_caminho_do_feeder(p) or eh_caminho_do_rdu(p))]
 
 
 def _git(args, cwd=None):

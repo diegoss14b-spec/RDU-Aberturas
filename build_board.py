@@ -49,6 +49,11 @@ from bookmaker_contracts import (
     BETANO_MK, betano_team as _betano_team, betano_market, event_participants,
     normalize_7k_event_name, normalize_betano_markets,
 )
+# 22/09/2026 (auditoria A01b/A01c): frescor do modelo por sinal (selo/penalidade/bloqueio)
+from model_freshness import (
+    assess as _fresh_assess, fetch_manifest as _fresh_fetch,
+    load_state as _fresh_load, save_state as _fresh_save, signal_state as _fresh_signal,
+)
 
 BRT = timezone(timedelta(hours=-3))
 # mercados do board (ordem de exibição) + qual tem modelo de valor
@@ -380,6 +385,33 @@ def main():
             cp, sp, fp, xp = CardsPricer(), ShotsPricer(), FoulsPricer(), CornersPricer()
             model_status, model_source = "production", "value_pricers"
     PRICERS = {"cartoes": cp, "finalizacoes": sp, "faltas": fp, "escanteios": xp}
+    # FRESCOR DO MODELO (22/09/2026, A01b): UMA leitura do manifesto do RDU por ciclo.
+    # O relógio do atraso (behind.since) é persistido no _status e commitado pelo
+    # persist — bloqueio só depois de MODEL_BEHIND_BLOCK_H h de atraso COMPROVADO.
+    # Fallback legado (value_pricers) não tem versão comparável: fica "unverified".
+    _status_dir = ROOT / "data" / "odds" / "_status"
+    FRESH = None
+    REF_FEED = None
+    if model_source == "candidate_pricer":
+        import candidate_pricer as _cpm
+        _man, _man_err = _fresh_fetch()
+        FRESH = _fresh_assess(_cpm._B or {}, _man, datetime.now(timezone.utc),
+                              prev=_fresh_load(_status_dir), error=_man_err)
+        try:
+            _fresh_save(_status_dir, FRESH)
+        except OSError as _e:
+            print(f"[board] ⚠ não gravei model_freshness.json ({_e})")
+        _rf = (_cpm._B or {}).get("ref_feed") or {}
+        _rf_age = _cpm._ref_feed_age_hours()
+        REF_FEED = {"generated_at": _rf.get("generated_at"), "count": _rf.get("count"),
+                    "max_age_hours": _cpm._ref_feed_max_hours(),
+                    "age_hours": round(_rf_age, 1) if _rf_age is not None else None,
+                    "stale": bool(_rf_age is not None and _rf_age > _cpm._ref_feed_max_hours())}
+        print("[board] modelo: bundle %s · RDU %s · estado=%s%s · feed de árbitros %s"
+              % (FRESH["bundle_version"], FRESH["rdu_version"] or "?", FRESH["state"],
+                 (" · BLOQUEIO (%.1fh atrás)" % FRESH["hours_behind"]) if FRESH["block"] else "",
+                 ("VENCIDO há %.0fh" % REF_FEED["age_hours"]) if REF_FEED["stale"]
+                 else ("%sh" % REF_FEED["age_hours"])))
     # cartões só entram no caminho da fixture com o pacote reds+regime no bundle
     FIXTURE_MERCADOS = set(FIXTURE_MERCADOS_BASE)
     if getattr(cp, "reds", None) and getattr(cp, "regime", None) and getattr(cp, "ok", False):
@@ -641,6 +673,7 @@ def main():
     n_skip_stale = 0
     n_skip_3way = 0
     n_skip_nosofa = 0
+    n_block_model = 0   # 22/09/2026: sinais fora de Acionáveis por modelo atrás do RDU comprovado
     now_brt = datetime.now(BRT)
     ladder_rej_all = []
     shadow_rows = []  # arquivo paralelo, nunca em BOARD.valor
@@ -735,8 +768,12 @@ def main():
                             pr = PRICERS[model].price(lg,hid,aid,ln_['linha'])
                         if pr:
                             _ctx_keys=('math_version','settlement_rule','contract_source','ref_applied','ref_reason',
-                                       'referee','ref_source','ref_observed_at','model_version','model_data_through','model_age_days')
-                            j.setdefault('model_context',{}).setdefault(canon,{})[casa]={k:pr.get(k) for k in _ctx_keys}
+                                       'referee','ref_source','ref_observed_at','model_version','model_data_through','model_age_days',
+                                       'ref_feed_age_hours')
+                            # 22/09/2026 (A01b): estado do modelo NESTE sinal (selo/penalidade/bloqueio)
+                            _m_state, _m_gate = _fresh_signal(FRESH, pr.get('model_age_days'))
+                            j.setdefault('model_context',{}).setdefault(canon,{})[casa]=dict(
+                                {k:pr.get(k) for k in _ctx_keys}, model_state=_m_state, model_gate=_m_gate)
                         if pr and actionable_game and not casa_stale and not j.get("sofa_id"):
                             n_skip_nosofa += 1
                         elif pr and actionable_game and not casa_stale:
@@ -763,12 +800,18 @@ def main():
                                         "mu": round(pr.get("mu_cal", pr["mu"]), 1),
                                         "mu_cal": round(pr.get("mu_cal", pr["mu"]), 1),
                                         "mu_raw": round(pr.get("mu_raw", pr["mu"]), 1),
-                                        "actionable": True,
+                                        # 22/09/2026 (A01b): só "atrás do RDU" COMPROVADO tira
+                                        # o sinal de Acionáveis; o resto é selo + penalidade.
+                                        "actionable": _m_gate != "block",
+                                        "model_state": _m_state,
+                                        "model_gate": _m_gate,
                                         "model_status": model_status,
                                         "model_source": model_source,
                                         **{k:pr.get(k) for k in _ctx_keys},
                                     })
                                     n_valor += 1
+                                    if _m_gate == "block":
+                                        n_block_model += 1
                         elif pr and not actionable_game:
                             n_skip_ko += 1
                         elif pr and casa_stale:
@@ -848,6 +891,11 @@ def main():
                               "ligas_com_offset": len((cp.regime or {}).get("r_liga") or {})}
                              if getattr(cp, "reds", None) and getattr(cp, "regime", None)
                              else None),
+            # 22/09/2026 (A01b/A01c): frescor do modelo × RDU publicado e do feed de
+            # árbitros — o ops e o front leem daqui; o juiz do mesa_bot respeita o block.
+            "freshness": FRESH,
+            "ref_feed": REF_FEED,
+            "n_block_model": n_block_model,
         },
         "pricing": {
             "ev_formula": "p_win*odd + p_push - 1",
@@ -859,7 +907,8 @@ def main():
         },
     }
     print(f"[board] valor flags={n_valor} · skip kickoff/started={n_skip_ko} · skip stale casa={n_skip_stale}"
-          f" · skip 3-vias={n_skip_3way} · skip zumbi>3h={n_skip_zumbi} · skip sem sofa_id={n_skip_nosofa} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}")
+          f" · skip 3-vias={n_skip_3way} · skip zumbi>3h={n_skip_zumbi} · skip sem sofa_id={n_skip_nosofa} · shadow flags={n_shadow} · ladder rej rows={len(ladder_rej_all)}"
+          f" · bloqueadas (modelo atrás do RDU)={n_block_model}")
     if n_skip_nosofa:
         # alto = fixture de liga de MODELO falhando (investigar); baixo = rótulo exótico barrado
         print(f"[board] ⚠ {n_skip_nosofa} flags suprimidas por falta de sofa_id (não liquidáveis)")
