@@ -17,7 +17,7 @@ def files(monkeypatch, tmp_path):
     end = start + timedelta(minutes=8)
     monkeypatch.setattr(ops, "STATUS", tmp_path)
     monkeypatch.setattr(ops, "now_brt", lambda: end.astimezone(ops.BRT))
-    monkeypatch.setattr(ops, "source_state", lambda status, house: "ok" if status.get("ok") else "failed")
+    monkeypatch.setattr(ops, "source_state", lambda status, house, **kw: "ok" if status.get("ok") else "failed")
     full = {"_pointer": "superbet_latest_full.json", "at": "2026-09-12T01:00:00-03:00",
             "_actual_n": 262, "captured_by": "actions", "market_counts": {"Faltas": 26}}
     monkeypatch.setattr(capture_common, "resolve_odds_pointer", lambda house, **kw: (full, None) if house == "superbet" else (None, None))
