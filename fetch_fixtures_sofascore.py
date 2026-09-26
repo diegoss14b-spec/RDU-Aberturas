@@ -17,9 +17,9 @@ from capture_common import (
     pointer_age_hours, classify_error, STATUS_DIR, br_proxies,
 )
 
-H = {"User-Agent": "Mozilla/5.0 Chrome/124.0.0.0", "Accept": "*/*",
-     "Origin": "https://www.sofascore.com", "Referer": "https://www.sofascore.com/",
-     "x-requested-with": "XMLHttpRequest"}
+# 26/09/2026: UA com cara de navegador = 403 challenge na Sofascore (medido: 15/15 endpoints).
+# Conjunto mínimo provado — igual ao sofa_headers.py do RDU. x-requested-with segue obrigatório.
+H = {"x-requested-with": "XMLHttpRequest", "User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 TOURNAMENTS = [
     (325, "BR-A"), (390, "BR-B"), (373, "BR-CdB"), (16, "WC"),
     (7, "UCL"), (679, "UEL"), (17, "EPL"), (8, "LaLiga"),
