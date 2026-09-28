@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-28T14:05:31.335104-03:00",
+  "generated_at": "2026-09-28T14:58:55.629947-03:00",
   "results_rows": 6177,
   "result_field_coverage": {
     "cards": {
@@ -42,9 +42,9 @@
   "totals_by_status": {
     "unavailable": 289068,
     "settled": 209841,
-    "pending_result": 47987,
+    "pending_result": 48051,
     "pending_semantics": 81,
-    "open": 8372
+    "open": 8265
   },
   "settled_date_offsets": {
     "-1": 12,
@@ -53,13 +53,13 @@
   },
   "by_market": {
     "Cartões": {
-      "total": 35943,
+      "total": 35939,
       "status": {
         "settled": 30571,
         "unavailable": 775,
         "pending_semantics": 81,
         "pending_result": 4072,
-        "open": 444
+        "open": 440
       },
       "pending_age": {
         "7-30d": 1324,
@@ -74,19 +74,19 @@
       }
     },
     "Cartões@away": {
-      "total": 18132,
+      "total": 18140,
       "status": {
         "unavailable": 17888,
-        "open": 244
+        "open": 252
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Cartões@home": {
-      "total": 18058,
+      "total": 18066,
       "status": {
         "unavailable": 17820,
-        "open": 238
+        "open": 246
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -110,19 +110,19 @@
       }
     },
     "Chutes no gol@away": {
-      "total": 22252,
+      "total": 22235,
       "status": {
         "unavailable": 21977,
-        "open": 275
+        "open": 258
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Chutes no gol@home": {
-      "total": 22837,
+      "total": 22819,
       "status": {
         "unavailable": 22554,
-        "open": 283
+        "open": 265
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -164,38 +164,39 @@
       "pending_reasons": {}
     },
     "Escanteios": {
-      "total": 155581,
+      "total": 155625,
       "status": {
         "settled": 86410,
         "unavailable": 30168,
-        "pending_result": 35705,
-        "open": 3298
+        "pending_result": 35769,
+        "open": 3278
       },
       "pending_age": {
-        "7-30d": 16193,
-        "3-7d": 5256,
-        "1-3d": 11752,
-        "0-24h": 2504
+        "7-30d": 16219,
+        "3-7d": 5248,
+        "1-3d": 11734,
+        "0-24h": 2530,
+        "not_started": 38
       },
       "pending_reasons": {
         "stat_missing:corners": 409,
-        "game_not_in_results": 35296
+        "game_not_in_results": 35360
       }
     },
     "Escanteios@away": {
-      "total": 39674,
+      "total": 39668,
       "status": {
         "unavailable": 38938,
-        "open": 736
+        "open": 730
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Escanteios@home": {
-      "total": 39473,
+      "total": 39465,
       "status": {
         "unavailable": 38740,
-        "open": 733
+        "open": 725
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -237,12 +238,12 @@
       "pending_reasons": {}
     },
     "Finalizações": {
-      "total": 39180,
+      "total": 39164,
       "status": {
         "settled": 34848,
         "pending_result": 3440,
         "unavailable": 504,
-        "open": 388
+        "open": 372
       },
       "pending_age": {
         "7-30d": 602,
@@ -256,39 +257,39 @@
       }
     },
     "Finalizações@away": {
-      "total": 25669,
+      "total": 25653,
       "status": {
         "unavailable": 25367,
-        "open": 302
+        "open": 286
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Finalizações@home": {
-      "total": 26036,
+      "total": 26020,
       "status": {
         "unavailable": 25738,
-        "open": 298
+        "open": 282
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Handicap de Cartões": {
-      "total": 3864,
+      "total": 3868,
       "status": {
         "unavailable": 3838,
-        "open": 26
+        "open": 30
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Impedimentos": {
-      "total": 9178,
+      "total": 9176,
       "status": {
         "settled": 8212,
         "unavailable": 92,
         "pending_result": 764,
-        "open": 110
+        "open": 108
       },
       "pending_age": {
         "7-30d": 202,
@@ -302,19 +303,19 @@
       }
     },
     "Impedimentos@away": {
-      "total": 5742,
+      "total": 5740,
       "status": {
         "unavailable": 5662,
-        "open": 80
+        "open": 78
       },
       "pending_age": {},
       "pending_reasons": {}
     },
     "Impedimentos@home": {
-      "total": 5714,
+      "total": 5712,
       "status": {
         "unavailable": 5636,
-        "open": 78
+        "open": 76
       },
       "pending_age": {},
       "pending_reasons": {}
@@ -393,12 +394,13 @@
     }
   },
   "backlog": {
-    "total": 48068,
+    "total": 48132,
     "age": {
-      "7-30d": 19057,
-      "3-7d": 6829,
-      "1-3d": 18177,
-      "0-24h": 4005
+      "7-30d": 19083,
+      "3-7d": 6821,
+      "1-3d": 18159,
+      "0-24h": 4031,
+      "not_started": 38
     },
     "age_unknown": 0,
     "reasons": {
@@ -406,7 +408,7 @@
       "stat_missing:corners": 409,
       "cards_incident_semantics_missing": 81,
       "stat_missing:cards": 499,
-      "game_not_in_results": 46971,
+      "game_not_in_results": 47035,
       "stat_missing:offsides": 28
     },
     "classes": {
@@ -415,13 +417,14 @@
         "3-7d": 6
       },
       "feed_sem_o_dia": {
-        "3-7d": 4581,
-        "1-3d": 10137,
-        "0-24h": 1982
+        "3-7d": 4599,
+        "1-3d": 10119,
+        "0-24h": 2008,
+        "not_started": 38
       },
       "fora_do_universo": {
-        "7-30d": 15757,
-        "3-7d": 1492
+        "7-30d": 15783,
+        "3-7d": 1466
       },
       "stat_missing": {
         "7-30d": 937
@@ -442,7 +445,7 @@
         "key": "superbet|2026-09-01|volos nps|pae ps kalamata|Finalizações|25.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -450,7 +453,7 @@
         "key": "superbet|2026-09-01|volos nps|pae ps kalamata|Finalizações|25.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -458,7 +461,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|26.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -466,7 +469,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|26.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -474,7 +477,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|24.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -482,7 +485,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|24.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -490,7 +493,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|28.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -498,7 +501,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|28.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -506,7 +509,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|18.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -514,7 +517,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|18.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -522,7 +525,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|20.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -530,7 +533,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|20.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -538,7 +541,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|22.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -546,7 +549,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|22.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -554,7 +557,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|30.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -562,7 +565,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|30.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -570,7 +573,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|32.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -578,7 +581,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|32.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -586,7 +589,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|34.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -594,7 +597,7 @@
         "key": "betano|2026-09-01|volos nps|pae ps kalamata|Finalizações|34.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -602,7 +605,7 @@
         "key": "estrelabet|2026-09-01|volos nps|pae ps kalamata|Finalizações|23.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -610,7 +613,7 @@
         "key": "estrelabet|2026-09-01|volos nps|pae ps kalamata|Finalizações|23.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -618,7 +621,7 @@
         "key": "estrelabet|2026-09-01|volos nps|pae ps kalamata|Finalizações|24.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -626,7 +629,7 @@
         "key": "estrelabet|2026-09-01|volos nps|pae ps kalamata|Finalizações|24.5|under",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       },
@@ -634,7 +637,7 @@
         "key": "estrelabet|2026-09-01|volos nps|pae ps kalamata|Finalizações|25.5|over",
         "market": "Finalizações",
         "kickoff": "2026-09-01T12:00:00-0300",
-        "age_days": 27.09,
+        "age_days": 27.12,
         "reason": "stat_missing:shots",
         "attempts": 97
       }
