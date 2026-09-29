@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-09-29T06:49:00Z",
- "ts_brt": "2026-09-29 03:49",
+ "ts_utc": "2026-09-29T07:51:00Z",
+ "ts_brt": "2026-09-29 04:51",
  "casas_ok": [
   "betano",
   "superbet",
@@ -20,7 +20,7 @@
  ],
  "n_ok": 5,
  "n_fail": 2,
- "total_events": 268,
+ "total_events": 265,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -30,7 +30,7 @@
     "Cartões": 16,
     "Chutes no gol": 4,
     "Desarmes": 2,
-    "Escanteios": 48,
+    "Escanteios": 40,
     "Faltas": 4,
     "Finalizações": 4,
     "Impedimentos": 4,
@@ -38,14 +38,14 @@
     "Tiros de meta": 2
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-29_0341.jsonl",
+   "pointer_file": "betano_2026-09-29_0442.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-29T06:48:57Z"
+   "ts_utc": "2026-09-29T07:50:57Z"
   },
   "superbet": {
    "ok": true,
@@ -63,14 +63,14 @@
     "Tiros de meta": 2
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-29_034128_006766_5714_1790664088793305710.jsonl",
+   "pointer_file": "superbet_2026-09-29_044227_812366_5536_1790667748268853786.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-29T06:41:50Z"
+   "ts_utc": "2026-09-29T07:42:52Z"
   },
   "estrelabet": {
    "ok": true,
@@ -89,8 +89,8 @@
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": true,
-   "skipped_reason": null,
+   "attempted": false,
+   "skipped_reason": "full_stride",
    "mode": "full",
    "ts_utc": "2026-09-29T06:42:03Z"
   },
@@ -114,8 +114,8 @@
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": true,
-   "skipped_reason": null,
+   "attempted": false,
+   "skipped_reason": "full_stride",
    "mode": "full",
    "ts_utc": "2026-09-29T06:44:45Z"
   },
@@ -128,36 +128,36 @@
     "Escanteios": 55
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-09-29_0300.jsonl",
+   "pointer_file": "pinnacle_2026-09-29_0410.jsonl",
    "error": null,
    "source_state": "protected_feed",
    "error_class": null,
    "attempted": false,
    "skipped_reason": "local_feed_fresh",
    "mode": "full",
-   "ts_utc": "2026-09-29T06:01:41Z"
+   "ts_utc": "2026-09-29T07:11:45Z"
   },
   "bet365": {
    "ok": true,
-   "n_events": 62,
+   "n_events": 59,
    "n_markets": 6,
    "market_counts": {
     "Cartões": 6,
     "Chutes no gol": 15,
     "Desarmes": 2,
-    "Escanteios": 62,
+    "Escanteios": 59,
     "Finalizações": 15,
     "Impedimentos": 1
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-09-29_0341.jsonl",
+   "pointer_file": "bet365_2026-09-29_0442.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-29T06:45:32Z"
+   "ts_utc": "2026-09-29T07:44:10Z"
   },
   "sportingbet": {
    "ok": false,
@@ -172,14 +172,14 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-29T06:49:00Z"
+   "ts_utc": "2026-09-29T07:50:59Z"
   }
  },
  "market_counts": {
   "Cartões": 92,
   "Chutes no gol": 54,
   "Desarmes": 9,
-  "Escanteios": 254,
+  "Escanteios": 243,
   "Faltas": 26,
   "Finalizações": 53,
   "Impedimentos": 27,
@@ -190,8 +190,8 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-09-29T06:42:03Z",
-  "ts_brt": "2026-09-29 03:42",
+  "ts_utc": "2026-09-29T07:42:43Z",
+  "ts_brt": "2026-09-29 04:42",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -201,8 +201,8 @@
   "pointer_file": "_snapshots/sofa_4d2e9450d341f0f0736b.json",
   "pointer_at": "2026-09-27T02:45:07-03:00",
   "pointer_n": 273,
-  "pointer_age_h": 48.949,
-  "duration_sec": 15.2,
+  "pointer_age_h": 49.96,
+  "duration_sec": 15.6,
   "error": "snapshot não saudável: n=0, mínimo=69; fallback preservado n=273; transporte req=1 proxy=1 direto=0 http=403:1 ultimo=HTTP 403 via proxy circuito=1 falhas=BR-A,BR-B,BR-CdB,WC,UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Eliteserien,Libertadores,Sud",
   "error_class": "Geo",
   "transport": {
@@ -292,8 +292,8 @@
    "inactive_tournaments": []
   },
   "attempted": true,
-  "attempt_started_epoch": 1790664107.9186544,
-  "attempt_finished_epoch": 1790664123.3143914,
+  "attempt_started_epoch": 1790667747.6664183,
+  "attempt_finished_epoch": 1790667763.418672,
   "source_state": "failed"
  },
  "deploy_allowed": true,
