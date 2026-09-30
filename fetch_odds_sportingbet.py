@@ -15,6 +15,8 @@ Saída: data/odds/sportingbet_{stamp}.jsonl + sportingbet_latest.json (formato n
   ~5 MB/rodada. Ligar só na máquina local do chasing:  ODDS_RAW=1 python3 fetch_odds_sportingbet.py
   A pasta data/odds/_raw/ está no .gitignore."""
 import sys, os, json, re, gzip, time
+from threading import Lock
+from urllib.parse import urlsplit
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 if sys.stdout is None or not hasattr(sys.stdout, "write"): sys.stdout = open(os.devnull, "w")
@@ -118,17 +120,90 @@ def canon_team(nm, participants=None):
 
 _LINE_RE = re.compile(r"([\d]+(?:[.,]\d+)?)")
 
+# Source refusals are not an empty sports calendar. Keep diagnostics without
+# recording query strings, response bodies, proxy credentials or access tokens.
+_DIAG_LOCK = Lock()
+_TRANSPORT = {"requests": 0, "http_statuses": {}, "routes": {},
+              "last_error": None, "last_failure_kind": None, "last_path": None,
+              "access_refused": False}
+_LISTING_FAILURES = []
+
+
+def _record_response(route, path, status=None, error=None, kind=None):
+    with _DIAG_LOCK:
+        _TRANSPORT["requests"] += 1
+        _TRANSPORT["routes"][route] = _TRANSPORT["routes"].get(route, 0) + 1
+        if status is not None:
+            key = str(status)
+            _TRANSPORT["http_statuses"][key] = _TRANSPORT["http_statuses"].get(key, 0) + 1
+        if error:
+            _TRANSPORT.update(last_error=error, last_failure_kind=kind, last_path=path)
+        if kind in ("AccessDenied", "RateLimited"):
+            _TRANSPORT["access_refused"] = True
+
+
+def _listing_failure(reason, kind):
+    with _DIAG_LOCK:
+        _LISTING_FAILURES.append({"route": "proxy" if PROX else "direct",
+                                  "reason": reason, "kind": kind})
+
+
+def listing_error():
+    if not _LISTING_FAILURES:
+        return "lista não obtida; motivo indisponível"
+    return "lista não obtida: " + "; ".join(
+        f"{x['route']}: {x['reason']}" for x in _LISTING_FAILURES[-2:])
+
+
+def route_retry_allowed():
+    # Never turn a source refusal/rate limit into a proxy retry. A healthy empty
+    # list or schema mismatch is also not improved by changing the IP address.
+    return bool(_LISTING_FAILURES and _LISTING_FAILURES[-1]["kind"] == "Transport"
+                and not _TRANSPORT["access_refused"])
+
+
+def finish_capture(*args, **kwargs):
+    from capture_common import finish, STATUS_DIR, _atomic_write_text
+    code = finish(*args, **kwargs)
+    path = STATUS_DIR / "sportingbet.json"
+    status = json.loads(path.read_text(encoding="utf-8"))
+    with _DIAG_LOCK:
+        status["transport"] = dict(_TRANSPORT)
+        status["listing_failures"] = list(_LISTING_FAILURES)
+    _atomic_write_text(path, json.dumps(status, ensure_ascii=False, indent=1))
+    return code
+
 def get(url, tries=3):
+    if _TRANSPORT["access_refused"]:
+        return None
     for a in range(tries):
+        route = "proxy" if PROX else "direct"
+        path = urlsplit(url).path
         try:
             r = creq.get(url, impersonate="chrome124", timeout=30, proxies=PROX)
-            if r.status_code == 200 and r.content[:1] in b"[{":
-                return r.json()
-            if r.status_code in (403, 429):
-                time.sleep(3.0 * (a + 1)); continue
-        except Exception:
-            pass
-        time.sleep(1.2)
+            status = int(r.status_code)
+            if status in (401, 403, 407, 429):
+                kind = "RateLimited" if status == 429 else "AccessDenied"
+                _record_response(route, path, status, f"HTTP {status}", kind)
+                return None
+            if status == 200:
+                try:
+                    data = r.json()
+                    if not isinstance(data, (dict, list)):
+                        raise ValueError("JSON deve ser objeto/lista")
+                except (ValueError, TypeError):
+                    _record_response(route, path, status, "HTTP 200 sem JSON válido", "Parse")
+                    return None
+                _record_response(route, path, status)
+                return data
+            kind = "Transport" if status >= 500 else "HTTP"
+            _record_response(route, path, status, f"HTTP {status}", kind)
+            if status < 500:
+                return None
+        except Exception as exc:
+            _record_response(route, path, error=type(exc).__name__, kind="Transport")
+        if a + 1 < tries:
+            time.sleep(1.2)
     return None
 
 def iter_markets(obj):
@@ -188,8 +263,18 @@ def fetch_fixtures():
                f"&fixtureTypes=Standard&state=Latest&offerMapping=Filtered"
                f"&offerCategories=Gridable&sportIds=4&skip={skip}&take={TAKE}&sortBy=StartDate")
         d = get(url)
-        fx = (d or {}).get("fixtures") or []
-        if not fx: break
+        if d is None:
+            _listing_failure(_TRANSPORT["last_error"] or "falha de transporte",
+                             _TRANSPORT["last_failure_kind"] or "Transport")
+            return []  # an incomplete listing must not look like a complete calendar
+        if not isinstance(d, dict) or not isinstance(d.get("fixtures"), list):
+            _listing_failure("JSON sem lista fixtures válida", "Parse")
+            return []
+        fx = d["fixtures"]
+        if not fx:
+            if skip == 0:
+                _listing_failure("HTTP 200: API retornou lista fixtures vazia", "Empty")
+            break
         out += fx
         if len(fx) < TAKE: break
         skip += TAKE
@@ -209,8 +294,8 @@ def main():
     fixtures = fetch_fixtures()
     print(f"[sportingbet] fixtures: {len(fixtures)} jogos")
     if not fixtures:
-        # lista vazia = TRANSPORTE morto (a lista não encolhe em modo close) —
-        # sentinela None distingue de "rodou e capturou 0" e aciona o flip de rota
+        # Preserve the distinction between unavailable transport, refused access,
+        # schema errors and a genuinely empty API response.
         return None
 
     _wh = odds_window()
@@ -241,6 +326,10 @@ def main():
         for fid, d in ex.map(_detail, ids):
             if d: details[fid] = d
     n_det = len(details)
+    if _TRANSPORT["access_refused"]:
+        _listing_failure("detalhes: " + (_TRANSPORT["last_error"] or "acesso recusado"),
+                         _TRANSPORT["last_failure_kind"] or "AccessDenied")
+        return None  # preserve the previous full; no route switch after refusal
 
     raw_bytes = 0
     n_out = n_corners = n_cards = 0
@@ -310,23 +399,22 @@ def main():
 CASA = "sportingbet"
 if __name__ == "__main__":
     import time as _t; _t0 = _t.time()
-    from capture_common import finish, br_proxies
+    from capture_common import br_proxies
     try:
         _n = main()
-        if _n is None:
-            # lista não veio pela rota primária → tenta a OUTRA rota no MESMO run
-            # (simétrico: direto→proxy se PROXY_OFF lista a casa; proxy→direto se o
-            # Decodo morrer — pane de 09/08: 407 derrubou 5 casas por 10h em silêncio)
+        if _n is None and route_retry_allowed():
+            # Only genuine transport failure may use the configured fallback.
+            # Access refusals, rate limits, schema errors and valid empty lists do not.
             _rota2 = "proxy BR" if PROX is None else "DIRETO"
-            print(f"[{CASA}] lista vazia na rota primária — tentando {_rota2} no mesmo run")
+            print(f"[{CASA}] falha técnica na rota primária — tentando {_rota2} no mesmo run")
             globals()["PROX"] = br_proxies(CASA, force=True) if PROX is None else None
             _n = main()
         if _n is None:
-            finish(CASA, 0, MIN_EFF, error="lista vazia nas DUAS rotas (direto e proxy)", t0=_t0)
+            finish_capture(CASA, 0, MIN_EFF, error=listing_error(), t0=_t0)
             sys.exit(2)
-        sys.exit(finish(CASA, _n, MIN_EFF, t0=_t0))
+        sys.exit(finish_capture(CASA, _n, MIN_EFF, t0=_t0))
     except SystemExit:
         raise
     except BaseException as _e:
-        finish(CASA, 0, MIN_EFF, error=_e, t0=_t0)
+        finish_capture(CASA, 0, MIN_EFF, error=_e, t0=_t0)
         sys.exit(1)
