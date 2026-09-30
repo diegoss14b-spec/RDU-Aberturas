@@ -134,3 +134,24 @@ def test_signal_judge_never_loads_models_in_contingency(monkeypatch):
     poisoned = public_board()
     poisoned["jogos"][0]["valor"] = [{"actionable": True, "ev": .3}]
     assert flatten_signals(poisoned) == []
+
+
+@pytest.mark.parametrize("policy,capture,gate,deploy,expected", [
+    ("1", "failure", "success", "success", 0),
+    ("0", "failure", "success", "success", 1),
+    ("1", "failure", "failure", "skipped", 1),
+    ("1", "failure", "success", "failure", 1),
+])
+def test_workflow_verdict_truthfully_reports_partial_publication(policy, capture, gate, deploy, expected):
+    import subprocess
+    workflow = (Path(__file__).parent / ".github/workflows/valor.yml").read_text()
+    text = workflow.split("      - name: Veredito", 1)[1].split("        run: |\n", 1)[1]
+    script = "\n".join(line[10:] for line in text.splitlines() if line.startswith("          "))
+    env = dict(os.environ, MODE="full", MESA_ODDS_ONLY=policy, CAPTURE_OUTCOME=capture,
+               PERSIST_OUTCOME="success", HISTORY_OUTCOME="success", BOARD_OUTCOME="success",
+               OPS_OUTCOME="success", GATE_OUTCOME=gate, MANIFEST_OUTCOME="success", DEPLOY_OUTCOME=deploy)
+    result = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env)
+    assert result.returncode == expected, result.stdout + result.stderr
+    if expected == 0:
+        assert "verificada e publicada" in result.stdout
+        assert "site anterior preservado" not in result.stdout

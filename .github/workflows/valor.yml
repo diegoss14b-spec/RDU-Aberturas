@@ -390,7 +390,7 @@ jobs:
             fail=1
           fi
           if [ "$MODE" = "full" ]; then
-            if [ "$CAPTURE_OUTCOME" != "success" ]; then
+            if [ "$CAPTURE_OUTCOME" != "success" ] && [ "$MESA_ODDS_ONLY" != "1" ]; then
               echo "::error::Captura insuficiente; deploy bloqueado e site anterior preservado."
               fail=1
             elif [ "$BOARD_OUTCOME" != "success" ]; then
@@ -405,6 +405,8 @@ jobs:
             elif [ "$DEPLOY_OUTCOME" != "success" ]; then
               echo "::error::Netlify não confirmou a publicação."
               fail=1
+            elif [ "$CAPTURE_OUTCOME" != "success" ]; then
+              echo "::warning::Captura parcial; contingência somente odds verificada e publicada. Conferir casas excluídas."
             fi
           fi
           exit "$fail"
