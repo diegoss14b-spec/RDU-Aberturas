@@ -146,7 +146,7 @@ class FrontendFailClosedTests(unittest.TestCase):
         self.assertIn("var gs = liveGameState(j);", board)
         # redesign 20/07 + §13: valActionable exige jogo AINDA por vir (upcoming) e não-stale;
         # o filtro "só próximos" usa o estado calculado ao vivo, não o game_state congelado.
-        self.assertIn('var valActionable = gs === "upcoming"', board)
+        self.assertIn('var valActionable = !valueUnavailable && gs === "upcoming" && !frCard.stale', board)
         self.assertIn("!valActionable", board)
         self.assertIn('liveGameState(j) !== "upcoming"', board)
         self.assertIn('document.getElementById("view-board")', board)
@@ -154,7 +154,10 @@ class FrontendFailClosedTests(unittest.TestCase):
         self.assertIn('document.getElementById("view-ops")', ops)
         for source in (board, valor, ops):
             self.assertIn("view.hidden", source)
-            self.assertIn("}, 60000);", source)
+            if source == board:
+                self.assertIn("window.setInterval(refreshVisible, 60000);", source)
+            else:
+                self.assertIn("}, 60000);", source)
         self.assertIn("function parseOpsTime(ts)", ops)
         self.assertIn("bare.exec(s)", ops)
         self.assertIn('"$1:$2"', ops)

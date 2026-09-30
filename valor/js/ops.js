@@ -54,6 +54,9 @@
     var root = document.getElementById("view-ops");
     if (!root) return;
     var O = window.OPS;
+    var publishedBoard = window.BOARD || {};
+    var oddsOnly = publishedBoard.mode === "odds_only";
+    var valueUnavailable = oddsOnly || (publishedBoard.model && publishedBoard.model.status === "unavailable");
     if (!O) {
       root.innerHTML = '<div class="empty"><div class="big">🛰️</div>Painel de operação ainda não gerado.<br>'
         + '<span style="font-size:12px;color:var(--faint)">Rode <code>python build_ops.py</code> após a captura.</span></div>';
@@ -80,6 +83,11 @@
       + "Área operacional — não é ranking de tip. Atualizado " + esc(O.gerado || "—") + "."
       + (mb ? ' Modelo do board: <span class="mdl-badge ' + mb.cls + '" title="' + esc(mb.title) + '">' + esc(mb.label) + "</span>." : "")
       + "</div>";
+    if (oddsOnly) {
+      head = '<div class="disc" role="status"><b>Operação em contingência: sem cálculos de valor.</b> ' +
+        'Este diagnóstico foi gerado em ' + esc(O.gerado || "horário não informado") +
+        '. Não comprova ofertas atuais; a Mesa aplica o prazo real de cada captura.</div>' + head;
+    }
 
     // --- KPI cards ---
     var kpis = [
@@ -234,7 +242,7 @@
             + '<span class="op-soon-j">' + esc(g.jogo) + "</span>"
             + '<span class="op-muted">' + g.n_casas + "c · " + g.n_mercados + "m"
             + (g.sofa ? " · sofa" : "")
-            + (g.tem_valor ? ' · <span class="op-good">+EV</span>' : "")
+            + (g.tem_valor && !valueUnavailable ? ' · <span class="op-good">+EV</span>' : "")
             + "</span></div>";
         }).join("") + "</div></div>"
       : "";

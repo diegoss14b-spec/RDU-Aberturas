@@ -184,12 +184,16 @@ def clear_blocked_marker(path=None):
 
 def load_sofa_state(status):
     out = dict(status or {})
+    # A green status is not proof that its pointer and body still exist.
+    out.update(pointer_valid=False, pointer_age_h=None, pointer_at=None)
     ptr = ROOT / "data" / "fixtures" / "sofa_latest.json"
     try:
         meta = json.loads(ptr.read_text(encoding="utf-8"))
-        data = json.loads((ptr.parent / meta["file"]).read_text(encoding="utf-8"))
+        source = ptr.parent / meta["file"]
+        source.resolve().relative_to(ptr.parent.resolve())
+        data = json.loads(source.read_text(encoding="utf-8"))
         n = len(data.get("fixtures") or [])
-        valid = n > 0 and n == int(meta.get("n") or 0)
+        valid = n > 0 and n == int(meta.get("n") or 0) and data.get("complete") is not False
         if valid:
             out.update({"pointer_valid": True, "pointer_file": meta.get("file"),
                         "pointer_at": meta.get("at") or meta.get("ts"),
@@ -212,6 +216,23 @@ def _board_age_min(board):
 
 def main():
     new = parse_board((ROOT / "valor" / "data" / "board.js").read_text(encoding="utf-8"))
+    from contingency_runtime import forced_odds_only, public_odds_only_reasons
+    if new.get("mode") == "odds_only":
+        from odds_only import odds_only_reasons
+        reasons = public_odds_only_reasons(new) + odds_only_reasons(new, ROOT)
+        if reasons:
+            STATUS.mkdir(parents=True, exist_ok=True)
+            _atomic_write_text(STATUS / "blocked_deploy.json", json.dumps({
+                "mode": "odds_only", "reasons": reasons,
+                "ts_brt": datetime.now(BRT).isoformat()}, ensure_ascii=False))
+            print("::error title=gate::Contingência bloqueada: " + " | ".join(reasons)[:500])
+            sys.exit(3)
+        clear_blocked_marker()
+        print(f"[gate] SOMENTE ODDS liberado: {len(new['jogos'])} ofertas verificadas, sem +EV")
+        sys.exit(0)
+    if forced_odds_only() or new.get("mode") not in (None, "full"):
+        print("::error title=gate::Modo de publicação incompatível; contingência não pode religar modelos")
+        sys.exit(3)
     summary = load_json(STATUS / "summary.json")
     sofa = load_sofa_state(load_json(STATUS / "sofa.json") or summary.get("fixtures") or {})
     prev = None

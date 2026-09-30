@@ -56,6 +56,8 @@ def signal_key(sig: Dict[str, Any]) -> str:
 
 def flatten_signals(board: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Lista plana de flags actionable com metadados do jogo."""
+    if board.get("mode") == "odds_only" or (board.get("model") or {}).get("status") == "unavailable":
+        return []
     out: List[Dict[str, Any]] = []
     for j in board.get("jogos") or []:
         if not isinstance(j, dict):

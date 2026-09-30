@@ -85,16 +85,28 @@
       return;
     }
 
+    var oddsOnly = window.BOARD && window.BOARD.mode === "odds_only";
+    // Este arquivo é um histórico independente do board. Durante a contingência,
+    // não tem contrato de captura/TTL para certificar ofertas futuras: só passado.
+    var gameIds = Object.keys(L.s).filter(function (g) {
+      if (!oddsOnly) return true;
+      var info = (L.games || {})[g] || {};
+      var ko = String(info.ko || "").replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+      if (!/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(ko)) return false;
+      var kickoff = Date.parse(ko);
+      return !isNaN(kickoff) && kickoff <= Date.now();
+    });
+
     // mercados presentes, pra barra de filtro
     var mercados = {};
-    Object.keys(L.s).forEach(function (g) {
+    gameIds.forEach(function (g) {
       Object.keys(L.s[g]).forEach(function (m) { mercados[m] = (mercados[m] || 0) + 1; });
     });
     var mkList = Object.keys(mercados).sort(function (a, b) { return mercados[b] - mercados[a]; });
 
     // jogos que passam no filtro, mais recentes primeiro
     var termo = estado.busca.toLowerCase().trim();
-    var jogos = Object.keys(L.s).filter(function (g) {
+    var jogos = gameIds.filter(function (g) {
       var info = L.games[g] || {};
       if (estado.mercado && !L.s[g][estado.mercado]) return false;
       if (!termo) return true;
@@ -111,6 +123,11 @@
     var mostrados = jogos.slice(0, LIM);
 
     var h = [];
+    if (oddsOnly) {
+      h.push('<div class="disc" role="status"><b>Histórico de odds, não ofertas atuais.</b> ' +
+        'Na contingência, esta aba mostra apenas jogos já iniciados com horário verificável. ' +
+        'Jogos futuros ficam ocultos aqui; odds recentes verificadas estão na Mesa de Aberturas.</div>');
+    }
     h.push('<div class="bar" id="ln-mkts">');
     h.push('<span class="chip' + (estado.mercado ? "" : " on") + '" data-mk="">Todos</span>');
     mkList.forEach(function (m) {
@@ -162,7 +179,7 @@
         var r = resumo(mercs[m][melhor]);
         h.push('<div class="ln-sum-row"><span class="ln-mk">' + esc(m) + "</span>"
           + '<span class="ln-vals"><b>' + num(r.ab[1]) + "</b> → <b>" + num(r.fe[1]) + "</b></span>"
-          + '<span class="ln-cap">' + (fechado ? "fechou" : "agora") + "</span>"
+          + '<span class="ln-cap">' + (oddsOnly ? "última observação histórica" : (fechado ? "fechou" : "agora")) + "</span>"
           + setaDelta(r.delta) + "</div>");
       });
       h.push("</div>");

@@ -245,6 +245,20 @@ def main():
     _mreason = manifest_gate(DIR, history_root=ROOT / "data" / "odds_history")
     if _mreason:
         return falha("ABORTADO — manifesto/atômico: " + _mreason)
+    # Recheck after persist/reconciliation and directly before contacting Netlify.
+    from gate_board import parse_board
+    from contingency_runtime import forced_odds_only, public_odds_only_reasons
+    try:
+        board = parse_board((DIR / "data/board.js").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return falha("ABORTADO — board ilegível: " + type(exc).__name__)
+    if board.get("mode") == "odds_only":
+        from odds_only import odds_only_reasons
+        problems = public_odds_only_reasons(board) + odds_only_reasons(board, ROOT)
+        if problems:
+            return falha("ABORTADO — contingência: " + "; ".join(problems))
+    elif forced_odds_only() or board.get("mode") not in (None, "full"):
+        return falha("ABORTADO — modo de publicação incompatível com contingência")
     files = {}
     for p in DIR.rglob("*"):
         if p.is_file() and not any(x in p.name for x in EXCLUDE):

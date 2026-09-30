@@ -161,6 +161,9 @@ def resolve_identity(j: dict, ctx: dict) -> Optional[Tuple[str, int, int]]:
 
 def judge_board(board: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Lista de sinais com EV≥gate, ordenada por EV desc."""
+    if board.get("mode") == "odds_only" or (board.get("model") or {}).get("status") == "unavailable":
+        print("judge: contingência somente odds — sem sinais", flush=True)
+        return []
     ctx = _ctx()
     sh = ctx["shared"]
     pricers = ctx["pricers"]

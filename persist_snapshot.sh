@@ -94,6 +94,7 @@ reingest_on_new_base() {
   if [ "$MODE" = "full" ] && [ "$GATE" = "success" ]; then
     python build_board.py || return 1
     python build_ops.py || return 1
+    python gate_board.py || return 1
     # regenera o manifesto sobre a base reconciliada (mesmo build) — se falhar, aborta
     python build_manifest.py || return 1
   else
@@ -149,6 +150,11 @@ while [ "$attempt" -lt "$MAX_TENTATIVAS" ]; do
   git fetch origin main
   if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
     reconcilia_com_main || exit 1
+  fi
+  if [ "$MODE" = "full" ] && [ "$GATE" = "success" ]; then
+    # Feeder reconciliation may replace the raw snapshot after the first gate.
+    # Rebuild/revalidate odds-only from CURRENT sources without re-ingesting history.
+    python contingency_runtime.py || exit 1
   fi
   stage
   if git diff --cached --quiet; then

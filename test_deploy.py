@@ -50,6 +50,7 @@ class DeployTests(unittest.TestCase):
             encoding="utf-8")
         # The policy gate parses history as well as checking its bytes.
         (self.site / "data/history.js").write_text("window.HIST={};", encoding="utf-8")
+        (self.site / "data/board.js").write_text("window.BOARD={};", encoding="utf-8")
         # manifesto atômico válido (por último — depende dos hashes dos artefatos acima)
         self._write_valid_manifest()
         self.token = patch.object(deploy, "TOKEN", "test-token")

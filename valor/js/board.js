@@ -3,6 +3,9 @@
 (function () {
   var B = (window.BOARD || { jogos: [], mercados: [], casas: [], gerado: "?" });
   var jogos = B.jogos || [];
+  var oddsOnly = B.mode === "odds_only";
+  var valueUnavailable = oddsOnly || (B.model && B.model.status === "unavailable");
+  var CONTINGENCY_TTL_MS = 120 * 60000;
   var MERCADOS = B.mercados || ["Cartões", "Faltas", "Finalizações", "Chutes no gol", "Escanteios", "Impedimentos", "Laterais", "Tiros de meta", "Desarmes"];
   var ABBR = { "Cartões": "CAR", "Faltas": "FAL", "Finalizações": "FIN", "Chutes no gol": "CG",
     "Escanteios": "ESC", "Impedimentos": "IMP", "Laterais": "LAT", "Tiros de meta": "TM", "Desarmes": "DES" };
@@ -38,6 +41,12 @@
   var _f = loadFilt();
   var state = { mercado: _f.mercado, casa: _f.casa, soValor: _f.soValor,
     ordem: _f.ordem, mostrarTodos: false, expanded: {} };
+  // Um filtro +EV salvo antes da contingência não pode esconder as odds disponíveis.
+  if (valueUnavailable) {
+    state.soValor = false;
+    if (state.ordem === "valor") state.ordem = "horario";
+    saveFilt();
+  }
   // filtro salvo pode apontar pra mercado/casa que não existe mais nesta board
   if (state.mercado !== "todos" && !jogos.some(function (j) { return hasMkt(j, state.mercado); })) state.mercado = "todos";
   if (state.casa !== "todas" && (B.casas || []).indexOf(state.casa) < 0) state.casa = "todas";
@@ -96,6 +105,28 @@
     return now >= kickoff ? "started" : "upcoming";
   }
 
+  function awareMs(value) {
+    if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return null;
+    var ms = Date.parse(value);
+    return isNaN(ms) ? null : ms;
+  }
+
+  // Contingência é estritamente pré-jogo, com prazo da CAPTURA, nunca do rebuild.
+  // Falta de qualquer relógio obrigatório fecha a linha, inclusive com JSON malformado.
+  function contingencyEligible(j) {
+    if (!oddsOnly) return true;
+    var now = Date.now();
+    var globalExpiry = awareMs(B.contingency && B.contingency.expires_at);
+    var gameExpiry = awareMs(j && j.expires_at);
+    var captured = awareMs(j && j.captured_at);
+    var generated = awareMs(B.gerado_iso);
+    var kickoff = awareMs(j && j.inicio_iso);
+    if ([globalExpiry, gameExpiry, captured, generated, kickoff].some(function (t) { return t == null; })) return false;
+    if (captured > now + 5 * 60000 || generated > now + 5 * 60000) return false;
+    return liveGameState(j, now) === "upcoming" && kickoff > now &&
+      now < Math.min(globalExpiry, gameExpiry, captured + CONTINGENCY_TTL_MS, generated + CONTINGENCY_TTL_MS);
+  }
+
   function freshness() {
     var ms = parseBrt(B.gerado_iso || B.gerado);
     if (ms == null) return { txt: "?", mins: null, stale: true, band: "unk" };
@@ -149,16 +180,17 @@
         saveFilt(); render();
       }, true));
     });
-    rowC.appendChild(chip("🎯 só com valor", state.soValor, "val", function () {
+    if (!valueUnavailable) rowC.appendChild(chip("🎯 só com valor", state.soValor, "val", function () {
       state.soValor = !state.soValor; saveFilt(); render();
     }));
     // P0.4 — por padrão só jogos próximos; liga pra ver ao vivo/encerrados.
-    rowC.appendChild(chip(state.mostrarTodos ? "👁 mostrando ao vivo/encerrados" : "👁 ver ao vivo/encerrados", state.mostrarTodos, "", function () {
+    if (!oddsOnly) rowC.appendChild(chip(state.mostrarTodos ? "👁 mostrando ao vivo/encerrados" : "👁 ver ao vivo/encerrados", state.mostrarTodos, "", function () {
       state.mostrarTodos = !state.mostrarTodos;
       render();
     }));
     var ords = [["valor", "＄ mais valor"], ["horario", "⏱ horário"], ["casas", "🏦 nº de casas"]];
     ords.forEach(function (o) {
+      if (valueUnavailable && o[0] === "valor") return;
       rowC.appendChild(chip(o[1], state.ordem === o[0], "ord", function () {
         state.ordem = o[0]; saveFilt(); render();
       }));
@@ -182,6 +214,7 @@
   }
 
   function valsOf(j) {
+    if (valueUnavailable) return [];
     return (j.valor || []).filter(function (v) {
       if (state.mercado !== "todos" && v.mercado !== state.mercado) return false;
       if (state.casa !== "todas" && !sameCasa(v.casa, state.casa)) return false;
@@ -190,6 +223,7 @@
   }
 
   function passa(j) {
+    if (!contingencyEligible(j)) return false;
     if (!marketsOf(j).length) return false;
     // §13 — "só próximos" usa o estado calculado AO VIVO (não o game_state congelado do build):
     // um jogo que começou depois da captura sai da lista sem esperar rebuild.
@@ -246,6 +280,7 @@
   // casas e cada uma tem que mostrar sua própria marca (antes só a última casa era marcada).
   function valMap(j) {
     var m = {};   // "mercado|linha|lado" -> { casa: v }
+    if (valueUnavailable) return m;
     (j.valor || []).forEach(function (v) {
       var k = v.mercado + "|" + v.linha + "|" + v.lado;
       (m[k] = m[k] || {})[v.casa] = v;
@@ -396,7 +431,7 @@
     var home = times.home || null;
     var away = times.away || null;
 
-    var vals = (j.valor || []).filter(function (v) {
+    var vals = valsOf(j).filter(function (v) {
       if (v.mercado !== mercado) return false;
       if (state.casa !== "todas" && !sameCasa(v.casa, state.casa)) return false;
       return true;
@@ -462,7 +497,7 @@
     var frCard = freshness();
     var gs = liveGameState(j);
     var gsLabel = { upcoming: "próximo", started: "iniciado", finished: "encerrado", unknown: "sem horário" }[gs] || gs;
-    var valActionable = gs === "upcoming" && !frCard.stale;
+    var valActionable = !valueUnavailable && gs === "upcoming" && !frCard.stale;
     var staleCasas = {};
     (j.stale_casas || []).forEach(function (c) { staleCasas[c] = 1; });
     var mkts = marketsOf(j);
@@ -507,7 +542,7 @@
     var casas = nCasasDo(j);
     var vals = valsOf(j);
     var bestEv = topEv(j);
-    var valActionable = gs === "upcoming" && !frCard.stale;
+    var valActionable = !valueUnavailable && gs === "upcoming" && !frCard.stale;
 
     var pills = mkts.map(function (m) {
       var perCasa = filterCasas((j.mercados && j.mercados[m]) || {});
@@ -560,6 +595,7 @@
     }
     if (state.expanded[key]) fill();
     function toggle() {
+      if (!contingencyEligible(j)) { render(); return; }
       var open = !state.expanded[key];
       state.expanded[key] = open;
       if (open) fill();
@@ -584,6 +620,17 @@
   // §20 (Lote D): chrome barato (banner de idade + meta/frescor + status de captura) — pode
   // rodar no timer sem tocar na lista de jogos.
   function renderChrome(vis, fr) {
+    var contingencyEl = document.getElementById("contingency-banner");
+    if (contingencyEl) {
+      contingencyEl.hidden = !oddsOnly;
+      if (oddsOnly) {
+        contingencyEl.innerHTML = '<b>Modo contingência — somente odds capturadas; cálculos de valor indisponíveis.</b>' +
+          '<br>O calendário do Sofascore está indisponível. Jogos e horários vêm diretamente das casas, sem associação entre fontes.' +
+          '<br>Captura mais antiga incluída: <b>' + esc(B.gerado || B.gerado_iso || "não informada") + '</b> (' + esc(fr.txt) + '). ' +
+          'As linhas são retiradas em até 120 minutos após a captura ou quando o jogo começa.' +
+          '<br>Confira a disponibilidade na casa: mercados podem ser retirados, inclusive por suspensão da operação. Uma captura não garante que a aposta possa ser feita.';
+      }
+    }
     // P0.4 — banner de board velha (≥8h vermelho, ≥12h crítico)
     var ageEl = document.getElementById("boardage");
     if (ageEl) {
@@ -611,7 +658,7 @@
       (!state.mostrarTodos ? " (só próximos)" : "") +
       " · " + esc(Object.keys(nCasas).join(", ") || "—") +
       ' · <span class="fresh fresh-' + fr.band + (fr.stale ? " stale" : "") + '">' +
-      '<span class="fresh-dot ' + fr.band + '"></span> mesa gerada ' + esc(fr.txt) +
+      '<span class="fresh-dot ' + fr.band + '"></span> ' + (oddsOnly ? "captura mais antiga " : "mesa gerada ") + esc(fr.txt) +
       (fr.stale ? " ⚠ (pode estar defasado)" : "") + "</span>" +
       ' · <span class="meta-hint">clique no jogo pra expandir</span>';
 
@@ -690,6 +737,11 @@
   };
 
   function vazioHTML() {
+    if (oddsOnly) {
+      return '<div class="empty"><div class="big">📭</div>Sem odds recentes verificadas com estes filtros.' +
+        '<br><span style="font-size:12px">Linhas vencidas, jogos iniciados ou capturas sem horário verificável ficam ocultos. ' +
+        'Isso não comprova ausência de mercados nas casas; aguarde nova captura ou confira diretamente na casa.</span></div>';
+    }
     var mkt = state.mercado, casa = state.casa;
     var reg = FONTE_SEM[casa];
     if (reg && mkt !== "todos" && reg.mercados.indexOf(mkt) >= 0) {
@@ -733,7 +785,7 @@
   if (sub) {
     sub.innerHTML = "Uma linha por jogo — <b>clique pra expandir</b> as linhas do jogo, do mandante e do visitante por casa. " +
       "Filtre por <b>mercado</b> e por <b>casa</b> (os filtros combinam e ficam salvos). " +
-      "Onde há modelo: <b style=\"color:var(--green)\">valor (+EV)</b>.";
+      (valueUnavailable ? "<b>Cálculos de valor temporariamente indisponíveis.</b>" : "Onde há modelo: <b style=\"color:var(--green)\">valor (+EV)</b>.");
   }
   var disc = document.querySelector("#view-board .disc");
   if (disc) {
@@ -741,9 +793,9 @@
       "Linhas de time só quando a casa publica (ex.: Superbet Fin / Betano Cartões).";
   }
 
-  window.setInterval(function () {
+  function refreshVisible() {
     var view = document.getElementById("view-board");
-    if (!view || view.hidden) return;
+    if (!view || (view.hidden && !oddsOnly)) return;
     // §20 (Lote D): não reconstruir a lista inteira a cada minuto. O chrome (idade/frescor)
     // atualiza sempre (barato); a lista só é reconstruída quando o conjunto visível muda
     // (algum jogo cruzou o kickoff, mudou a banda de frescor ou o filtro).
@@ -757,7 +809,15 @@
       render();
       if (typeof window.scrollTo === "function") window.scrollTo(sx, sy);
     }
-  }, 60000);
+  }
+  window.refreshMesaBoard = refreshVisible;
+  window.setInterval(refreshVisible, 60000);
+  if (typeof document.addEventListener === "function") {
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) refreshVisible();
+    });
+  }
+  if (typeof window.addEventListener === "function") window.addEventListener("focus", refreshVisible);
 
   // P0.2 — badge honesto do modelo (candidate vs produção). Regra única, sem mentir:
   // source candidate_pricer → CANDIDATE (mesmo com status "promoted" no board);
@@ -766,6 +826,8 @@
     model = model || (window.BOARD && window.BOARD.model) || {};
     var src = String(model.source || "").toLowerCase();
     var st = String(model.status || "").toLowerCase();
+    if (oddsOnly || st === "unavailable")
+      return { label: oddsOnly ? "SOMENTE ODDS" : "MODELO INDISPONÍVEL", cls: "mdl-unk", title: "Cálculos de valor desativados: dados do modelo não disponíveis nesta atualização." };
     if (st.indexOf("shadow") === 0 || src.indexOf("shadow") >= 0)
       return { label: "SHADOW", cls: "mdl-shadow", title: "Modelo em sombra — não usar para decisão." };
     if (src.indexOf("candidate") >= 0)
@@ -782,6 +844,18 @@
     el.textContent = mb.label;
     el.title = mb.title;
   })();
+
+  if (valueUnavailable) {
+    var valueTab = document.querySelector('[data-view="valor"]');
+    if (valueTab) {
+      valueTab.textContent = "Valor (+EV) · indisponível";
+      valueTab.title = "Abra para ver o motivo da indisponibilidade dos cálculos de valor.";
+    }
+  }
+  if (oddsOnly) {
+    var tagline = document.getElementById("mesa-tagline");
+    if (tagline) tagline.textContent = "Rei do Under · odds capturadas";
+  }
 
   render();
 })();

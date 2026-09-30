@@ -47,6 +47,14 @@ def _ts_of(name, data, file_path):
     """Timestamp do artefato: gerado_iso quando existe (board/ops/history/openclose),
     senão o mtime do arquivo (moves.js não carimba). Retorna datetime aware (BRT)."""
     g = artifact_gerado(name, data)
+    if name == "board" and data.get("mode") == "odds_only":
+        # Build coherence uses assembly time; quote freshness stays gerado_iso
+        # and is independently checked against raw source in gate/deploy.
+        g = data.get("rebuilt_at")
+        dt = datetime.fromisoformat(str(g).replace("Z", "+00:00"))
+        if dt.utcoffset() is None:
+            raise ValueError("board odds_only: rebuilt_at sem fuso")
+        return dt.astimezone(BRT)
     dt = parse_iso_flex(g, default_tz=BRT) if g else None
     if dt is None:
         dt = datetime.fromtimestamp(file_path.stat().st_mtime, tz=BRT)
@@ -97,7 +105,11 @@ def main():
         except Exception as e:
             problems.append(f"artefato ilegível {rel}: {type(e).__name__}: {e}")
             continue
-        ts = _ts_of(name, data, f)
+        try:
+            ts = _ts_of(name, data, f)
+        except (ValueError, TypeError) as exc:
+            problems.append(f"relógio inválido {rel}: {exc}")
+            continue
         tstamps[name] = ts
         artifacts[rel] = {
             "name": name,

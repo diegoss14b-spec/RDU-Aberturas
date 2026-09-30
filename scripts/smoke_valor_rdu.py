@@ -66,7 +66,12 @@ def main():
         _, braw = get(f"{base}/data/board.js?{cb}")
         board = json.loads(braw.split("=", 1)[1].strip().rstrip(";"))
         n = len(board.get("jogos") or [])
-        if n < 20: fails.append(f"board com só {n} jogos (stub tinha 20 velhos; app real ~150+)")
+        if board.get("mode") == "odds_only":
+            from contingency_runtime import public_odds_only_reasons
+            fails.extend(public_odds_only_reasons(board))
+            max_age = min(max_age, 120)
+        elif n < 20:
+            fails.append(f"board com só {n} jogos (stub tinha 20 velhos; app real ~150+)")
         import datetime as dt
         stamp = board.get("gerado_iso") or board.get("gerado")
         parsed = dt.datetime.fromisoformat(str(stamp).replace("Z", "+00:00")) if "T" in str(stamp) \

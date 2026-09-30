@@ -308,7 +308,7 @@ def test_aplica_com_index_ja_staged_o_retry_do_persist(repos):
 STUBS_PIPELINE = ["migrate_history_keys.py", "history_ingest.py", "history_close.py",
                   "history_settle.py", "build_model_ledger.py", "build_history.py",
                   "build_moves.py", "build_openclose.py", "build_ops.py",
-                  "build_board.py", "build_manifest.py"]
+                  "build_board.py", "build_manifest.py", "gate_board.py"]
 
 
 def prepara_persist(r, corrida_no_push=False):
@@ -360,6 +360,10 @@ def prepara_persist(r, corrida_no_push=False):
         if s == "history_ingest.py":   # o pipeline de verdade regenera os ticks sobre a base nova
             corpo += "open('data/odds_history/ticks/2026-09-05.jsonl','a').write('{\"tick\":\"reingest\"}\\n')\n"
         (ci / s).write_text(corpo)
+    # New publication guard is separate from expensive history re-ingest.
+    # Its real source validation is covered in test_contingency_runtime/test_odds_only.
+    (ci / "contingency_runtime.py").write_text(
+        "open('_contingency_check.log','a').write('validated current source\\n')\n")
     return env
 
 
@@ -462,6 +466,7 @@ def test_persist_sh_caso_A_full_pointer_do_feeder_vence_o_da_nuvem(repos):
     rc, log = roda_persist(r, env, mode="full", gate="success")
     assert rc == 0, log
     assert "avanço só do feeder: 5 arquivos" in log and not (r["ci"] / "_reingest.log").exists()
+    assert (r["ci"] / "_contingency_check.log").exists()
     bare, e = r["bare"], r["env"]
     assert "pinnacle_full_ccc" in le_no_main(bare, "data/odds/pinnacle_latest_full.json", e)   # feeder venceu
     assert le_no_main(bare, "data/odds/_snapshots/pinnacle_full_aaa.jsonl", e) is None

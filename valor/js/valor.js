@@ -107,6 +107,14 @@
     var root = document.getElementById("view-valor");
     if (!root) return;
     var B = window.BOARD || {};
+    if (B.mode === "odds_only" || (B.model && B.model.status === "unavailable")) {
+      // Também impede que um payload misto/antigo reexiba sinais +EV na contingência.
+      root.innerHTML = '<div class="disc" role="status"><b>Cálculos de valor temporariamente indisponíveis.</b>' +
+        '<br>O calendário e os dados necessários do Sofascore não estão disponíveis para validar os modelos.' +
+        ' A Mesa de Aberturas mostra apenas odds capturadas recentemente nas casas, sem probabilidades, odds justas ou indicações +EV.' +
+        '<br>Os cálculos só voltam após uma atualização completa validada.</div>';
+      return;
+    }
     var bets = [];
     (B.jogos || []).forEach(function (j) {
       (j.valor || []).forEach(function (v) {

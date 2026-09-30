@@ -162,6 +162,10 @@ jobs:
     timeout-minutes: 75
     env:
       MODE: ${{ needs.gate.outputs.mode }}
+      # Temporary explicit hold: remove only after audited Sofa/calendar recovery.
+      # No +EV; raw quote TTL remains 120 min and the full-mode 12h gate is unchanged.
+      MESA_ODDS_ONLY: '1'
+      MERCADOS_OFF: ${{ vars.MERCADOS_OFF || 'escanteios' }}
     steps:
       # ref: main → pega o TIP ATUAL do main ao INICIAR o job, não o github.sha congelado
       # no agendamento. Sem isso, uma rodada enfileirada nasce com base velha e vê o commit
@@ -200,6 +204,10 @@ jobs:
       # BLOQUEANTE (sem continue-on-error): teste vermelho não vira snapshot
       # nem deploy.
       - name: Testes (bloqueia o ciclo se algum falhar)
+        env:
+          # Test both normal and contingency contracts independently of operations.
+          MESA_ODDS_ONLY: '0'
+          MERCADOS_OFF: ''
         run: python -m pytest test_*.py -q
 
       # 21/08: SEMPRE instalar (com cache quente é ~5-10s de verificação). O "só no
@@ -278,7 +286,7 @@ jobs:
       # filtrado da janela curta NÃO deve substituir o board cheio do site)
       - name: Montar o board
         id: board
-        if: env.MODE == 'full' && steps.capture.outcome == 'success'
+        if: env.MODE == 'full' && (steps.capture.outcome == 'success' || env.MESA_ODDS_ONLY == '1')
         env:
           # 21/08: o corte de mercados (opção A do Diego: escanteios fora em TODAS as
           # casas) é aplicado na NORMALIZAÇÃO do build_board — superbet/7k/estrela
@@ -297,7 +305,7 @@ jobs:
 
       - name: Gate de qualidade
         id: gate
-        if: env.MODE == 'full' && steps.capture.outcome == 'success'
+        if: env.MODE == 'full' && steps.board.outcome == 'success' && (steps.capture.outcome == 'success' || env.MESA_ODDS_ONLY == '1')
         continue-on-error: true
         run: python gate_board.py
 
@@ -305,7 +313,7 @@ jobs:
       # Falha aqui = build misturado/stale → deploy bloqueado (não publica meio-build).
       - name: Manifesto atômico do build
         id: manifest
-        if: env.MODE == 'full' && steps.capture.outcome == 'success' && steps.board.outcome == 'success'
+        if: env.MODE == 'full' && steps.board.outcome == 'success' && (steps.capture.outcome == 'success' || env.MESA_ODDS_ONLY == '1')
         continue-on-error: true
         run: python build_manifest.py
 
@@ -331,7 +339,7 @@ jobs:
         id: deploy
         if: >-
           env.MODE == 'full' &&
-          steps.capture.outcome == 'success' &&
+          (steps.capture.outcome == 'success' || env.MESA_ODDS_ONLY == '1') &&
           steps.board.outcome == 'success' &&
           steps.ops.outcome == 'success' &&
           steps.gate.outcome == 'success' &&

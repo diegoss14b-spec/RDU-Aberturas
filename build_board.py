@@ -363,6 +363,20 @@ def game_state(inicio_str, now=None):
 
 
 def main():
+    from contingency_runtime import contingency_reasons
+    source_problems = contingency_reasons()
+    if source_problems:
+        from odds_only import build_odds_only, odds_only_reasons
+        from capture_common import _atomic_write_text
+        board = build_odds_only(ROOT, reason="; ".join(source_problems))
+        problems = odds_only_reasons(board, ROOT)
+        if problems:
+            raise ValueError("Contingência recusada: " + "; ".join(problems))
+        outdir = ROOT / "valor/data"
+        outdir.mkdir(parents=True, exist_ok=True)
+        _atomic_write_text(outdir / "board.js", "window.BOARD=" + json.dumps(board, ensure_ascii=False) + ";")
+        print(f"[board] SOMENTE ODDS: {len(board['jogos'])} ofertas · sem modelos/+EV · TTL 120 min")
+        return
     baseline_status, baseline_source = "baseline", "value_pricers"
     if FORCE_LEGACY:
         # rollback de emergência: modelos antigos no board
