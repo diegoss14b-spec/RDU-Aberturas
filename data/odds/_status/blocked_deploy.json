@@ -1,24 +1,25 @@
 {
- "ts_brt": "2026-09-29 21:37",
+ "ts_brt": "2026-09-29 22:10",
  "reasons": [
-  "SofaScore defasado: 66.9h > 12h"
+  "SofaScore defasado: 67.4h > 12h"
  ],
  "now": {
-  "n_games": 49,
-  "sofa_games": 24,
-  "sofa_pct": 48.97959183673469,
-  "value_games": 16,
-  "value_sofa": 16,
+  "n_games": 50,
+  "sofa_games": 25,
+  "sofa_pct": 50.0,
+  "value_games": 15,
+  "value_sofa": 15,
   "value_sofa_pct": 100.0,
   "houses": {
-   "Betano": 8,
-   "Superbet": 13,
-   "EstrelaBet": 19,
-   "bet365": 22,
-   "7k": 31
+   "Superbet": 12,
+   "EstrelaBet": 22,
+   "Pinnacle": 1,
+   "bet365": 24,
+   "7k": 32,
+   "Betano": 8
   },
   "markets": {
-   "Cartões": 41,
+   "Cartões": 42,
    "Chutes no gol": 33,
    "Finalizações": 31,
    "Impedimentos": 14,
@@ -28,29 +29,29 @@
    "Desarmes": 3
   },
   "house_markets": {
-   "Betano": {
-    "Cartões": 8
-   },
    "Superbet": {
-    "Cartões": 39,
+    "Cartões": 36,
     "Chutes no gol": 3,
     "Finalizações": 3
    },
    "EstrelaBet": {
-    "Cartões": 40,
-    "Chutes no gol": 7,
-    "Finalizações": 7,
     "Impedimentos": 5,
-    "Faltas": 2
+    "Finalizações": 13,
+    "Chutes no gol": 11,
+    "Faltas": 2,
+    "Cartões": 43
+   },
+   "Pinnacle": {
+    "Cartões": 3
    },
    "bet365": {
     "Cartões": 24,
-    "Chutes no gol": 60,
-    "Finalizações": 60,
+    "Chutes no gol": 65,
+    "Finalizações": 66,
     "Desarmes": 3
    },
    "7k": {
-    "Cartões": 75,
+    "Cartões": 78,
     "Faltas": 37,
     "Chutes no gol": 60,
     "Impedimentos": 37,
@@ -58,6 +59,9 @@
     "Tiros de meta": 11,
     "Laterais": 11,
     "Desarmes": 9
+   },
+   "Betano": {
+    "Cartões": 12
    }
   }
  },
@@ -145,8 +149,8 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-09-30T00:12:49Z",
-  "ts_brt": "2026-09-29 21:12",
+  "ts_utc": "2026-09-30T00:49:05Z",
+  "ts_brt": "2026-09-29 21:49",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -156,8 +160,8 @@
   "pointer_file": "_snapshots/sofa_4d2e9450d341f0f0736b.json",
   "pointer_at": "2026-09-27T02:45:07-03:00",
   "pointer_n": 273,
-  "pointer_age_h": 66.87357096638888,
-  "duration_sec": 15.3,
+  "pointer_age_h": 67.42276384416667,
+  "duration_sec": 15.2,
   "error": "snapshot não saudável: n=0, mínimo=69; fallback preservado n=273; transporte req=1 proxy=1 direto=0 http=403:1 ultimo=HTTP 403 via proxy circuito=1 falhas=BR-A,BR-B,BR-CdB,WC,UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Eliteserien,Libertadores,Sud",
   "error_class": "Geo",
   "transport": {
@@ -247,8 +251,8 @@
    "inactive_tournaments": []
   },
   "attempted": true,
-  "attempt_started_epoch": 1790727153.9195743,
-  "attempt_finished_epoch": 1790727169.3627667,
+  "attempt_started_epoch": 1790729330.596614,
+  "attempt_finished_epoch": 1790729345.9392798,
   "source_state": "failed"
  },
  "model": {
@@ -269,7 +273,7 @@
   },
   "freshness": {
    "schema": 1,
-   "checked_at": "2026-09-30T00:37:30+00:00",
+   "checked_at": "2026-09-30T01:10:27+00:00",
    "bundle_version": "2026-09-21",
    "bundle_generated_at": "2026-09-26T00:47:10-03:00",
    "rdu_version": "2026-09-21",
@@ -285,7 +289,7 @@
    "generated_at": "2026-09-25 21:30",
    "count": 47,
    "max_age_hours": 48.0,
-   "age_hours": 96.1,
+   "age_hours": 96.7,
    "stale": true
   },
   "n_block_model": 0
