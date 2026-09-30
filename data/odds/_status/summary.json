@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-09-30T16:18:39Z",
- "ts_brt": "2026-09-30 13:18",
+ "ts_utc": "2026-09-30T17:18:38Z",
+ "ts_brt": "2026-09-30 14:18",
  "casas_ok": [
   "betano",
   "superbet",
@@ -23,35 +23,35 @@
  ],
  "n_ok": 4,
  "n_fail": 3,
- "total_events": 221,
+ "total_events": 211,
  "per_casa": {
   "betano": {
    "ok": true,
    "n_events": 60,
    "n_markets": 2,
    "market_counts": {
-    "Cartões": 8,
-    "Escanteios": 33
+    "Cartões": 7,
+    "Escanteios": 29
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-09-30_1311.jsonl",
+   "pointer_file": "betano_2026-09-30_1411.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-30T16:18:38Z"
+   "ts_utc": "2026-09-30T17:18:37Z"
   },
   "superbet": {
    "ok": true,
-   "n_events": 91,
+   "n_events": 81,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 25,
+    "Cartões": 22,
     "Chutes no gol": 6,
     "Desarmes": 4,
-    "Escanteios": 91,
+    "Escanteios": 81,
     "Faltas": 5,
     "Finalizações": 10,
     "Impedimentos": 5,
@@ -59,14 +59,14 @@
     "Tiros de meta": 4
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-09-30_131115_187899_5836_1790784675657713081.jsonl",
+   "pointer_file": "superbet_2026-09-30_141112_614453_5815_1790788272943775592.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-30T16:11:42Z"
+   "ts_utc": "2026-09-30T17:11:34Z"
   },
   "estrelabet": {
    "ok": true,
@@ -85,8 +85,8 @@
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": true,
-   "skipped_reason": null,
+   "attempted": false,
+   "skipped_reason": "full_stride",
    "mode": "full",
    "ts_utc": "2026-09-30T16:11:55Z"
   },
@@ -110,32 +110,32 @@
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": true,
-   "skipped_reason": null,
+   "attempted": false,
+   "skipped_reason": "full_stride",
    "mode": "full",
    "ts_utc": "2026-09-30T16:14:39Z"
   },
   "pinnacle": {
    "ok": false,
-   "n_events": 38,
+   "n_events": 40,
    "n_markets": 2,
    "market_counts": {
     "Cartões": 6,
-    "Escanteios": 38
+    "Escanteios": 40
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-09-30_1250.jsonl",
+   "pointer_file": "pinnacle_2026-09-30_1400.jsonl",
    "error": null,
    "source_state": "protected_feed",
    "error_class": null,
    "attempted": false,
    "skipped_reason": "local_feed_fresh",
    "mode": "full",
-   "ts_utc": "2026-09-30T15:51:18Z"
+   "ts_utc": "2026-09-30T17:01:30Z"
   },
   "bet365": {
    "ok": false,
-   "n_events": 77,
+   "n_events": 97,
    "n_markets": 0,
    "market_counts": {},
    "pointer_valid": false,
@@ -146,7 +146,7 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-30T16:18:15Z"
+   "ts_utc": "2026-09-30T17:18:13Z"
   },
   "sportingbet": {
    "ok": false,
@@ -161,14 +161,14 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-09-30T16:18:39Z"
+   "ts_utc": "2026-09-30T17:18:38Z"
   }
  },
  "market_counts": {
-  "Cartões": 96,
+  "Cartões": 92,
   "Chutes no gol": 33,
   "Desarmes": 12,
-  "Escanteios": 193,
+  "Escanteios": 179,
   "Faltas": 23,
   "Finalizações": 36,
   "Impedimentos": 24,
@@ -179,8 +179,8 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-09-30T16:11:32Z",
-  "ts_brt": "2026-09-30 13:11",
+  "ts_utc": "2026-09-30T17:11:27Z",
+  "ts_brt": "2026-09-30 14:11",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -190,7 +190,7 @@
   "pointer_file": "_snapshots/sofa_4d2e9450d341f0f0736b.json",
   "pointer_at": "2026-09-27T02:45:07-03:00",
   "pointer_n": 273,
-  "pointer_age_h": 82.44,
+  "pointer_age_h": 83.439,
   "duration_sec": 15.3,
   "error": "snapshot não saudável: n=0, mínimo=69; fallback preservado n=273; transporte req=1 proxy=1 direto=0 http=403:1 ultimo=HTTP 403 via proxy recusa=403:challenge@proxy circuito=1 causa=recusa_destino nao_consultados=71 esquema=0 falhas=BR-A inativos=-",
   "error_class": "recusa_destino",
@@ -295,7 +295,7 @@
     "body_len": 48,
     "sha256_16": "8daa84ee218857a4",
     "reason": "challenge",
-    "ts_utc": "2026-09-30T16:11:17Z"
+    "ts_utc": "2026-09-30T17:11:13Z"
    },
    "last_exception": null,
    "schema_misses": []
@@ -308,8 +308,8 @@
    "headers_sha16": "4aff973acb161360"
   },
   "attempted": true,
-  "attempt_started_epoch": 1790784676.7097898,
-  "attempt_finished_epoch": 1790784692.2550652,
+  "attempt_started_epoch": 1790788272.4198036,
+  "attempt_finished_epoch": 1790788287.9232621,
   "source_state": "failed"
  },
  "deploy_allowed": true,
