@@ -1,32 +1,55 @@
 {
- "ts_brt": "2026-09-30 06:54",
+ "ts_brt": "2026-09-30 07:36",
  "reasons": [
-  "SofaScore defasado: 76.1h > 12h"
+  "SofaScore defasado: 76.9h > 12h"
  ],
  "now": {
-  "n_games": 35,
-  "sofa_games": 16,
-  "sofa_pct": 45.714285714285715,
-  "value_games": 6,
-  "value_sofa": 6,
+  "n_games": 51,
+  "sofa_games": 24,
+  "sofa_pct": 47.05882352941177,
+  "value_games": 16,
+  "value_sofa": 16,
   "value_sofa_pct": 100.0,
   "houses": {
    "Superbet": 10,
+   "EstrelaBet": 22,
+   "7k": 32,
    "Pinnacle": 5,
    "bet365": 26,
    "Betano": 7
   },
   "markets": {
-   "Cartões": 19,
-   "Chutes no gol": 24,
-   "Finalizações": 25,
-   "Desarmes": 1
+   "Cartões": 44,
+   "Chutes no gol": 31,
+   "Finalizações": 30,
+   "Impedimentos": 15,
+   "Faltas": 14,
+   "Laterais": 6,
+   "Tiros de meta": 6,
+   "Desarmes": 3
   },
   "house_markets": {
    "Superbet": {
     "Cartões": 30,
     "Chutes no gol": 3,
     "Finalizações": 3
+   },
+   "EstrelaBet": {
+    "Impedimentos": 5,
+    "Finalizações": 15,
+    "Chutes no gol": 13,
+    "Faltas": 2,
+    "Cartões": 38
+   },
+   "7k": {
+    "Cartões": 79,
+    "Faltas": 38,
+    "Chutes no gol": 57,
+    "Impedimentos": 38,
+    "Finalizações": 45,
+    "Laterais": 12,
+    "Tiros de meta": 12,
+    "Desarmes": 9
    },
    "Pinnacle": {
     "Cartões": 15
@@ -126,8 +149,8 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-09-30T09:22:35Z",
-  "ts_brt": "2026-09-30 06:22",
+  "ts_utc": "2026-09-30T10:12:04Z",
+  "ts_brt": "2026-09-30 07:12",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -137,8 +160,8 @@
   "pointer_file": "_snapshots/sofa_4d2e9450d341f0f0736b.json",
   "pointer_at": "2026-09-27T02:45:07-03:00",
   "pointer_n": 273,
-  "pointer_age_h": 76.1466943925,
-  "duration_sec": 15.9,
+  "pointer_age_h": 76.86125290083334,
+  "duration_sec": 15.4,
   "error": "snapshot não saudável: n=0, mínimo=69; fallback preservado n=273; transporte req=1 proxy=1 direto=0 http=403:1 ultimo=HTTP 403 via proxy circuito=1 falhas=BR-A,BR-B,BR-CdB,WC,UCL,UEL,EPL,LaLiga,SerieA,Bundesliga,Ligue1,MLS,Argentina,CSL,Allsvenskan,Uruguay,Ecuador,Russia,Eliteserien,Libertadores,Sud",
   "error_class": "Geo",
   "transport": {
@@ -228,8 +251,8 @@
    "inactive_tournaments": []
   },
   "attempted": true,
-  "attempt_started_epoch": 1790760139.7548726,
-  "attempt_finished_epoch": 1790760155.9202292,
+  "attempt_started_epoch": 1790763109.1425872,
+  "attempt_finished_epoch": 1790763124.685322,
   "source_state": "failed"
  },
  "model": {
@@ -250,7 +273,7 @@
   },
   "freshness": {
    "schema": 1,
-   "checked_at": "2026-09-30T09:53:53+00:00",
+   "checked_at": "2026-09-30T10:36:46+00:00",
    "bundle_version": "2026-09-21",
    "bundle_generated_at": "2026-09-26T00:47:10-03:00",
    "rdu_version": "2026-09-21",
@@ -266,7 +289,7 @@
    "generated_at": "2026-09-25 21:30",
    "count": 47,
    "max_age_hours": 48.0,
-   "age_hours": 105.4,
+   "age_hours": 106.1,
    "stale": true
   },
   "n_block_model": 0
