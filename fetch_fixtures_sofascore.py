@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Calendário canônico SofaScore com promoção e fallback atômicos/observáveis."""
-import sys, os, json, time, math
+import sys, os, json, time, math, hashlib, re
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlsplit
 if sys.stdout is None or not hasattr(sys.stdout, "write"):
     sys.stdout = open(os.devnull, "w")
 try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -130,6 +131,10 @@ def _reset_get_diag():
         "requests": 0, "proxy_attempts": 0, "direct_attempts": 0,
         "statuses": {}, "last_error": None, "consecutive_failures": 0,
         "circuit_open": False, "failed_tournaments": [], "inactive_tournaments": [],
+        # D11 (30/09) — só observabilidade, nenhuma requisição a mais:
+        "skipped_after_circuit": [], "failure_classes": {}, "circuit_cause": None,
+        "last_attempt_class": None, "last_refusal": None, "last_exception": None,
+        "schema_misses": [],
     })
 
 
@@ -142,20 +147,238 @@ def _diag_snapshot():
         "last_error": _GET_DIAG.get("last_error"),
         "consecutive_failures": int(_GET_DIAG.get("consecutive_failures") or 0),
         "circuit_open": bool(_GET_DIAG.get("circuit_open")),
+        "circuit_cause": _GET_DIAG.get("circuit_cause"),
         "failed_tournaments": list(_GET_DIAG.get("failed_tournaments") or []),
+        "failure_classes": dict(_GET_DIAG.get("failure_classes") or {}),
+        "skipped_after_circuit": list(_GET_DIAG.get("skipped_after_circuit") or []),
         "inactive_tournaments": list(_GET_DIAG.get("inactive_tournaments") or []),
+        "last_refusal": dict(_GET_DIAG["last_refusal"]) if _GET_DIAG.get("last_refusal") else None,
+        "last_exception": dict(_GET_DIAG["last_exception"]) if _GET_DIAG.get("last_exception") else None,
+        "schema_misses": [dict(m) for m in (_GET_DIAG.get("schema_misses") or [])],
     }
 
 
 def _diag_text():
     d = _diag_snapshot()
     statuses = ",".join(f"{k}:{v}" for k, v in sorted(d["statuses"].items())) or "nenhum"
+    lr = d.get("last_refusal") or {}
+    recusa = f"{lr.get('status')}:{lr.get('reason') or '-'}@{lr.get('rota')}" if lr else "-"
     return (
         f"req={d['requests']} proxy={d['proxy_attempts']} direto={d['direct_attempts']} "
-        f"http={statuses} ultimo={d['last_error'] or '-'} "
-        f"circuito={int(d['circuit_open'])} falhas={','.join(d['failed_tournaments']) or '-'} "
+        f"http={statuses} ultimo={d['last_error'] or '-'} recusa={recusa} "
+        f"circuito={int(d['circuit_open'])} causa={d.get('circuit_cause') or '-'} "
+        f"nao_consultados={len(d.get('skipped_after_circuit') or [])} "
+        f"esquema={len(d.get('schema_misses') or [])} "
+        f"falhas={','.join(d['failed_tournaments']) or '-'} "
         f"inativos={','.join(d.get('inactive_tournaments') or []) or '-'}"
     )
+
+
+# ── D11 (30/09/2026): observabilidade da recusa. Até aqui o corpo só era lido no
+# 200, então o 403 {"error":{"reason":"challenge"}} medido no Mac nunca apareceu no
+# log do GitHub, e o status rotulava tudo como 'Geo' (classify_error), sem prova de
+# geobloqueio. Nada abaixo faz requisição, muda rota, headers, impersonate,
+# tentativas ou o disjuntor: só descreve a resposta que JÁ chegou. Segredo nunca
+# entra: endpoint sem query e sem userinfo, exceção só com o NOME do tipo.
+_REASON_STRIP = re.compile(r"[^a-z0-9_ -]")
+_HEADER_STRIP = re.compile(r"[^\x20-\x7e]")
+_BODY_JSON_MAX = 65536   # corpo maior que isto não é o JSON curto de erro da Sofa
+
+
+def _rota(mode):
+    return "direto" if mode == "direct" else mode
+
+
+def _endpoint(url):
+    """host + caminho, sem query/fragmento/usuário/porta."""
+    try:
+        p = urlsplit(str(url))
+        return f"{p.hostname or ''}{p.path}"[:200] or None
+    except Exception:
+        return None
+
+
+def _sanitize_reason(value):
+    if not isinstance(value, str):
+        return None
+    txt = _REASON_STRIP.sub("", value.lower()).strip()[:40].strip()
+    return txt or None
+
+
+def _header(r, name):
+    try:
+        h = getattr(r, "headers", None)
+        v = (h.get(name) or h.get(name.title())) if h is not None else None
+    except Exception:
+        return None
+    if not isinstance(v, str):
+        return None
+    v = _HEADER_STRIP.sub("", v).strip()[:80]
+    return v or None
+
+
+def _body_bytes(r):
+    raw = getattr(r, "content", None)
+    if isinstance(raw, (bytes, bytearray)):
+        return bytes(raw)
+    txt = getattr(r, "text", "")
+    return txt.encode("utf-8", "replace") if isinstance(txt, str) else b""
+
+
+def _refusal_reason(raw):
+    """error.reason do JSON de erro da Sofa ({"error":{"code":403,"reason":"challenge"}})."""
+    if not raw or len(raw) > _BODY_JSON_MAX or raw.lstrip()[:1] != b"{":
+        return None
+    try:
+        obj = json.loads(raw.decode("utf-8", "replace"))
+    except Exception:
+        return None
+    err = obj.get("error") if isinstance(obj, dict) else None
+    return _sanitize_reason(err.get("reason")) if isinstance(err, dict) else None
+
+
+def _status_class(status, reason):
+    """Classe de uma resposta HTTP não aproveitada. Própria da Sofa: as casas seguem
+    com capture_common.classify_error, sem mudança."""
+    if status in (401, 403):
+        # com error.reason no corpo, quem recusou foi o DESTINO (formato de erro da
+        # API da Sofa); sem motivo legível a origem não está provada → recusa_http.
+        return "recusa_destino" if reason else "recusa_http"
+    if status == 407:
+        return "proxy_erro"
+    if status == 429:
+        return "limite_429"
+    if status == 404:
+        return "nao_encontrado"
+    if status == 200:
+        return "schema"          # 200 que não é JSON (ex.: página HTML)
+    return "transporte"
+
+
+def _exception_class(exc):
+    names = " ".join(k.__name__ for k in type(exc).__mro__).lower()
+    if "proxy" in names:
+        return "proxy_erro"
+    if "timeout" in names:
+        return "timeout"
+    if "ssl" in names:
+        return "tls"
+    if "jsondecodeerror" in names:
+        return "schema"
+    return "transporte"
+
+
+def _record_refusal(r, status, mode, url):
+    """Registra a última resposta não aproveitada. Nunca levanta: uma exceção aqui
+    cairia no except do get() e viraria tentativa extra — proibido."""
+    rec = {"status": status, "rota": _rota(mode), "classe": _status_class(status, None)}
+    try:
+        raw = _body_bytes(r)
+        reason = _refusal_reason(raw)
+        rec.update({
+            "endpoint": _endpoint(url),
+            "content_type": _header(r, "content-type"),
+            "server": _header(r, "server"),
+            "body_len": len(raw),
+            "sha256_16": hashlib.sha256(raw).hexdigest()[:16],
+            "reason": reason,
+            "classe": _status_class(status, reason),
+            "ts_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        })
+    except Exception:
+        pass
+    _GET_DIAG["last_refusal"] = rec
+    _GET_DIAG["last_attempt_class"] = rec["classe"]
+    return rec
+
+
+def _record_exception(exc, mode):
+    """Só o NOME do tipo + classe: o texto cru de erro de proxy pode trazer a URL
+    com usuário/senha do Decodo."""
+    rec = {"type": type(exc).__name__, "classe": _exception_class(exc), "rota": _rota(mode)}
+    _GET_DIAG["last_exception"] = rec
+    _GET_DIAG["last_attempt_class"] = rec["classe"]
+    return rec
+
+
+_KEY_STRIP = re.compile(r"[^A-Za-z0-9_ -]")
+
+
+def _record_schema_miss(label, url, data, expected, page=None):
+    """200 com JSON válido, mas sem a chave esperada ('seasons'/'events' em lista).
+    Ex.: {"error":{"reason":"challenge"}} servido com 200. SÓ REGISTRA: a liga segue o
+    caminho de antes (INATIVO / fim de página / falha), sem mudar guarda nem promoção.
+    Tratar isto como falha é decisão fora desta frente. Nunca levanta."""
+    rec = {"label": label, "expected": expected, "classe": "schema"}
+    try:
+        err = data.get("error") if isinstance(data, dict) else None
+        rec.update({
+            "endpoint": _endpoint(url),
+            "json_type": type(data).__name__,
+            "keys": [k for k in (_KEY_STRIP.sub("", str(k))[:40]
+                                 for k in list(data)[:10]) if k] if isinstance(data, dict) else [],
+            "reason": _sanitize_reason(err.get("reason")) if isinstance(err, dict) else None,
+        })
+        if page is not None:
+            rec["page"] = int(page)
+    except Exception:
+        pass
+    _GET_DIAG.setdefault("schema_misses", []).append(rec)
+    _GET_DIAG["last_attempt_class"] = "schema"
+    return rec
+
+
+def _schema_miss_of(label, expected):
+    for m in reversed(_GET_DIAG.get("schema_misses") or []):
+        if m.get("label") == label and m.get("expected") == expected:
+            return m
+    return None
+
+
+def _mark_failed(label):
+    if label not in _GET_DIAG["failed_tournaments"]:
+        _GET_DIAG["failed_tournaments"].append(label)
+    _GET_DIAG["failure_classes"][label] = _GET_DIAG.get("last_attempt_class") or "transporte"
+
+
+def _sofa_error_class(error):
+    """error_class do status Sofa. Sem 'Geo': nenhum 403 da Sofa provou geobloqueio."""
+    if error is None:
+        return None
+    if isinstance(error, BaseException):
+        return classify_error(error)          # quebra fora do get(): régua comum
+    if _GET_DIAG.get("circuit_open"):
+        return _GET_DIAG.get("circuit_cause") or "transporte"
+    failed = _GET_DIAG.get("failed_tournaments") or []
+    if failed:
+        return (_GET_DIAG.get("failure_classes") or {}).get(failed[-1]) or "transporte"
+    if _GET_DIAG.get("schema_misses"):
+        return "schema"                       # 200 sem a chave esperada (só rótulo)
+    return classify_error(error)              # transporte sadio, snapshot pequeno etc.
+
+
+def _dist_version(module, dist):
+    mod = sys.modules.get(module)
+    v = getattr(mod, "__version__", None) if mod is not None else None
+    if v:
+        return str(v)
+    try:
+        from importlib import metadata
+        return metadata.version(dist)
+    except Exception:
+        return None
+
+
+def _client_info():
+    """Cliente HTTP efetivo desta execução (requirements.txt não pina versão)."""
+    return {
+        "lib": "curl_cffi" if _HTTP_IMPERSONATE else "requests",
+        "curl_cffi": _dist_version("curl_cffi", "curl_cffi"),
+        "requests": _dist_version("requests", "requests"),
+        "impersonate": "chrome124" if _HTTP_IMPERSONATE else None,
+        "headers_sha16": hashlib.sha256(
+            json.dumps(H, sort_keys=True).encode("utf-8")).hexdigest()[:16],
+    }
 
 
 def _transport_get(url, proxies):
@@ -189,10 +412,14 @@ def get(url, tries=2):
                     data = r.json()
                     _GET_DIAG["last_error"] = None
                     _GET_DIAG["consecutive_failures"] = 0
+                    _GET_DIAG["last_attempt_class"] = None
                     return data
+                # D11: descreve a resposta que já chegou (corpo já está em memória)
+                refusal = _record_refusal(r, status, mode, url)
                 if status in (401, 403, 407):
                     _GET_DIAG["last_error"] = f"HTTP {status} via {mode}"
                     _GET_DIAG["circuit_open"] = True
+                    _GET_DIAG["circuit_cause"] = refusal["classe"]
                     return None
                 if status == 404:
                     _GET_DIAG["last_error"] = f"HTTP 404 via {mode}"
@@ -200,6 +427,7 @@ def get(url, tries=2):
                 _GET_DIAG["last_error"] = f"HTTP {status or '?'} via {mode}"
             except Exception as exc:
                 _GET_DIAG["last_error"] = f"{type(exc).__name__} via {mode}"
+                _record_exception(exc, mode)
             if attempt + 1 < tries:
                 time.sleep(0.8 * (attempt + 1))
     _GET_DIAG["consecutive_failures"] += 1
@@ -213,22 +441,40 @@ def get(url, tries=2):
     # dois timeouts é trocar um problema pequeno por um grande.
     if _GET_DIAG["consecutive_failures"] >= FALHAS_ATE_ABRIR:
         _GET_DIAG["circuit_open"] = True
+        _GET_DIAG["circuit_cause"] = _GET_DIAG.get("last_attempt_class") or "transporte"
         _GET_DIAG["last_error"] = f"{_GET_DIAG.get('last_error') or 'transport failure'}; circuit open"
     return None
 
 
-def season_id(utid):
+def season_id(utid, label=None):
     """Retorna (sid, api_respondeu). sid=None com api_respondeu=True = torneio SEM temporada
     ativa (encerrado/sazonal, ex: Copa do Mundo pós-final) — é INATIVO, não falha."""
-    d = get(f"https://api.sofascore.com/api/v1/unique-tournament/{utid}/seasons")
+    url = f"https://api.sofascore.com/api/v1/unique-tournament/{utid}/seasons"
+    d = get(url)
     if not isinstance(d, dict):
+        if d is not None:      # D11: 200 com JSON que não é objeto — só registra
+            _record_schema_miss(label, url, d, "seasons")
         return None, False
+    raw_seas = d.get("seasons")
+    if not isinstance(raw_seas, list) or (
+            raw_seas and not (isinstance(raw_seas[0], dict) and raw_seas[0].get("id"))):
+        # D11: sem 'seasons' em lista (ou 1ª sem id) ≠ lista vazia legítima — só registra
+        _record_schema_miss(label, url, d, "seasons")
     seas = d.get("seasons") or []
     return (seas[0].get("id") if seas else None), True
 
 
 def fetch_tournament(utid, label, max_ts=None):
-    sid, api_ok = season_id(utid)
+    # D11 (30/09): liga que NÃO chegou a ser consultada porque o disjuntor já estava
+    # aberto não é "falha de transporte" dela. Antes as 71 restantes entravam em
+    # failed_tournaments e o status mostrava 72 "falhas" para 1 requisição. A saúde
+    # da fonte não muda: circuito aberto continua impedindo a promoção.
+    if _GET_DIAG.get("circuit_open"):
+        if label not in _GET_DIAG["skipped_after_circuit"]:
+            _GET_DIAG["skipped_after_circuit"].append(label)
+        print(f"[sofa] {label} utid={utid}: não consultado (circuito aberto)")
+        return []
+    sid, api_ok = season_id(utid, label)
     if not sid:
         if api_ok:
             # Torneio sem temporada ativa → INATIVO (warning), NÃO falha do source.
@@ -237,15 +483,32 @@ def fetch_tournament(utid, label, max_ts=None):
             # travou a Mesa em 20/07/2026, quando a Copa do Mundo (16, "WC") acabou.
             if label not in _GET_DIAG["inactive_tournaments"]:
                 _GET_DIAG["inactive_tournaments"].append(label)
-            print(f"[sofa] {label} utid={utid}: sem temporada ativa → INATIVO (não bloqueia)")
+            miss = _schema_miss_of(label, "seasons")
+            if miss:
+                # D11: mesmo caminho INATIVO de antes, mas o log diz o que chegou
+                print(f"[sofa] {label} utid={utid}: 200 SEM 'seasons' válido "
+                      f"(chaves={','.join(miss.get('keys') or []) or '-'} "
+                      f"reason={miss.get('reason') or '-'}) → tratado como INATIVO "
+                      f"(não bloqueia; ver transport.schema_misses)")
+            else:
+                print(f"[sofa] {label} utid={utid}: sem temporada ativa → INATIVO (não bloqueia)")
         else:
-            if label not in _GET_DIAG["failed_tournaments"]:
-                _GET_DIAG["failed_tournaments"].append(label)
+            _mark_failed(label)
             print(f"[sofa] {label} utid={utid}: falha de transporte ({_diag_text()})")
         return []
     out = []
     for page in range(MAX_PAGES):
-        d = get(f"https://api.sofascore.com/api/v1/unique-tournament/{utid}/season/{sid}/events/next/{page}")
+        url = f"https://api.sofascore.com/api/v1/unique-tournament/{utid}/season/{sid}/events/next/{page}"
+        d = get(url)
+        if d is not None and not isinstance(d, dict):
+            _record_schema_miss(label, url, d, "events", page)   # D11: só registra
+        elif isinstance(d, dict) and not isinstance(d.get("events"), list):
+            # D11: 200 sem 'events' em lista ≠ página vazia legítima — só registra; o
+            # fluxo abaixo (break) é o mesmo de antes.
+            miss = _record_schema_miss(label, url, d, "events", page)
+            print(f"[sofa] {label} utid={utid} página {page}: 200 SEM 'events' válido "
+                  f"(chaves={','.join(miss.get('keys') or []) or '-'} "
+                  f"reason={miss.get('reason') or '-'}) → registrado em transport.schema_misses")
         if not isinstance(d, dict):
             # 404 na PRIMEIRA página de eventos futuros = temporada existe mas acabou
             # (ex.: Copa do Mundo pós-final ainda lista a season 58210, mas /events/next
@@ -255,8 +518,8 @@ def fetch_tournament(utid, label, max_ts=None):
                 if label not in _GET_DIAG["inactive_tournaments"]:
                     _GET_DIAG["inactive_tournaments"].append(label)
                 print(f"[sofa] {label} utid={utid}: sem eventos futuros (404) → INATIVO (não bloqueia)")
-            elif label not in _GET_DIAG["failed_tournaments"]:
-                _GET_DIAG["failed_tournaments"].append(label)
+            else:
+                _mark_failed(label)
             break
         evs = d.get("events") or []
         if not evs: break
@@ -317,8 +580,9 @@ def write_status(ok, n, min_required, promoted, error=None, t0=None):
         "pointer_age_h": round(age_h, 3) if age_h is not None else None,
         "duration_sec": round(time.time() - t0, 1) if t0 else None,
         "error": str(error)[:300] if error else None,
-        "error_class": classify_error(error) if error else None,
+        "error_class": _sofa_error_class(error) if error else None,
         "transport": _diag_snapshot(),
+        "client": _client_info(),
     }
     _atomic_write_text(STATUS_DIR / "sofa.json", json.dumps(st, ensure_ascii=False, indent=1))
     return st
