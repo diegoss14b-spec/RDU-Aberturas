@@ -1,16 +1,13 @@
 {
- "ts_utc": "2026-10-01T12:51:16Z",
- "ts_brt": "2026-10-01 09:51",
+ "ts_utc": "2026-10-01T13:29:16Z",
+ "ts_brt": "2026-10-01 10:29",
  "casas_ok": [
   "betano",
+  "superbet",
   "estrelabet",
   "7k"
  ],
  "casas_fail": [
-  {
-   "casa": "superbet",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=60 há 25min > n_novo=55; guarda 75min)"
-  },
   {
    "casa": "pinnacle",
    "error": "status inconsistente (pointer/n_markets)"
@@ -24,9 +21,9 @@
    "error": "0 eventos < mínimo 8 — fonte respondeu vazia/rala sem exceção (manutenção ou rate-limit da fonte?)"
   }
  ],
- "n_ok": 3,
- "n_fail": 4,
- "total_events": 178,
+ "n_ok": 4,
+ "n_fail": 3,
+ "total_events": 240,
  "per_casa": {
   "betano": {
    "ok": true,
@@ -36,7 +33,7 @@
     "Cartões": 17,
     "Chutes no gol": 8,
     "Desarmes": 3,
-    "Escanteios": 32,
+    "Escanteios": 40,
     "Faltas": 7,
     "Finalizações": 8,
     "Impedimentos": 7,
@@ -44,39 +41,39 @@
     "Tiros de meta": 3
    },
    "pointer_valid": true,
-   "pointer_file": "betano_2026-10-01_0943.jsonl",
+   "pointer_file": "betano_2026-10-01_1021.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-01T12:51:13Z"
+   "ts_utc": "2026-10-01T13:29:14Z"
   },
   "superbet": {
-   "ok": false,
-   "n_events": 55,
+   "ok": true,
+   "n_events": 62,
    "n_markets": 9,
    "market_counts": {
-    "Cartões": 20,
-    "Chutes no gol": 9,
-    "Desarmes": 4,
-    "Escanteios": 52,
-    "Faltas": 7,
-    "Finalizações": 11,
-    "Impedimentos": 7,
-    "Laterais": 4,
-    "Tiros de meta": 4
+    "Cartões": 27,
+    "Chutes no gol": 13,
+    "Desarmes": 7,
+    "Escanteios": 59,
+    "Faltas": 11,
+    "Finalizações": 15,
+    "Impedimentos": 11,
+    "Laterais": 7,
+    "Tiros de meta": 7
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-10-01_094312_551767_5757_1790858592917154165.jsonl",
-   "error": "promoção full bloqueada: feed local fresco mais rico (n=60 há 25min > n_novo=55; guarda 75min)",
-   "source_state": "protected_feed",
-   "error_class": "Other",
+   "pointer_file": "superbet_2026-10-01_102135_161209_5487_1790860895828864823.jsonl",
+   "error": null,
+   "source_state": "ok",
+   "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-01T12:43:37Z"
+   "ts_utc": "2026-10-01T13:22:07Z"
   },
   "estrelabet": {
    "ok": true,
@@ -96,8 +93,8 @@
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": true,
-   "skipped_reason": null,
+   "attempted": false,
+   "skipped_reason": "full_stride",
    "mode": "full",
    "ts_utc": "2026-10-01T12:43:53Z"
   },
@@ -121,8 +118,8 @@
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": true,
-   "skipped_reason": null,
+   "attempted": false,
+   "skipped_reason": "full_stride",
    "mode": "full",
    "ts_utc": "2026-10-01T12:47:01Z"
   },
@@ -135,18 +132,18 @@
     "Escanteios": 31
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-10-01_0915.jsonl",
+   "pointer_file": "pinnacle_2026-10-01_0950.jsonl",
    "error": null,
    "source_state": "protected_feed",
    "error_class": null,
    "attempted": false,
    "skipped_reason": "local_feed_fresh",
    "mode": "full",
-   "ts_utc": "2026-10-01T12:17:19Z"
+   "ts_utc": "2026-10-01T12:51:15Z"
   },
   "bet365": {
    "ok": false,
-   "n_events": 95,
+   "n_events": 67,
    "n_markets": 0,
    "market_counts": {},
    "pointer_valid": false,
@@ -157,7 +154,7 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-01T12:50:12Z"
+   "ts_utc": "2026-10-01T13:28:35Z"
   },
   "sportingbet": {
    "ok": false,
@@ -172,26 +169,26 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-01T12:51:16Z"
+   "ts_utc": "2026-10-01T13:29:16Z"
   }
  },
  "market_counts": {
-  "Cartões": 105,
-  "Chutes no gol": 49,
-  "Desarmes": 12,
-  "Escanteios": 150,
-  "Faltas": 31,
-  "Finalizações": 49,
-  "Impedimentos": 36,
-  "Laterais": 19,
-  "Tiros de meta": 14
+  "Cartões": 132,
+  "Chutes no gol": 62,
+  "Desarmes": 19,
+  "Escanteios": 217,
+  "Faltas": 42,
+  "Finalizações": 64,
+  "Impedimentos": 47,
+  "Laterais": 26,
+  "Tiros de meta": 21
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-10-01T12:43:30Z",
-  "ts_brt": "2026-10-01 09:43",
+  "ts_utc": "2026-10-01T13:21:50Z",
+  "ts_brt": "2026-10-01 10:21",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -201,8 +198,8 @@
   "pointer_file": "_snapshots/sofa_4d2e9450d341f0f0736b.json",
   "pointer_at": "2026-09-27T02:45:07-03:00",
   "pointer_n": 273,
-  "pointer_age_h": 102.973,
-  "duration_sec": 15.3,
+  "pointer_age_h": 103.612,
+  "duration_sec": 15.6,
   "error": "snapshot não saudável: n=0, mínimo=69; fallback preservado n=273; transporte req=1 proxy=1 direto=0 http=403:1 ultimo=HTTP 403 via proxy recusa=403:challenge@proxy circuito=1 causa=recusa_destino nao_consultados=71 esquema=0 falhas=BR-A inativos=-",
   "error_class": "recusa_destino",
   "transport": {
@@ -306,7 +303,7 @@
     "body_len": 48,
     "sha256_16": "8daa84ee218857a4",
     "reason": "challenge",
-    "ts_utc": "2026-10-01T12:43:16Z"
+    "ts_utc": "2026-10-01T13:21:36Z"
    },
    "last_exception": null,
    "schema_misses": []
@@ -319,8 +316,8 @@
    "headers_sha16": "4aff973acb161360"
   },
   "attempted": true,
-  "attempt_started_epoch": 1790858595.0706966,
-  "attempt_finished_epoch": 1790858610.464589,
+  "attempt_started_epoch": 1790860895.0271978,
+  "attempt_finished_epoch": 1790860910.8409512,
   "source_state": "failed"
  },
  "deploy_allowed": true,
