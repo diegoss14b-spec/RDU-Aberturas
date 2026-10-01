@@ -1,18 +1,18 @@
 {
  "casa": "sportingbet",
  "ok": false,
- "ts_utc": "2026-10-01T08:21:29Z",
- "ts_brt": "2026-10-01 05:21",
+ "ts_utc": "2026-10-01T09:11:29Z",
+ "ts_brt": "2026-10-01 06:11",
  "attempted": true,
  "skipped_reason": null,
- "last_decision_at": "2026-10-01T08:21:29.252431+00:00",
+ "last_decision_at": "2026-10-01T09:11:29.635801+00:00",
  "n_events": 0,
  "n_markets": 0,
  "market_counts": {},
  "min_events": 8,
- "duration_sec": 1.4,
- "error": "lista não obtida: proxy: HTTP 200: API retornou lista fixtures vazia",
- "error_class": "Other",
+ "duration_sec": 1.5,
+ "error": "lista não obtida: proxy: HTTP 403",
+ "error_class": "Geo",
  "mode": "full",
  "sample_events": [],
  "proxy_br": true,
@@ -25,23 +25,23 @@
  "transport": {
   "requests": 1,
   "http_statuses": {
-   "200": 1
+   "403": 1
   },
   "routes": {
    "proxy": 1
   },
-  "last_error": null,
-  "last_failure_kind": null,
-  "last_path": null,
-  "access_refused": false
+  "last_error": "HTTP 403",
+  "last_failure_kind": "AccessDenied",
+  "last_path": "/cds-api/bettingoffer/fixtures",
+  "access_refused": true
  },
  "listing_failures": [
   {
    "route": "proxy",
-   "reason": "HTTP 200: API retornou lista fixtures vazia",
-   "kind": "Empty"
+   "reason": "HTTP 403",
+   "kind": "AccessDenied"
   }
  ],
- "attempt_started_epoch": 1790842887.7320359,
- "attempt_finished_epoch": 1790842889.3510265
+ "attempt_started_epoch": 1790845887.8301892,
+ "attempt_finished_epoch": 1790845889.7022324
 }
