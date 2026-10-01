@@ -1,18 +1,18 @@
 {
  "casa": "sportingbet",
  "ok": false,
- "ts_utc": "2026-10-01T09:11:29Z",
- "ts_brt": "2026-10-01 06:11",
+ "ts_utc": "2026-10-01T09:56:49Z",
+ "ts_brt": "2026-10-01 06:56",
  "attempted": true,
  "skipped_reason": null,
- "last_decision_at": "2026-10-01T09:11:29.635801+00:00",
+ "last_decision_at": "2026-10-01T09:56:49.819991+00:00",
  "n_events": 0,
  "n_markets": 0,
  "market_counts": {},
  "min_events": 8,
- "duration_sec": 1.5,
- "error": "lista não obtida: proxy: HTTP 403",
- "error_class": "Geo",
+ "duration_sec": 2.3,
+ "error": "0 eventos < mínimo 8 — fonte respondeu vazia/rala sem exceção (manutenção ou rate-limit da fonte?)",
+ "error_class": "HTTP429",
  "mode": "full",
  "sample_events": [],
  "proxy_br": true,
@@ -23,25 +23,19 @@
  "promotion_blocked": [],
  "source_state": "failed",
  "transport": {
-  "requests": 1,
+  "requests": 2,
   "http_statuses": {
-   "403": 1
+   "200": 2
   },
   "routes": {
-   "proxy": 1
+   "proxy": 2
   },
-  "last_error": "HTTP 403",
-  "last_failure_kind": "AccessDenied",
-  "last_path": "/cds-api/bettingoffer/fixtures",
-  "access_refused": true
+  "last_error": null,
+  "last_failure_kind": null,
+  "last_path": null,
+  "access_refused": false
  },
- "listing_failures": [
-  {
-   "route": "proxy",
-   "reason": "HTTP 403",
-   "kind": "AccessDenied"
-  }
- ],
- "attempt_started_epoch": 1790845887.8301892,
- "attempt_finished_epoch": 1790845889.7022324
+ "listing_failures": [],
+ "attempt_started_epoch": 1790848607.3593216,
+ "attempt_finished_epoch": 1790848609.8800664
 }
