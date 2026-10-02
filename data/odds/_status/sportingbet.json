@@ -1,19 +1,19 @@
 {
  "casa": "sportingbet",
- "ok": false,
- "ts_utc": "2026-10-02T00:48:29Z",
- "ts_brt": "2026-10-01 21:48",
+ "ok": true,
+ "ts_utc": "2026-10-02T01:16:28Z",
+ "ts_brt": "2026-10-01 22:16",
  "attempted": true,
  "skipped_reason": null,
- "last_decision_at": "2026-10-02T00:48:29.226942+00:00",
+ "last_decision_at": "2026-10-02T01:16:28.483314+00:00",
  "n_events": 0,
  "n_markets": 0,
  "market_counts": {},
- "min_events": 8,
- "duration_sec": 2.0,
- "error": "0 eventos < mínimo 8 — fonte respondeu vazia/rala sem exceção (manutenção ou rate-limit da fonte?)",
- "error_class": "HTTP429",
- "mode": "full",
+ "min_events": 0,
+ "duration_sec": 2.1,
+ "error": null,
+ "error_class": null,
+ "mode": "close",
  "sample_events": [],
  "proxy_br": true,
  "pointer_valid": true,
@@ -21,14 +21,14 @@
  "pointer_at": null,
  "pointer_age_h": null,
  "promotion_blocked": [],
- "source_state": "failed",
+ "source_state": "ok",
  "transport": {
-  "requests": 2,
+  "requests": 1,
   "http_statuses": {
-   "200": 2
+   "200": 1
   },
   "routes": {
-   "proxy": 2
+   "proxy": 1
   },
   "last_error": null,
   "last_failure_kind": null,
@@ -36,6 +36,6 @@
   "access_refused": false
  },
  "listing_failures": [],
- "attempt_started_epoch": 1790902107.0804486,
- "attempt_finished_epoch": 1790902109.251291
+ "attempt_started_epoch": 1790903786.2140238,
+ "attempt_finished_epoch": 1790903788.5338535
 }
