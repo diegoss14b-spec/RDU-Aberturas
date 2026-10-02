@@ -3,8 +3,8 @@
  "ok": true,
  "ts_utc": "2026-10-02T00:31:31Z",
  "ts_brt": "2026-10-01 21:31",
- "attempted": true,
- "skipped_reason": null,
+ "attempted": false,
+ "skipped_reason": "local_feed_fresh",
  "last_decision_at": "2026-10-02T00:31:31.038126+00:00",
  "n_events": 40,
  "n_markets": 2,
@@ -24,5 +24,6 @@
  "pointer_at": "2026-10-01T21:30:05-03:00",
  "pointer_age_h": 0.024,
  "promotion_blocked": [],
- "source_state": "ok"
+ "source_state": "protected_feed",
+ "last_decision_epoch": 1790901638.340772
 }
