@@ -1,19 +1,19 @@
 {
  "casa": "sportingbet",
- "ok": true,
- "ts_utc": "2026-10-02T01:16:28Z",
- "ts_brt": "2026-10-01 22:16",
+ "ok": false,
+ "ts_utc": "2026-10-02T02:18:36Z",
+ "ts_brt": "2026-10-01 23:18",
  "attempted": true,
  "skipped_reason": null,
- "last_decision_at": "2026-10-02T01:16:28.483314+00:00",
+ "last_decision_at": "2026-10-02T02:18:36.539588+00:00",
  "n_events": 0,
  "n_markets": 0,
  "market_counts": {},
- "min_events": 0,
- "duration_sec": 2.1,
- "error": null,
- "error_class": null,
- "mode": "close",
+ "min_events": 8,
+ "duration_sec": 1.1,
+ "error": "lista não obtida: proxy: HTTP 200: API retornou lista fixtures vazia",
+ "error_class": "Other",
+ "mode": "full",
  "sample_events": [],
  "proxy_br": true,
  "pointer_valid": true,
@@ -21,7 +21,7 @@
  "pointer_at": null,
  "pointer_age_h": null,
  "promotion_blocked": [],
- "source_state": "ok",
+ "source_state": "failed",
  "transport": {
   "requests": 1,
   "http_statuses": {
@@ -35,7 +35,13 @@
   "last_path": null,
   "access_refused": false
  },
- "listing_failures": [],
- "attempt_started_epoch": 1790903786.2140238,
- "attempt_finished_epoch": 1790903788.5338535
+ "listing_failures": [
+  {
+   "route": "proxy",
+   "reason": "HTTP 200: API retornou lista fixtures vazia",
+   "kind": "Empty"
+  }
+ ],
+ "attempt_started_epoch": 1790907515.277067,
+ "attempt_finished_epoch": 1790907516.5952847
 }
