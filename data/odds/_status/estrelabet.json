@@ -3,8 +3,8 @@
  "ok": false,
  "ts_utc": "2026-10-06T00:33:30Z",
  "ts_brt": "2026-10-05 21:33",
- "attempted": true,
- "skipped_reason": null,
+ "attempted": false,
+ "skipped_reason": "full_stride",
  "last_decision_at": "2026-10-06T00:33:30.630868+00:00",
  "n_events": 79,
  "n_markets": 7,
@@ -32,7 +32,8 @@
   "mercado Faltas caiu >65%: 12 → 3 eventos",
   "mercado Impedimentos caiu >65%: 14 → 4 eventos"
  ],
- "source_state": "failed",
+ "source_state": "stale",
  "attempt_started_epoch": 1791246768.248368,
- "attempt_finished_epoch": 1791246810.6859283
+ "attempt_finished_epoch": 1791246810.6859283,
+ "last_decision_epoch": 1791255697.7118943
 }
