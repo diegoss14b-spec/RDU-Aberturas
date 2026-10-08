@@ -3,8 +3,8 @@
  "ok": true,
  "ts_utc": "2026-10-08T00:07:15Z",
  "ts_brt": "2026-10-07 21:07",
- "attempted": true,
- "skipped_reason": null,
+ "attempted": false,
+ "skipped_reason": "full_stride",
  "last_decision_at": "2026-10-08T00:07:15.885805+00:00",
  "n_events": 98,
  "n_markets": 7,
@@ -29,7 +29,8 @@
  "pointer_at": "2026-10-07T21:06:30-03:00",
  "pointer_age_h": 0.013,
  "promotion_blocked": [],
- "source_state": "ok",
+ "source_state": "stale",
  "attempt_started_epoch": 1791417990.1093261,
- "attempt_finished_epoch": 1791418035.9506872
+ "attempt_finished_epoch": 1791418035.9506872,
+ "last_decision_epoch": 1791424577.6490579
 }
