@@ -1,1 +1,1 @@
-window.OPENCLOSE={"gerado":"2026-10-09 23:48","gerado_iso":"2026-10-09T23:48:46-03:00","rows":[]};
+window.OPENCLOSE={"gerado":"2026-10-10 04:18","gerado_iso":"2026-10-10T04:18:31-03:00","rows":[]};
