@@ -3,8 +3,8 @@
  "ok": false,
  "ts_utc": "2026-10-11T18:14:46Z",
  "ts_brt": "2026-10-11 15:14",
- "attempted": true,
- "skipped_reason": null,
+ "attempted": false,
+ "skipped_reason": "full_stride",
  "last_decision_at": "2026-10-11T18:14:46.730516+00:00",
  "n_events": 110,
  "n_markets": 7,
@@ -32,7 +32,8 @@
   "mercado Desarmes caiu >65%: 21 → 7 eventos",
   "mercado Faltas caiu >65%: 21 → 7 eventos"
  ],
- "source_state": "failed",
+ "source_state": "stale",
  "attempt_started_epoch": 1791742449.6490636,
- "attempt_finished_epoch": 1791742486.7700624
+ "attempt_finished_epoch": 1791742486.7700624,
+ "last_decision_epoch": 1791748353.6294756
 }
