@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-10-12T07:34:53Z",
- "ts_brt": "2026-10-12 04:34",
+ "ts_utc": "2026-10-12T09:50:25Z",
+ "ts_brt": "2026-10-12 06:50",
  "casas_ok": [
   "pinnacle",
   "bet365"
@@ -29,7 +29,7 @@
  ],
  "n_ok": 2,
  "n_fail": 5,
- "total_events": 220,
+ "total_events": 198,
  "per_casa": {
   "betano": {
    "ok": false,
@@ -44,7 +44,7 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-12T07:34:53Z"
+   "ts_utc": "2026-10-12T09:50:25Z"
   },
   "superbet": {
    "ok": false,
@@ -54,14 +54,14 @@
     "Escanteios": 7
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-10-12_043431_976950_5701_1791790472211959464.jsonl",
+   "pointer_file": "superbet_2026-10-12_065003_916111_5674_1791798604178290679.jsonl",
    "error": "7 eventos < mínimo 10 — fonte respondeu vazia/rala sem exceção (manutenção ou rate-limit da fonte?)",
    "source_state": "failed",
    "error_class": "HTTP429",
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-12T07:34:33Z"
+   "ts_utc": "2026-10-12T09:50:06Z"
   },
   "estrelabet": {
    "ok": false,
@@ -109,36 +109,36 @@
     "Cartões": 17
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-10-12_0433.jsonl",
+   "pointer_file": "pinnacle_2026-10-12_0648.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-12T07:34:31Z"
+   "ts_utc": "2026-10-12T09:50:03Z"
   },
   "bet365": {
    "ok": true,
-   "n_events": 203,
+   "n_events": 181,
    "n_markets": 6,
    "market_counts": {
-    "Cartões": 42,
+    "Cartões": 43,
     "Chutes no gol": 38,
     "Desarmes": 6,
-    "Escanteios": 203,
+    "Escanteios": 181,
     "Finalizações": 38,
     "Impedimentos": 6
    },
    "pointer_valid": true,
-   "pointer_file": "_snapshots/bet365_full_f4cb06d3702592cd56f9.jsonl",
+   "pointer_file": "bet365_2026-10-12_0648.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": false,
-   "skipped_reason": "full_interval",
+   "attempted": true,
+   "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-12T07:07:21Z"
+   "ts_utc": "2026-10-12T09:49:08Z"
   },
   "sportingbet": {
    "ok": false,
@@ -153,14 +153,14 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-12T07:33:15Z"
+   "ts_utc": "2026-10-12T09:49:00Z"
   }
  },
  "market_counts": {
-  "Cartões": 59,
+  "Cartões": 60,
   "Chutes no gol": 38,
   "Desarmes": 6,
-  "Escanteios": 203,
+  "Escanteios": 181,
   "Finalizações": 38,
   "Impedimentos": 6
  },
@@ -168,8 +168,8 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-10-12T07:33:25Z",
-  "ts_brt": "2026-10-12 04:33",
+  "ts_utc": "2026-10-12T09:49:09Z",
+  "ts_brt": "2026-10-12 06:49",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -179,7 +179,7 @@
   "pointer_file": "_snapshots/sofa_4d2e9450d341f0f0736b.json",
   "pointer_at": "2026-09-27T02:45:07-03:00",
   "pointer_n": 273,
-  "pointer_age_h": 361.805,
+  "pointer_age_h": 364.067,
   "duration_sec": 15.3,
   "error": "snapshot não saudável: n=0, mínimo=69; fallback preservado n=273; transporte req=1 proxy=1 direto=0 http=403:1 ultimo=HTTP 403 via proxy recusa=403:challenge@proxy circuito=1 causa=recusa_destino nao_consultados=71 esquema=0 falhas=BR-A inativos=-",
   "error_class": "recusa_destino",
@@ -284,7 +284,7 @@
     "body_len": 48,
     "sha256_16": "8daa84ee218857a4",
     "reason": "challenge",
-    "ts_utc": "2026-10-12T07:33:10Z"
+    "ts_utc": "2026-10-12T09:48:55Z"
    },
    "last_exception": null,
    "schema_misses": []
@@ -297,8 +297,8 @@
    "headers_sha16": "4aff973acb161360"
   },
   "attempted": true,
-  "attempt_started_epoch": 1791790389.539497,
-  "attempt_finished_epoch": 1791790405.2580926,
+  "attempt_started_epoch": 1791798534.085097,
+  "attempt_finished_epoch": 1791798549.7014816,
   "source_state": "failed"
  },
  "deploy_allowed": true,
