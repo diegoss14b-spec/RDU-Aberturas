@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-10-12T07:08:57Z",
- "ts_brt": "2026-10-12 04:08",
+ "ts_utc": "2026-10-12T07:34:53Z",
+ "ts_brt": "2026-10-12 04:34",
  "casas_ok": [
   "pinnacle",
   "bet365"
@@ -44,7 +44,7 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-12T07:08:57Z"
+   "ts_utc": "2026-10-12T07:34:53Z"
   },
   "superbet": {
    "ok": false,
@@ -54,14 +54,14 @@
     "Escanteios": 7
    },
    "pointer_valid": true,
-   "pointer_file": "superbet_2026-10-12_040835_021886_5683_1791788915511891232.jsonl",
+   "pointer_file": "superbet_2026-10-12_043431_976950_5701_1791790472211959464.jsonl",
    "error": "7 eventos < mínimo 10 — fonte respondeu vazia/rala sem exceção (manutenção ou rate-limit da fonte?)",
    "source_state": "failed",
    "error_class": "HTTP429",
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-12T07:08:37Z"
+   "ts_utc": "2026-10-12T07:34:33Z"
   },
   "estrelabet": {
    "ok": false,
@@ -109,14 +109,14 @@
     "Cartões": 17
    },
    "pointer_valid": true,
-   "pointer_file": "pinnacle_2026-10-12_0407.jsonl",
+   "pointer_file": "pinnacle_2026-10-12_0433.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-12T07:08:34Z"
+   "ts_utc": "2026-10-12T07:34:31Z"
   },
   "bet365": {
    "ok": true,
@@ -131,14 +131,14 @@
     "Impedimentos": 6
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-10-12_0407.jsonl",
+   "pointer_file": "_snapshots/bet365_full_f4cb06d3702592cd56f9.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
-   "attempted": true,
-   "skipped_reason": null,
+   "attempted": false,
+   "skipped_reason": "full_interval",
    "mode": "full",
-   "ts_utc": "2026-10-12T07:07:36Z"
+   "ts_utc": "2026-10-12T07:07:21Z"
   },
   "sportingbet": {
    "ok": false,
@@ -153,7 +153,7 @@
    "attempted": true,
    "skipped_reason": null,
    "mode": "full",
-   "ts_utc": "2026-10-12T07:07:28Z"
+   "ts_utc": "2026-10-12T07:33:15Z"
   }
  },
  "market_counts": {
@@ -168,8 +168,8 @@
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-10-12T07:07:37Z",
-  "ts_brt": "2026-10-12 04:07",
+  "ts_utc": "2026-10-12T07:33:25Z",
+  "ts_brt": "2026-10-12 04:33",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -179,8 +179,8 @@
   "pointer_file": "_snapshots/sofa_4d2e9450d341f0f0736b.json",
   "pointer_at": "2026-09-27T02:45:07-03:00",
   "pointer_n": 273,
-  "pointer_age_h": 361.375,
-  "duration_sec": 15.4,
+  "pointer_age_h": 361.805,
+  "duration_sec": 15.3,
   "error": "snapshot não saudável: n=0, mínimo=69; fallback preservado n=273; transporte req=1 proxy=1 direto=0 http=403:1 ultimo=HTTP 403 via proxy recusa=403:challenge@proxy circuito=1 causa=recusa_destino nao_consultados=71 esquema=0 falhas=BR-A inativos=-",
   "error_class": "recusa_destino",
   "transport": {
@@ -284,7 +284,7 @@
     "body_len": 48,
     "sha256_16": "8daa84ee218857a4",
     "reason": "challenge",
-    "ts_utc": "2026-10-12T07:07:22Z"
+    "ts_utc": "2026-10-12T07:33:10Z"
    },
    "last_exception": null,
    "schema_misses": []
@@ -297,8 +297,8 @@
    "headers_sha16": "4aff973acb161360"
   },
   "attempted": true,
-  "attempt_started_epoch": 1791788841.6022298,
-  "attempt_finished_epoch": 1791788857.2614174,
+  "attempt_started_epoch": 1791790389.539497,
+  "attempt_finished_epoch": 1791790405.2580926,
   "source_state": "failed"
  },
  "deploy_allowed": true,
