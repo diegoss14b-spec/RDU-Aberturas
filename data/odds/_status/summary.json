@@ -1,6 +1,6 @@
 {
- "ts_utc": "2026-10-15T23:15:07Z",
- "ts_brt": "2026-10-15 20:15",
+ "ts_utc": "2026-10-16T00:50:44Z",
+ "ts_brt": "2026-10-15 21:50",
  "casas_ok": [
   "estrelabet",
   "pinnacle",
@@ -13,7 +13,7 @@
   },
   {
    "casa": "superbet",
-   "error": "falha consultando ate=prematch&sportId=5&startDate=2026-10-15 20:14:23&endDate=2026-10-19 20:14:23: HTTP 503"
+   "error": "falha consultando ate=prematch&sportId=5&startDate=2026-10-15 21:48:17&endDate=2026-10-19 21:48:17: HTTP 503"
   },
   {
    "casa": "7k",
@@ -26,7 +26,7 @@
  ],
  "n_ok": 3,
  "n_fail": 4,
- "total_events": 6,
+ "total_events": 337,
  "per_casa": {
   "betano": {
    "ok": false,
@@ -40,8 +40,8 @@
    "error_class": "Other",
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-15T23:15:07Z"
+   "mode": "full",
+   "ts_utc": "2026-10-16T00:50:44Z"
   },
   "superbet": {
    "ok": false,
@@ -50,36 +50,36 @@
    "market_counts": {},
    "pointer_valid": true,
    "pointer_file": null,
-   "error": "falha consultando ate=prematch&sportId=5&startDate=2026-10-15 20:14:23&endDate=2026-10-19 20:14:23: HTTP 503",
+   "error": "falha consultando ate=prematch&sportId=5&startDate=2026-10-15 21:48:17&endDate=2026-10-19 21:48:17: HTTP 503",
    "source_state": "failed",
    "error_class": "CaptureIncomplete",
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-15T23:14:34Z"
+   "mode": "full",
+   "ts_utc": "2026-10-16T00:48:31Z"
   },
   "estrelabet": {
    "ok": true,
-   "n_events": 1,
+   "n_events": 124,
    "n_markets": 7,
    "market_counts": {
-    "Cartões": 1,
-    "Chutes no gol": 1,
-    "Desarmes": 1,
-    "Escanteios": 1,
-    "Faltas": 1,
-    "Finalizações": 1,
-    "Impedimentos": 1
+    "Cartões": 96,
+    "Chutes no gol": 79,
+    "Desarmes": 34,
+    "Escanteios": 124,
+    "Faltas": 34,
+    "Finalizações": 79,
+    "Impedimentos": 39
    },
    "pointer_valid": true,
-   "pointer_file": "estrelabet_2026-10-15_2014.jsonl",
+   "pointer_file": "estrelabet_2026-10-15_2148.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-15T23:14:28Z"
+   "mode": "full",
+   "ts_utc": "2026-10-16T00:49:03Z"
   },
   "7k": {
    "ok": false,
@@ -93,43 +93,47 @@
    "error_class": "Other",
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-15T23:14:53Z"
+   "mode": "full",
+   "ts_utc": "2026-10-16T00:50:29Z"
   },
   "pinnacle": {
    "ok": true,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "n_events": 40,
+   "n_markets": 1,
+   "market_counts": {
+    "Cartões": 40
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "pinnacle_2026-10-15_2148.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-15T23:14:45Z"
+   "mode": "full",
+   "ts_utc": "2026-10-16T00:50:21Z"
   },
   "bet365": {
    "ok": true,
-   "n_events": 5,
-   "n_markets": 4,
+   "n_events": 173,
+   "n_markets": 6,
    "market_counts": {
-    "Cartões": 1,
-    "Chutes no gol": 1,
-    "Escanteios": 5,
-    "Finalizações": 1
+    "Cartões": 71,
+    "Chutes no gol": 73,
+    "Desarmes": 7,
+    "Escanteios": 173,
+    "Finalizações": 73,
+    "Impedimentos": 5
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-10-15_2014.jsonl",
+   "pointer_file": "bet365_2026-10-15_2148.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-15T23:14:23Z"
+   "mode": "full",
+   "ts_utc": "2026-10-16T00:48:29Z"
   },
   "sportingbet": {
    "ok": false,
@@ -143,25 +147,25 @@
    "error_class": "Parse",
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-15T23:14:30Z"
+   "mode": "full",
+   "ts_utc": "2026-10-16T00:48:35Z"
   }
  },
  "market_counts": {
-  "Cartões": 2,
-  "Chutes no gol": 2,
-  "Desarmes": 1,
-  "Escanteios": 6,
-  "Faltas": 1,
-  "Finalizações": 2,
-  "Impedimentos": 1
+  "Cartões": 207,
+  "Chutes no gol": 152,
+  "Desarmes": 41,
+  "Escanteios": 297,
+  "Faltas": 34,
+  "Finalizações": 152,
+  "Impedimentos": 44
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-10-15T23:14:44Z",
-  "ts_brt": "2026-10-15 20:14",
+  "ts_utc": "2026-10-16T00:48:44Z",
+  "ts_brt": "2026-10-15 21:48",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -171,8 +175,8 @@
   "pointer_file": "_snapshots/sofa_4d2e9450d341f0f0736b.json",
   "pointer_at": "2026-09-27T02:45:07-03:00",
   "pointer_n": 273,
-  "pointer_age_h": 449.494,
-  "duration_sec": 15.6,
+  "pointer_age_h": 451.061,
+  "duration_sec": 15.4,
   "error": "snapshot não saudável: n=0, mínimo=69; fallback preservado n=273; transporte req=1 proxy=1 direto=0 http=403:1 ultimo=HTTP 403 via proxy recusa=403:challenge@proxy circuito=1 causa=recusa_destino nao_consultados=71 esquema=0 falhas=BR-A inativos=-",
   "error_class": "recusa_destino",
   "transport": {
@@ -276,7 +280,7 @@
     "body_len": 48,
     "sha256_16": "8daa84ee218857a4",
     "reason": "challenge",
-    "ts_utc": "2026-10-15T23:14:30Z"
+    "ts_utc": "2026-10-16T00:48:30Z"
    },
    "last_exception": null,
    "schema_misses": []
@@ -289,11 +293,11 @@
    "headers_sha16": "4aff973acb161360"
   },
   "attempted": true,
-  "attempt_started_epoch": 1792106068.759153,
-  "attempt_finished_epoch": 1792106084.6625113,
+  "attempt_started_epoch": 1792111709.2619958,
+  "attempt_finished_epoch": 1792111724.8575118,
   "source_state": "failed"
  },
  "deploy_allowed": true,
  "reason": "ok",
- "mode": "close"
+ "mode": "full"
 }
