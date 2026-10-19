@@ -1,7 +1,8 @@
 {
- "ts_utc": "2026-10-19T06:52:54Z",
- "ts_brt": "2026-10-19 03:52",
+ "ts_utc": "2026-10-19T08:03:11Z",
+ "ts_brt": "2026-10-19 05:03",
  "casas_ok": [
+  "estrelabet",
   "pinnacle",
   "bet365"
  ],
@@ -12,11 +13,7 @@
   },
   {
    "casa": "superbet",
-   "error": "falha consultando ate=prematch&sportId=5&startDate=2026-10-19 03:52:09&endDate=2026-10-23 03:52:09: HTTP 503"
-  },
-  {
-   "casa": "estrelabet",
-   "error": "lista respondeu com 0 eventos nas DUAS rotas (manutenção/rate-limit Altenar?)"
+   "error": "falha consultando ate=prematch&sportId=5&startDate=2026-10-19 05:01:40&endDate=2026-10-23 05:01:40: HTTP 503"
   },
   {
    "casa": "7k",
@@ -27,9 +24,9 @@
    "error": "lista não obtida: proxy: ConnectionError; direct: HTTP 200 sem JSON válido"
   }
  ],
- "n_ok": 2,
- "n_fail": 5,
- "total_events": 1,
+ "n_ok": 3,
+ "n_fail": 4,
+ "total_events": 303,
  "per_casa": {
   "betano": {
    "ok": false,
@@ -43,8 +40,8 @@
    "error_class": "Other",
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-19T06:52:54Z"
+   "mode": "full",
+   "ts_utc": "2026-10-19T08:03:11Z"
   },
   "superbet": {
    "ok": false,
@@ -53,28 +50,37 @@
    "market_counts": {},
    "pointer_valid": true,
    "pointer_file": null,
-   "error": "falha consultando ate=prematch&sportId=5&startDate=2026-10-19 03:52:09&endDate=2026-10-23 03:52:09: HTTP 503",
+   "error": "falha consultando ate=prematch&sportId=5&startDate=2026-10-19 05:01:40&endDate=2026-10-23 05:01:40: HTTP 503",
    "source_state": "failed",
    "error_class": "CaptureIncomplete",
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-19T06:52:21Z"
+   "mode": "full",
+   "ts_utc": "2026-10-19T08:01:51Z"
   },
   "estrelabet": {
-   "ok": false,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "ok": true,
+   "n_events": 58,
+   "n_markets": 8,
+   "market_counts": {
+    "Cartões": 39,
+    "Chutes no gol": 34,
+    "Desarmes": 6,
+    "Escanteios": 50,
+    "Faltas": 6,
+    "Finalizações": 34,
+    "Impedimentos": 14,
+    "Tiros de meta": 1
+   },
    "pointer_valid": true,
-   "pointer_file": null,
-   "error": "lista respondeu com 0 eventos nas DUAS rotas (manutenção/rate-limit Altenar?)",
-   "source_state": "failed",
-   "error_class": "HTTP429",
+   "pointer_file": "estrelabet_2026-10-19_0501.jsonl",
+   "error": null,
+   "source_state": "ok",
+   "error_class": null,
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-19T06:52:37Z"
+   "mode": "full",
+   "ts_utc": "2026-10-19T08:02:19Z"
   },
   "7k": {
    "ok": false,
@@ -88,40 +94,47 @@
    "error_class": "Other",
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-19T06:52:45Z"
+   "mode": "full",
+   "ts_utc": "2026-10-19T08:02:57Z"
   },
   "pinnacle": {
    "ok": true,
-   "n_events": 0,
-   "n_markets": 0,
-   "market_counts": {},
+   "n_events": 13,
+   "n_markets": 1,
+   "market_counts": {
+    "Cartões": 13
+   },
    "pointer_valid": true,
-   "pointer_file": null,
+   "pointer_file": "pinnacle_2026-10-19_0501.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-19T06:52:31Z"
+   "mode": "full",
+   "ts_utc": "2026-10-19T08:02:50Z"
   },
   "bet365": {
    "ok": true,
-   "n_events": 1,
-   "n_markets": 1,
+   "n_events": 232,
+   "n_markets": 6,
    "market_counts": {
-    "Escanteios": 1
+    "Cartões": 35,
+    "Chutes no gol": 35,
+    "Desarmes": 11,
+    "Escanteios": 223,
+    "Finalizações": 35,
+    "Impedimentos": 7
    },
    "pointer_valid": true,
-   "pointer_file": "bet365_2026-10-19_0352.jsonl",
+   "pointer_file": "bet365_2026-10-19_0501.jsonl",
    "error": null,
    "source_state": "ok",
    "error_class": null,
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-19T06:52:09Z"
+   "mode": "full",
+   "ts_utc": "2026-10-19T08:01:52Z"
   },
   "sportingbet": {
    "ok": false,
@@ -135,19 +148,26 @@
    "error_class": "Parse",
    "attempted": true,
    "skipped_reason": null,
-   "mode": "close",
-   "ts_utc": "2026-10-19T06:52:16Z"
+   "mode": "full",
+   "ts_utc": "2026-10-19T08:01:55Z"
   }
  },
  "market_counts": {
-  "Escanteios": 1
+  "Cartões": 87,
+  "Chutes no gol": 69,
+  "Desarmes": 17,
+  "Escanteios": 273,
+  "Faltas": 6,
+  "Finalizações": 69,
+  "Impedimentos": 21,
+  "Tiros de meta": 1
  },
  "fixtures": {
   "casa": "sofa",
   "kind": "fixture",
   "ok": false,
-  "ts_utc": "2026-10-19T06:52:32Z",
-  "ts_brt": "2026-10-19 03:52",
+  "ts_utc": "2026-10-19T08:02:07Z",
+  "ts_brt": "2026-10-19 05:02",
   "n_events": 0,
   "n_fixtures": 0,
   "n_markets": 0,
@@ -157,8 +177,8 @@
   "pointer_file": "_snapshots/sofa_4d2e9450d341f0f0736b.json",
   "pointer_at": "2026-09-27T02:45:07-03:00",
   "pointer_n": 273,
-  "pointer_age_h": 529.124,
-  "duration_sec": 15.4,
+  "pointer_age_h": 530.284,
+  "duration_sec": 15.6,
   "error": "snapshot não saudável: n=0, mínimo=69; fallback preservado n=273; transporte req=1 proxy=1 direto=0 http=403:1 ultimo=HTTP 403 via proxy recusa=403:challenge@proxy circuito=1 causa=recusa_destino nao_consultados=71 esquema=0 falhas=BR-A inativos=-",
   "error_class": "recusa_destino",
   "transport": {
@@ -262,7 +282,7 @@
     "body_len": 48,
     "sha256_16": "8daa84ee218857a4",
     "reason": "challenge",
-    "ts_utc": "2026-10-19T06:52:17Z"
+    "ts_utc": "2026-10-19T08:01:53Z"
    },
    "last_exception": null,
    "schema_misses": []
@@ -275,11 +295,11 @@
    "headers_sha16": "4aff973acb161360"
   },
   "attempted": true,
-  "attempt_started_epoch": 1792392736.7126257,
-  "attempt_finished_epoch": 1792392752.2683742,
+  "attempt_started_epoch": 1792396911.9573865,
+  "attempt_finished_epoch": 1792396927.7533717,
   "source_state": "failed"
  },
- "deploy_allowed": false,
- "reason": "captura insuficiente: 2 casas ok, 1 eventos",
- "mode": "close"
+ "deploy_allowed": true,
+ "reason": "ok",
+ "mode": "full"
 }
